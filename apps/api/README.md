@@ -98,3 +98,36 @@ TEST_DATABASE_ADMIN_URL=postgresql+psycopg://resume:resume@localhost:5432/postgr
 - If the account cannot create databases or the configuration is missing/invalid, the run fails with an actionable message.
 
 Do not run integration tests against a developer's existing database without separate authorization.
+
+
+## Owner authentication (A0)
+
+Public health and project listing do not require admin configuration. To enable
+administration, provision all four settings in `apps/api/.env`: `OWNER_ID` (stable
+subject), `OWNER_USERNAME`, `OWNER_PASSWORD_HASH` (Argon2id), and
+`API_ACCESS_SECRET` (at least 32 random bytes). Never commit the real values.
+Generate the key locally with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+Generate the hash without putting the password in shell history:
+
+```bash
+# From apps/api/; enter the password only at the hidden prompt.
+uv run python -c 'from getpass import getpass; from argon2 import PasswordHasher; print(PasswordHasher().hash(getpass("Owner password: ")))'
+```
+
+`POST /api/v1/auth/login` accepts JSON username/password and issues a backend-only
+HS256 bearer credential. `GET /api/v1/auth/me` verifies it independently. Tokens
+expire at their original 900-second deadline; reads never renew them. No backend
+logout/refresh route exists. The Next.js logout route deletes its browser cookie;
+a copied bearer token remains valid until expiry. Rotating `API_ACCESS_SECRET`
+invalidates all outstanding tokens immediately.
+
+Login permits five attempts per fixed 300-second monotonic-clock window, including
+failed logins and unknown usernames. The concurrency-safe bucket is process-local:
+use **one worker/replica** until a shared limiter is implemented. Restart resets
+the bucket. Invalid/missing configuration gives admin endpoints a generic 503;
+public startup and liveness remain independent.
+
+`uv run pytest` covers auth without PostgreSQL, including malformed configuration,
+strict claims, absolute expiry/key rotation, rate limits and credential-free
+validation errors. PostgreSQL integration tests still require their existing
+explicit opt-in; A0 introduces no migration or database writes.

@@ -4,12 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { HealthStatus } from "@/components/health-status";
 
 const NAV_ITEMS = [
-  { label: "About", href: "#about" },
-  { label: "Skills", href: "#skills" },
-  { label: "Projects", href: "#projects" },
-  { label: "Experience", href: "#experience" },
-  { label: "Education", href: "#education" },
-  { label: "Contact", href: "#contact" },
+  { label: "About", href: "/#about" },
+  { label: "Skills", href: "/#skills" },
+  { label: "Projects", href: "/#projects" },
+  { label: "Experience", href: "/#experience" },
+  { label: "Education", href: "/#education" },
+  { label: "Contact", href: "/#contact" },
 ] as const;
 
 export function Header({ isSample }: { isSample: boolean }) {

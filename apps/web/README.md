@@ -62,3 +62,34 @@ Browser scenarios to check against the real page and the `/api/projects` proxy:
 8. Layout at 375px, 664px, and desktop widths — no clipping or horizontal overflow; long titles and technology lists wrap.
 
 Check mobile and desktop layouts, keyboard focus, and the retry control. Report any scenario that cannot run (e.g. no browser tooling) as unverified rather than inferring success from a passing build.
+
+
+## Owner sign-in (A0)
+
+Set server-only `API_BASE_URL` and `ADMIN_WEB_ORIGIN` in `apps/web/.env.local`.
+The origin must be the exact browser origin (scheme, hostname and port), without a
+path or trailing slash. For example, `http://localhost:3000` and
+`http://127.0.0.1:3000` are different origins. Production requires an HTTPS origin.
+Missing/invalid admin origin disables admin routes while public browsing works.
+Owner credentials and the signing key belong only in the FastAPI configuration.
+No Auth.js dependency, frontend signing secret or owner table is used.
+
+Visit `/auth/signin`. `/admin/projects` currently shows verified identity and
+session diagnostics only; project create/edit/delete are a later assignment.
+The browser sends JSON to the same-origin `/api/auth/login`; Next.js keeps the
+backend bearer token in a host-only HttpOnly cookie. JSON/HTML/client props contain
+only sanitized identity. Development uses `portfolio-admin`; production uses
+`__Host-portfolio-admin` with Secure, HttpOnly, SameSite=Lax and Path=/, no Domain.
+Cookie expiry is the backend's original 15-minute expiry, never sliding.
+
+Login, diagnostic and logout POSTs require an exact configured Origin and
+`X-Requested-With: online-resume-admin`; `Sec-Fetch-Site`, when present, must be
+`same-origin`. The browser supplies Origin automatically. Normal HTML forms do
+not meet this custom-header contract. Logout clears the cookie even when FastAPI
+is offline. Copied tokens remain valid until expiry or backend key rotation.
+
+Run `npm run test:auth` for the Node regression suite (uses the installed
+TypeScript compiler and real handlers; no additional test framework). It covers
+CSRF, production/development cookies, malformed payloads, expired response data,
+upstream outages, and deadlines during JSON parsing. Also run `npm run lint`,
+`npm run typecheck`, and `npm run build`.
