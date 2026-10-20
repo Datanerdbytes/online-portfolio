@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Online Resume / Portfolio",
+  title: `${resume.profile.name} | Resume & Portfolio`,
   description:
-    "Online resume and project portfolio.",
+    `${resume.profile.headline}. ${resume.profile.introduction}`,
 };
 
 export default function RootLayout({

@@ -2,9 +2,9 @@ import { resume } from "@/content/resume";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
 
 export function ContactSection() {
-  const { email, links = [] } = resume.contact;
+  const { email, phone, links = [] } = resume.contact;
   const validLinks = links.filter((link) => isAbsoluteHttpUrl(link.url));
-  const hasContact = Boolean(email) || validLinks.length > 0;
+  const hasContact = Boolean(email) || Boolean(phone) || validLinks.length > 0;
 
   return (
     <section id="contact" aria-labelledby="contact-heading" className="py-12 sm:py-24">
@@ -25,6 +25,17 @@ export function ContactSection() {
                     className="min-w-0 text-sm [overflow-wrap:anywhere] text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {email}
+                  </a>
+                </div>
+              )}
+              {phone && (
+                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:gap-4">
+                  <span className="min-w-0 text-sm text-muted-foreground">Phone</span>
+                  <a
+                    href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
+                    className="min-w-0 text-sm [overflow-wrap:anywhere] text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {phone}
                   </a>
                 </div>
               )}

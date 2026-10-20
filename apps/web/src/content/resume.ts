@@ -31,6 +31,7 @@ export type ContactLink = {
 };
 
 export type Contact = {
+  phone?: string;
   email?: string;
   links?: ContactLink[];
 };
@@ -53,72 +54,127 @@ export type ResumeContent = {
   contact: Contact;
 };
 
-// Illustrative sample content. Every entry below is a fictional example and
-// must be replaced with real resume details supplied by the owner.
-// Do not treat any name, employer, degree, date, or highlight as factual.
-// Set isSample to false for the profile and each entry when replacing examples
-// with real content. Sample labels and the page notice follow these flags.
+// Resume content supplied by the owner in Resume_PDF.pdf.
 export const resume: ResumeContent = {
-  isSample: true,
-  sampleNotice: "Illustrative sample resume — placeholder content",
-  profile: {
-    name: "Example Person",
-    headline: "Example professional headline (placeholder)",
-    introduction:
-      "Illustrative introduction. Replace this with a real summary supplied by the owner.",
-    about:
-      "This page uses clearly labeled placeholder content. It contains no real " +
-      "personal information, employers, institutions, or achievements.",
-    location: undefined,
+  "isSample": false,
+  "profile": {
+    "name": "Roel Somido",
+    "headline": "Data Analytics & Data Engineering Candidate",
+    "introduction": "B.S. Information Technology graduate specializing in end-to-end data architecture, automated pipeline engineering, cloud data warehousing, and executive business intelligence.",
+    "about": "Transitioning from technical support to Data Engineering and Analytics with hands-on experience building multi-tier Medallion pipelines, implementing dbt test suites, deploying serverless web apps, and delivering interactive Tableau dashboards.",
+    "location": "Claveria, Misamis Oriental"
   },
-  skills: [
+  "skills": [
     {
-      label: "Example skill group A",
-      items: ["Example skill 1", "Example skill 2", "Example skill 3"],
+      "label": "Data Engineering & Cloud Warehousing",
+      "items": [
+        "Medallion Architecture (Bronze/Silver/Gold)",
+        "Google BigQuery",
+        "Snowflake",
+        "dbt Core",
+        "Microsoft SQL Server",
+        "PostgreSQL",
+        "Star Schema Design",
+        "ETL/ELT Pipelines",
+        "Watermarking",
+        "Cryptographic Hashing (SHA-256)"
+      ]
     },
     {
-      label: "Example skill group B",
-      items: ["Example skill 4", "Example skill 5"],
+      "label": "Programming & Tools",
+      "items": [
+        "Python (Pandas, SQLAlchemy)",
+        "T-SQL",
+        "Docker",
+        "Google Cloud Run",
+        "GitHub Actions (CI/CD)",
+        "uv",
+        "Git/GitHub"
+      ]
     },
+    {
+      "label": "Data Visualization & Analytics",
+      "items": [
+        "Tableau (Desktop & Public)",
+        "Plotly Dash",
+        "Executive Dashboard Design",
+        "Data Storytelling",
+        "Advanced Excel (Power Query, Pivot Tables)"
+      ]
+    },
+    {
+      "label": "Core Strengths",
+      "items": [
+        "Analytical Troubleshooting",
+        "Pipeline Observability",
+        "Cross-Functional Communication"
+      ]
+    }
   ],
-  experience: [
+  "experience": [
     {
-      isSample: true,
-      id: "sample-experience-prior",
-      role: "Example prior role",
-      organization: "Example Technology Co.",
-      started: "2022-03",
-      ended: "2024-06",
-      current: false,
-      description:
-        "Illustrative role description. Replace with real details supplied by the owner.",
-      highlights: ["Example highlight one", "Example highlight two"],
+      "isSample": false,
+      "id": "exl-service-executive",
+      "role": "Executive",
+      "organization": "EXL Service",
+      "started": "2021-10",
+      "ended": "2022-10",
+      "current": false,
+      "description": "",
+      "highlights": [
+        "Managed insurance claim data and financial reimbursements with strict attention to data accuracy.",
+        "Resolved complex data discrepancies in customer accounts to ensure precise billing."
+      ]
     },
     {
-      isSample: true,
-      id: "sample-experience-current",
-      role: "Example current role",
-      organization: "Example Systems Ltd.",
-      started: "2024-07",
-      ended: undefined,
-      current: true,
-      description: "Illustrative current role description.",
-      highlights: ["Example highlight three"],
+      "isSample": false,
+      "id": "wipro-associate",
+      "role": "Associate",
+      "organization": "Wipro",
+      "started": "2019-06",
+      "ended": "2021-02",
+      "current": false,
+      "description": "",
+      "highlights": [
+        "Processed airline booking and transaction data, ensuring compliance with global distribution system standards."
+      ]
     },
+    {
+      "isSample": false,
+      "id": "concentrix-technical-support-associate",
+      "role": "Technical Support Associate",
+      "organization": "Concentrix",
+      "started": "2017-05",
+      "ended": "2017-12",
+      "current": false,
+      "description": "",
+      "highlights": [
+        "Analyzed network connectivity data to troubleshoot and resolve infrastructure issues for ISP clients."
+      ]
+    }
   ],
-  education: [
+  "education": [
     {
-      isSample: true,
-      id: "sample-education-degree",
-      qualification: "Example degree",
-      institution: "Example University",
-      started: "2018-09",
-      ended: "2022-05",
-      details: ["Example detail one"],
-    },
+      "isSample": false,
+      "id": "asian-college-information-technology",
+      "qualification": "B.S. in Information Technology",
+      "institution": "Asian College",
+      "started": "2001-06",
+      "ended": "2005-05"
+    }
   ],
-  contact: {
-    email: undefined,
-    links: [],
-  },
+  "contact": {
+    "phone": "+63 923-456-8257",
+    "email": "roel.somido@icloud.com",
+    "links": [
+      {
+        "label": "GitHub",
+        "url": "https://github.com/Datanerdbytes"
+      },
+      {
+        "label": "Tableau Public",
+        "url": "https://public.tableau.com/app/profile/roel.somido/vizzes"
+      }
+    ]
+  }
 };
