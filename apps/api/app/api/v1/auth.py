@@ -12,6 +12,7 @@ from app.core.auth import (
     DUMMY_PASSWORD_HASH,
     IdentityResponse,
     TokenResponse,
+    bearer_token_from_header,
     create_access_token,
     decode_and_verify_token,
     identity_response_from_claims,
@@ -54,10 +55,7 @@ class LoginRequest(BaseModel):
 
 
 def _get_bearer_token(authorization: str | None) -> str:
-    scheme, _, token = (authorization or "").partition(" ")
-    if scheme.lower() != "bearer" or not token or token != token.strip():
-        raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"})
-    return token
+    return bearer_token_from_header(authorization)
 
 
 @router.post("/auth/login", response_model=TokenResponse)
