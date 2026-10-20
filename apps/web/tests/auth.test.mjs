@@ -31,7 +31,13 @@ function harness(options = {}) {
         if (id === "server-only") return {};
         if (id === "next/headers") return { cookies: async () => ({ get: (name) => jar.get(name) }) };
         if (id === "next/server") return { NextResponse };
+        if (id === "@/app/api/projects/[slug]/route") return load("app/api/projects/[slug]/route");
         if (id === "@/lib/auth") return load("lib/auth");
+        if (id === "@/lib/projects") return load("lib/projects");
+        if (id === "@/lib/project-management") return load("lib/project-management");
+        if (id === "@/lib/api") return {
+          fetchProjects: async () => { throw new Error("fetchProjects not used by handler tests"); },
+        };
         throw new Error(`Unexpected import: ${id}`);
       },
       process: { env }, URL, Headers, Request, Response, Date, TextEncoder, AbortController,
@@ -189,4 +195,366 @@ test("protected check and identity require the cookie, not spoofed identity head
   assert.equal((await check.POST(mutation())).status, 200);
   assert.equal((await me.GET()).status, 200);
   assert.equal(h.timers.size, 0);
+});
+
+function project() {
+  return {
+    id: 1, slug: "resume-site", title: "Resume site", summary: "Portfolio application.",
+    technologies: ["Next.js", "FastAPI"], repository_url: null, demo_url: null,
+    display_order: 0, is_sample: false,
+  };
+}
+
+function projectRequest(path, method = "POST", body, extraHeaders = {}) {
+  return new Request(`http://localhost:3000${path}`, {
+    method,
+    headers: {
+      Origin: "http://localhost:3000", "X-Requested-With": "online-resume-admin",
+      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...extraHeaders,
+    },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  });
+}
+
+function headersOf(init) {
+  return new Headers(init.headers);
+}
+
+const detailFor = {
+  400: "Invalid request", 401: "Not authenticated", 403: "Not authorized",
+  404: "Project not found", 409: "Project already exists", 429: "Too many requests",
+  503: "Administration unavailable",
+};
+
+test("public GET /api/projects stays unauthenticated and keeps its outage contract", async () => {
+  const h = harness();
+  const { GET } = h.load("app/api/projects/route");
+  h.setFetch(async () => { throw new Error("raw upstream secret"); });
+  const response = await GET();
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.status, "unavailable");
+});
+
+test("project create requires admin configuration, authentication, CSRF and JSON", async () => {
+  const h = harness();
+  const { POST } = h.load("app/api/projects/route");
+  const base = { slug: "resume-site", title: "Resume site", summary: "Portfolio application.", technologies: ["Next.js"] };
+
+  assert.equal((await POST(projectRequest("/api/projects", "POST", base))).status, 401);
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  assert.equal((await POST(projectRequest("/api/projects", "POST", base, { Origin: "null" }))).status, 403);
+  assert.equal((await POST(projectRequest("/api/projects", "POST", base, { "X-Requested-With": "wrong" }))).status, 403);
+  assert.equal((await POST(projectRequest("/api/projects", "POST", base, { "Content-Type": "text/plain" }))).status, 400);
+  h.env.ADMIN_WEB_ORIGIN = "";
+  assert.equal((await POST(projectRequest("/api/projects", "POST", base))).status, 503);
+  h.env.ADMIN_WEB_ORIGIN = "http://localhost:3000";
+});
+
+test("project create authenticates via cookie and forwards the exact payload", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/route");
+  let upstreamAuth; let upstreamBody;
+  h.setFetch(async (_url, init) => {
+    const headers = headersOf(init);
+    upstreamAuth = headers.get("authorization");
+    upstreamBody = JSON.parse(init.body || "null");
+    assert.equal(headers.get("x-owner-id"), null);
+    return Response.json(project(), { status: 201 });
+  });
+  const response = await POST(projectRequest("/api/projects", "POST", {
+    slug: "resume-site", title: "Resume site", summary: "Portfolio application.",
+    technologies: ["Next.js", "FastAPI"], display_order: 0,
+  }));
+  assert.equal(response.status, 201);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), project());
+  assert.equal(upstreamAuth, "Bearer test-token");
+  assert.deepEqual(upstreamBody, {
+    slug: "resume-site", title: "Resume site", summary: "Portfolio application.",
+    technologies: ["Next.js", "FastAPI"], display_order: 0,
+  });
+});
+
+test("project create never sends read-only or unknown fields", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/route");
+  let upstreamCalled = false;
+  h.setFetch(async () => { upstreamCalled = true; return Response.json(project(), { status: 201 }); });
+  const base = { slug: "resume-site", title: "Resume site", summary: "Portfolio application.", technologies: ["Next.js"] };
+  for (const body of [
+    { ...base, id: 9 }, { ...base, is_sample: true }, { ...base, bogus: 1 },
+  ]) {
+    assert.equal((await POST(projectRequest("/api/projects", "POST", body))).status, 400);
+  }
+  assert.equal(upstreamCalled, false);
+});
+
+test("project create maps upstream statuses to sanitized proxy errors", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/route");
+  const base = { slug: "x", title: "t", summary: "s", technologies: ["a"] };
+  for (const [status, expected] of [[400, 400], [401, 401], [403, 403], [404, 404],
+    [409, 409], [429, 429], [503, 503], [500, 502]]) {
+    h.setFetch(async () => new Response(JSON.stringify({ detail: "raw backend detail" }), {
+      status, headers: new Headers({ "content-type": "application/json" }),
+    }));
+    const response = await POST(projectRequest("/api/projects", "POST", base));
+    assert.equal(response.status, expected);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const body = await response.json();
+    assert.deepEqual(Object.keys(body).sort(), ["detail"]);
+    assert.equal(body.detail, detailFor[expected] ?? "Projects service unavailable");
+  }
+});
+
+test("project create treats network errors, malformed payloads and stalls as outages", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/route");
+  const base = { slug: "x", title: "t", summary: "s", technologies: ["a"] };
+  for (const fetch of [
+    async () => { throw new Error("raw upstream secret"); },
+    async () => new Response("not JSON", { status: 200 }),
+    async () => new Response(JSON.stringify({ id: "not-a-number" }), { status: 201, headers: new Headers({ "content-type": "application/json" }) }),
+  ]) {
+    h.setFetch(fetch);
+    const response = await POST(projectRequest("/api/projects", "POST", base));
+    assert.equal(response.status, 502);
+    assert.equal((await response.json()).detail, "Projects service unavailable");
+    assert.equal(h.timers.size, 0);
+  }
+});
+
+test("project create deadline stays armed during body parsing", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/route");
+  let parsingStarted;
+  const started = new Promise((resolve) => { parsingStarted = resolve; });
+  h.setFetch(async (_url, init) => ({ ok: true, status: 201, json: () => new Promise((_resolve, reject) => {
+    parsingStarted();
+    init.signal.addEventListener("abort", () => reject(new Error("aborted")));
+  }) }));
+  const pending = POST(projectRequest("/api/projects", "POST", { slug: "x", title: "t", summary: "s", technologies: ["a"] }));
+  await Promise.race([started, pending.then(() => { throw new Error("Request returned before reading the body"); })]);
+  assert.equal(h.timers.size, 1);
+  [...h.timers.values()][0]();
+  assert.equal((await pending).status, 502);
+  assert.equal(h.timers.size, 0);
+});
+
+test("project PUT requires all writable fields and rejects immutable fields", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { PUT } = h.load("app/api/projects/[slug]/route");
+  const full = { title: "T", summary: "S", technologies: [], repository_url: null, demo_url: null, display_order: 3 };
+  let upstreamBody;
+  h.setFetch(async (_url, init) => {
+    upstreamBody = JSON.parse(init.body || "null");
+    return new Response(JSON.stringify(project()), { status: 200, headers: new Headers({ "content-type": "application/json" }) });
+  });
+  assert.equal((await PUT(projectRequest("/api/projects/keep", "PUT", { ...full, slug: "changed" }), { params: { slug: "keep" } })).status, 400);
+  assert.equal((await PUT(projectRequest("/api/projects/keep", "PUT", { ...full, bogus: 1 }), { params: { slug: "keep" } })).status, 400);
+  h.setFetch(async () => new Response(JSON.stringify({ detail: "raw" }), { status: 400, headers: new Headers({ "content-type": "application/json" }) }));
+  assert.equal((await PUT(projectRequest("/api/projects/keep", "PUT", full), { params: { slug: "keep" } })).status, 400);
+  h.setFetch(async () => new Response(JSON.stringify(project()), { status: 404, headers: new Headers({ "content-type": "application/json" }) }));
+  const missing = await PUT(projectRequest("/api/projects/gone", "PUT", full), { params: { slug: "gone" } });
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).detail, "Project not found");
+  h.setFetch(async (_url, init) => {
+    upstreamBody = JSON.parse(init.body || "null");
+    return new Response(JSON.stringify(project()), { status: 200, headers: new Headers({ "content-type": "application/json" }) });
+  });
+  const ok = await PUT(projectRequest("/api/projects/keep", "PUT", full), { params: { slug: "keep" } });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), project());
+  assert.deepEqual(upstreamBody, full);
+});
+
+test("project PATCH sends only changed fields, clears URLs with null, and rejects empty bodies", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { PATCH } = h.load("app/api/projects/[slug]/route");
+  assert.equal((await PATCH(projectRequest("/api/projects/keep", "PATCH", {}), { params: { slug: "keep" } })).status, 400);
+  let upstreamBody;
+  h.setFetch(async (_url, init) => {
+    upstreamBody = JSON.parse(init.body || "null");
+    return new Response(JSON.stringify(project()), { status: 200, headers: new Headers({ "content-type": "application/json" }) });
+  });
+  assert.equal((await PATCH(projectRequest("/api/projects/keep", "PATCH", { title: "Revised" }), { params: { slug: "keep" } })).status, 200);
+  assert.deepEqual(upstreamBody, { title: "Revised" });
+  assert.equal((await PATCH(projectRequest("/api/projects/keep", "PATCH", { repository_url: null }), { params: { slug: "keep" } })).status, 200);
+  assert.deepEqual(upstreamBody, { repository_url: null });
+});
+
+test("project DELETE returns empty 204 and maps 404", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { DELETE } = h.load("app/api/projects/[slug]/route");
+  h.setFetch(async () => new Response(null, { status: 204 }));
+  const response = await DELETE(projectRequest("/api/projects/keep", "DELETE", undefined), { params: { slug: "keep" } });
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.equal(await response.text(), "");
+  h.setFetch(async () => new Response(JSON.stringify({ detail: "raw" }), { status: 404, headers: new Headers({ "content-type": "application/json" }) }));
+  const missing = await DELETE(projectRequest("/api/projects/gone", "DELETE", undefined), { params: { slug: "gone" } });
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).detail, "Project not found");
+});
+
+test("project reorder validates the batch and returns the updated count", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/reorder/route");
+  let upstreamBody;
+  h.setFetch(async (_url, init) => {
+    upstreamBody = JSON.parse(init.body || "null");
+    return new Response(JSON.stringify({ updated: 2 }), { status: 200, headers: new Headers({ "content-type": "application/json" }) });
+  });
+  const response = await POST(projectRequest("/api/projects/reorder", "POST", {
+    orders: [{ slug: "resume-site", display_order: 1 }, { slug: "another-project", display_order: 2 }],
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { updated: 2 });
+  assert.deepEqual(upstreamBody, {
+    orders: [{ slug: "resume-site", display_order: 1 }, { slug: "another-project", display_order: 2 }],
+  });
+  for (const body of [
+    { orders: [] }, {}, { orders: Array.from({ length: 101 }, (_, i) => ({ slug: `s-${i}`, display_order: i })) },
+    { orders: [{ slug: "a", display_order: 1 }, { slug: "a", display_order: 2 }] },
+    { orders: [{ slug: "a", display_order: 1.5 }] },
+    { orders: [{ slug: "a", display_order: true }] },
+    { orders: [{ slug: "Bad Slug", display_order: 0 }] },
+    { commands: [] },
+  ]) {
+    assert.equal((await POST(projectRequest("/api/projects/reorder", "POST", body))).status, 400);
+  }
+  h.setFetch(async () => new Response(JSON.stringify({ updated: "two" }), { status: 200, headers: new Headers({ "content-type": "application/json" }) }));
+  const malformed = await POST(projectRequest("/api/projects/reorder", "POST", {
+    orders: [{ slug: "a", display_order: 0 }],
+  }));
+  assert.equal(malformed.status, 502);
+  assert.equal((await malformed.json()).detail, "Projects service unavailable");
+});
+
+
+test("management supports empty technologies and validates actual entries", () => {
+  const helpers = harness().load("lib/project-management");
+  assert.deepEqual(Array.from(helpers.parseTechnologies("")), []);
+  assert.deepEqual(Array.from(helpers.parseTechnologies("  ")), []);
+  assert.deepEqual(Array.from(helpers.parseTechnologies(" Next.js, FastAPI ")), ["Next.js", "FastAPI"]);
+  for (const input of ["a, a", "a,,b", "x".repeat(51), Array.from({ length: 21 }, (_, i) => `t${i}`).join(",")]) {
+    assert.equal(helpers.parseTechnologies(input), null);
+  }
+});
+
+test("reorder submits only changed targets in collections larger than 100", () => {
+  const { changedOrders } = harness().load("lib/project-management");
+  const projects = Array.from({ length: 101 }, (_, i) => ({ ...project(), id: i+1, slug: `p-${i}`, display_order: i }));
+  const result = changedOrders(projects, { "p-0": "7" });
+  assert.deepEqual(JSON.parse(JSON.stringify(result.orders)), [{ slug: "p-0", display_order: 7 }]);
+  assert.equal(changedOrders(projects, Object.fromEntries(projects.map((p) => [p.slug, "200"]))).orders, null);
+  assert.equal(changedOrders(projects, { "p-0": "" }).orders, null);
+  assert.equal(changedOrders(projects, { "p-0": "1.5" }).orders, null);
+});
+
+test("obsolete list requests are aborted and cannot publish or clear a newer request", () => {
+  const { LatestProjectRequest } = harness().load("lib/project-management");
+  const requests = new LatestProjectRequest();
+  const old = requests.start();
+  const newer = requests.start();
+  assert.equal(old.signal.aborted, true);
+  assert.equal(requests.owns(old), false);
+  requests.finish(old);
+  assert.equal(requests.owns(newer), true);
+  requests.cancel();
+  assert.equal(newer.signal.aborted, true);
+  assert.equal(requests.owns(newer), false);
+});
+
+test("admin links omit unsafe or malformed URLs", () => {
+  const { safeProjectLink } = harness().load("lib/project-management");
+  for (const value of [null, "javascript:alert(1)", "data:text/plain,x", "/relative", "https://exa mple.com", "http:/example.com"]) assert.equal(safeProjectLink(value), false);
+  assert.equal(safeProjectLink("https://example.com/repo"), true);
+});
+
+test("dynamic proxy slugs cannot alter upstream path or query", async () => {
+  const h = harness(); h.jar.set("portfolio-admin", { value: "test-token" });
+  let called = false;
+  h.setFetch(async () => { called = true; return Response.json(project()); });
+  const routes = h.load("app/api/projects/[slug]/route");
+  for (const slug of ["../auth/logout", "project/other", "project?query=1", "Upper", "", "x".repeat(101)]) {
+    for (const method of ["PUT", "PATCH", "DELETE"]) {
+      const body = method === "PUT" ? { title:"t", summary:"s", technologies:[], repository_url:null, demo_url:null, display_order:0 } : { title:"t" };
+      const response = await routes[method](projectRequest("/api/projects/x", method, body), { params: Promise.resolve({ slug }) });
+      assert.equal(response.status, 400);
+    }
+  }
+  assert.equal(called, false);
+});
+
+test("mutation proxies require exact success status instead of accepting arbitrary 2xx", async () => {
+  const h = harness(); h.jar.set("portfolio-admin", { value: "test-token" });
+  h.setFetch(async () => Response.json(project(), { status: 200 }));
+  const created = await h.load("app/api/projects/route").POST(projectRequest("/api/projects", "POST", { slug:"x", title:"t", summary:"s", technologies:[] }));
+  assert.equal(created.status, 502);
+  const removed = await h.load("app/api/projects/[slug]/route").DELETE(projectRequest("/api/projects/x", "DELETE"), { params: Promise.resolve({ slug:"x" }) });
+  assert.equal(removed.status, 502);
+});
+
+test("reorder rejects unknown entry fields and impossible or mismatched success counts", async () => {
+  const h = harness(); h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/reorder/route");
+  const input = { orders: [{ slug:"a", display_order:1 }, { slug:"b", display_order:2 }] };
+  assert.equal((await POST(projectRequest("/api/projects/reorder", "POST", { orders:[{ slug:"a", display_order:1, extra:true }] }))).status, 400);
+  for (const count of [-1, 0, 0.5, 101, 1]) {
+    h.setFetch(async () => Response.json({ updated: count }));
+    assert.equal((await POST(projectRequest("/api/projects/reorder", "POST", input))).status, 502);
+  }
+});
+
+test("project mutation responses omit upstream-only fields and reject invalid numeric fields", async () => {
+  const h = harness(); h.jar.set("portfolio-admin", { value: "test-token" });
+  const { POST } = h.load("app/api/projects/route");
+  const input = { slug:"resume-site", title:"t", summary:"s", technologies:[] };
+  h.setFetch(async () => Response.json({ ...project(), access_token:"private-upstream-token" }, { status:201 }));
+  const response = await POST(projectRequest("/api/projects", "POST", input));
+  assert.equal(response.status, 201);
+  assert.equal((await response.text()).includes("private-upstream-token"), false);
+  for (const value of [{ ...project(), id: 0 }, { ...project(), display_order: -1 }]) {
+    h.setFetch(async () => Response.json(value, { status:201 }));
+    assert.equal((await POST(projectRequest("/api/projects", "POST", input))).status, 502);
+  }
+});
+
+
+test("unmodified technology labels containing commas are preserved during partial edits", () => {
+  const { formTechnologies } = harness().load("lib/project-management");
+  const original = ["Node, platform", "FastAPI"];
+  assert.deepEqual(Array.from(formTechnologies("Node, platform, FastAPI", original)), original);
+  assert.deepEqual(Array.from(formTechnologies("Next.js", original)), ["Next.js"]);
+  assert.deepEqual(Array.from(formTechnologies("", original)), []);
+});
+
+test("the legal reorder slug supports project CRUD alongside batch POST", async () => {
+  const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-token" });
+  const route = h.load("app/api/projects/reorder/route");
+  const project = { id:1, slug:"reorder", title:"t", summary:"s", technologies:[], repository_url:null, demo_url:null, display_order:0, is_sample:false };
+  for (const method of ["PUT", "PATCH", "DELETE"]) {
+    h.setFetch(async (url, init) => {
+      assert.equal(new URL(url).pathname, "/api/v1/projects/reorder");
+      assert.equal(init.method, method);
+      return method === "DELETE" ? new Response(null, {status:204}) : Response.json(project);
+    });
+    const body = method === "DELETE" ? undefined : method === "PATCH" ? { title:"t" } : { title:"t",summary:"s",technologies:[],repository_url:null,demo_url:null,display_order:0 };
+    const response = await route[method](projectRequest("/api/projects/reorder", method, body));
+    assert.equal(response.status, method === "DELETE" ? 204 : 200);
+  }
 });
