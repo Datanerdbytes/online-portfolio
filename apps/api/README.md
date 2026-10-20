@@ -32,7 +32,19 @@ FastAPI backend for the online resume portfolio. Runs on http://localhost:8000.
 All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs` and `/openapi.json`.
 
 - `GET /api/v1/health` — `{"status": "ok"}`. Process liveness only; never claims PostgreSQL is connected.
-- `GET /api/v1/projects` — Returns `{"items": [...]}` of project entries ordered by `display_order` ascending, then `id` ascending. Returns `{"items": []}` when none exist. A database failure returns a controlled HTTP 503 without exposing connection strings or raw exceptions.
+- `GET /api/v1/projects` — Returns `{"items": [...]}` of project entries ordered by `display_order` ascending, then `id` ascending. Returns `{"items": []}` when none exist. A database failure returns a controlled HTTP 503 without exposing connection strings or raw exceptions. Public: no authentication required.
+
+## Protected project management (owner only)
+
+All mutation routes require a valid FastAPI bearer token issued by `POST /api/v1/auth/login`. Every mutation independently verifies the bearer token and owner; cookies, supplied owner headers, and frontend checks are never used for authorization. Missing/invalid/expired tokens return 401 (`WWW-Authenticate: Bearer`); tokens for a different owner return 403. When administration is unconfigured, mutations return 503.
+
+- `POST /api/v1/projects` — Create a project. Requires `slug`, `title`, `summary`, `technologies`; `repository_url`/`demo_url` default null; `display_order` defaults 0. Returns 201 with the full `ProjectResponse` including generated `id` and `is_sample:false`. `is_sample` is always false on creation and read-only thereafter. Duplicate slug (including unique-constraint races) returns a sanitized 409 after rollback.
+- `PUT /api/v1/projects/{slug}` — Full replacement of all writable fields. Every writable field is required; omitted fields fail validation. `slug`, `id`, `is_sample`, and unknown fields are rejected. `slug` is immutable; `is_sample` is preserved. Missing target returns 404. Returns 200 with the full `ProjectResponse`.
+- `PATCH /api/v1/projects/{slug}` — Partial update. Omitted fields are unchanged; null clears only the two URL fields. Null is invalid for `title`, `summary`, `technologies`, and `display_order`. An empty body is rejected. `is_sample` is preserved. Missing target returns 404. Returns 200 with the full `ProjectResponse`.
+- `DELETE /api/v1/projects/{slug}` — Deletes a project. Returns an empty 204 on success; missing target returns 404.
+- `POST /api/v1/projects/reorder` — Atomic partial batch reorder. Body `{"orders": [{"slug": "...", "display_order": N}, ...]}` (1–100 entries, unique slugs within the batch). Validates and writes in a single transaction with target rows locked; any invalid entry, duplicate slug, or missing target rejects the whole batch with no partial writes (400/404). Returns 200 `{"updated": N}`.
+
+Validation: `slug` must match `^[a-z0-9]+(?:-[a-z0-9]+)*$` (1–100 chars, not trimmed). `title` 1–200, `summary` 1–1000 (trimmed). `technologies` 0–20 items, each 1–50 chars (trimmed, deduplicated after trim, order preserved). URLs null or absolute HTTP(S) with a host, max 1024 chars; blank URLs rejected. `display_order` is a strict integer 0–2147483647; booleans, floats, and numeric strings are rejected. Unknown request fields are rejected. All error responses use `{"detail": "..."}` and never echo credentials, tokens, or request bodies.
 
 ## Project model
 
@@ -79,6 +91,13 @@ uv run pytest
 These tests do not connect to, create, modify, or drop any PostgreSQL database.
 They use dependency overrides and test doubles for API behavior, and pure
 functions for URL parsing.
+
+- `tests/test_projects_crud.py` — database-free project CRUD tests: bearer-token
+  auth enforcement, validation, null/omitted semantics, sample-marker
+  preservation, duplicate-create race (sanitized 409 after rollback), and
+  atomic-reorder rollback behavior.
+- `tests/test_projects_integration.py` — opt-in PostgreSQL tests for create
+  persistence, duplicate slug (409), and atomic reorder (no partial writes).
 
 ### Integration tests (disposable PostgreSQL database)
 

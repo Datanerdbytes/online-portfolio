@@ -68,10 +68,31 @@ def create_access_token(owner_id: str, secret: str) -> str:
     )
 
 
+def bearer_token_from_header(authorization: str | None) -> str:
+    """Extract and validate a bearer credential from an Authorization header.
+
+    FastAPI accepts bearer tokens only: no cookies, no owner headers.
+    """
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not token or token != token.strip():
+        raise HTTPException(401, "Not authenticated", headers={"WWW-Authenticate": "Bearer"})
+    return token
+
+
 def _unauthorized() -> HTTPException:
     return HTTPException(
         401, "Invalid authentication credentials", headers={"WWW-Authenticate": "Bearer"}
     )
+
+
+def verify_owner_token(authorization: str | None) -> TokenClaims:
+    """Verify an incoming bearer token independently for a protected operation.
+
+    Raises 503 when administration is unconfigured, 401 for missing/invalid/
+    expired tokens, and 403 for tokens issued for a different owner.
+    """
+    secret = secret_or_fail()
+    return decode_and_verify_token(bearer_token_from_header(authorization), secret)
 
 
 def decode_and_verify_token(token: str, secret: str) -> TokenClaims:
