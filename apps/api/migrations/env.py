@@ -3,12 +3,13 @@ import sys
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
+from app.models import Project  # noqa: E402, F401  (registers model metadata for autogeneration)
 
 config = context.config
 
@@ -18,8 +19,22 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def _get_database_url(config):
+    """Resolve the database URL for Alembic.
+
+    Integration tests set ``config.attributes["sqlalchemy.url"]`` to a
+    SQLAlchemy URL object for their unique disposable database.  The default
+    CLI path uses ``settings.DATABASE_URL``, ignoring the placeholder value
+    left in ``alembic.ini``.
+    """
+    url = config.attributes.get("sqlalchemy.url")
+    if url is not None:
+        return url
+    return settings.DATABASE_URL
+
+
 def run_migrations_offline() -> None:
-    url = settings.DATABASE_URL
+    url = _get_database_url(config)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -32,11 +47,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        {"sqlalchemy.url": settings.DATABASE_URL},
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    url = _get_database_url(config)
+    connectable = create_engine(url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(

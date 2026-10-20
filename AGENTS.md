@@ -226,3 +226,17 @@ Run checks appropriate to the assigned change; do not claim checks that were not
 - [ ] Remaining failures, unavailable tools, and unverified integration checks are reported explicitly.
 
 At planning time, Docker was installed but its engine was not running, and dependency downloads required network access beyond the restricted execution environment. These are observations, not permanent assumptions: check the current environment again when verification begins.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as markdown files under `.scratch/` in this repo. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default triage label vocabulary (five canonical roles). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain.md`.
