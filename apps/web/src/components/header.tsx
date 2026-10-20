@@ -8,10 +8,11 @@ const NAV_ITEMS = [
   { label: "Skills", href: "#skills" },
   { label: "Projects", href: "#projects" },
   { label: "Experience", href: "#experience" },
+  { label: "Education", href: "#education" },
   { label: "Contact", href: "#contact" },
 ] as const;
 
-export function Header() {
+export function Header({ isSample }: { isSample: boolean }) {
   const [open, setOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -35,9 +36,11 @@ export function Header() {
         <div className="flex h-16 items-center justify-between gap-2">
           <div className="flex min-w-0 flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2">
             <span className="whitespace-nowrap font-semibold tracking-tight">Online Resume</span>
-            <span className="text-xs text-muted-foreground uppercase tracking-wider">
-              placeholder
-            </span>
+            {isSample && (
+              <span className="text-xs text-muted-foreground uppercase tracking-wider">
+                placeholder
+              </span>
+            )}
           </div>
           <nav aria-label="Main" className="hidden md:flex items-center gap-4 shrink-0">
             {NAV_ITEMS.map((item) => (

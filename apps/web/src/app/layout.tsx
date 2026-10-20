@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { resume } from "@/content/resume";
 import { Header } from "@/components/header";
 import "./globals.css";
 
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Online Resume / Portfolio",
   description:
-    "Starter online resume and portfolio. All resume content is clearly labeled as placeholder.",
+    "Online resume and project portfolio.",
 };
 
 export default function RootLayout({
@@ -28,13 +29,14 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <Header />
+        <Header isSample={resume.isSample} />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-input bg-background py-8">
           <div className="container mx-auto px-4">
             <p className="text-center text-xs text-muted-foreground">
-              Starter online resume portfolio. All resume entries are clearly
-              labeled placeholders.
+              {resume.isSample
+                ? "Illustrative sample resume. Example entries are labeled as samples."
+                : "Online resume and portfolio."}
             </p>
           </div>
         </footer>
