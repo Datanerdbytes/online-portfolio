@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { fetchProjects } from "@/lib/api";
+import { ProjectManager } from "@/components/project-manager";
 import { AdminSessionControls } from "@/components/admin-session-controls";
 import { adminConfigurationError, readAdminToken, verifyIdentityViaBackend } from "@/lib/auth";
+import { type Project } from "@/lib/api";
+import { isProjectsResponse, projectResponse } from "@/lib/project-management";
 
 export const dynamic = "force-dynamic";
 
@@ -11,28 +15,45 @@ export default async function AdminProjectsPage() {
   if (!token) return <SignInGate />;
   const result = await verifyIdentityViaBackend(token);
   if (result.error) {
-    return [401, 403].includes(result.error.status) ? <SignInGate /> : <Unavailable hasSession />;
+    return [401, 403].includes(result.error.status) ? <SignInGate /> : <Unavailable hasSession={Boolean(token)} />;
   }
-  return <section className="mx-auto max-w-2xl space-y-6 px-4 py-8">
-    <div>
-      <h1 className="mb-2 text-2xl font-bold">Admin: Projects</h1>
-      <p className="break-words text-sm text-muted-foreground">
-        Identity verified. Owner: {result.identity.owner_id}
+  let projects: Project[] = [];
+  let listStatus: "idle" | "loading" | "ok" | "unavailable" = "idle";
+  try {
+    const data = await fetchProjects();
+    if (!isProjectsResponse(data)) throw new Error("Invalid project list");
+    projects = data.items.map(projectResponse);
+    listStatus = "ok";
+  } catch {
+    listStatus = "unavailable";
+  }
+  return (
+    <section className="mx-auto max-w-4xl space-y-6 px-4 py-8">
+      <div>
+        <h1 className="mb-2 text-2xl font-bold">Admin: Projects</h1>
+        <p className="break-words text-sm text-muted-foreground">
+          Identity verified. Owner: {result.identity.owner_id}
+        </p>
+      </div>
+      <div className="space-y-2 rounded-md border p-4">
+        <h2 className="font-semibold">Session status</h2>
+        <p className="text-sm">Authenticated</p>
+        <p className="break-words text-sm text-muted-foreground">Session expires at:{" "}
+          <time dateTime={new Date(result.identity.expires_at * 1000).toISOString()}>
+            {new Date(result.identity.expires_at * 1000).toISOString()}
+          </time>
+        </p>
+        <p className="text-sm text-muted-foreground">Sign in again after 15 minutes. Activity does not extend your session.</p>
+      </div>
+      <AdminSessionControls />
+      <ProjectManager initialProjects={projects} initialListStatus={listStatus} />
+      <p className="text-sm text-muted-foreground">
+        <Link href="/" className="underline focus-visible:outline-2 focus-visible:outline-offset-4">
+          Return to public resume
+        </Link>
       </p>
-    </div>
-    <div className="space-y-2 rounded-md border p-4">
-      <h2 className="font-semibold">Session status</h2>
-      <p className="text-sm">Authenticated</p>
-      <p className="break-words text-sm text-muted-foreground">Session expires at:{" "}
-        <time dateTime={new Date(result.identity.expires_at * 1000).toISOString()}>
-          {new Date(result.identity.expires_at * 1000).toISOString()}
-        </time>
-      </p>
-      <p className="text-sm text-muted-foreground">Sign in again after 15 minutes. Activity does not extend your session.</p>
-    </div>
-    <AdminSessionControls />
-    <p className="text-sm text-muted-foreground">Project management will be added in the next phase.</p>
-  </section>;
+    </section>
+  );
 }
 
 function SignInGate() {
