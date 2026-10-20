@@ -74,6 +74,8 @@ cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 ```
 
+The defaults run a public-only site. To enable the project administration interface, provision the four owner values in `apps/api/.env` and set `ADMIN_WEB_ORIGIN` in `apps/web/.env.local` — see [Administration](#administration).
+
 ### 4. Run database migrations
 
 **Starting directory:** repository root (the subshell runs Alembic from `apps/api`, then returns to root)
@@ -161,9 +163,81 @@ All backend commands run from `apps/api` so that `app.core.config` loads `apps/a
 | `npm run format`        | Format all files with Prettier |
 | `npm run format:check`  | Check formatting with Prettier |
 
+## Administration
+
+Project administration is optional. Without owner configuration the site stays public-only and the administration routes are disabled.
+
+### Backend owner configuration (apps/api/.env)
+
+All four values must be provisioned together. A partial configuration fails closed: administration is disabled while public browsing keeps working.
+
+| Variable              | Purpose                                                                       |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `API_ACCESS_SECRET`   | HMAC signing secret for owner access tokens; at least 32 bytes of random data |
+| `OWNER_ID`            | Stable identifier shown in the administration interface                       |
+| `OWNER_USERNAME`      | Login name for the owner account                                              |
+| `OWNER_PASSWORD_HASH` | Argon2id hash of the owner password; the plaintext password is never stored   |
+
+Generate the password hash out of band and keep the plaintext out of every environment file:
+
+```bash
+cd apps/api
+uv run python -c "from argon2 import PasswordHasher; print(PasswordHasher().hash('change-me'))"
+```
+
+### Frontend configuration (apps/web/.env.local)
+
+`ADMIN_WEB_ORIGIN` must match the scheme, host, and port of the public site exactly — no trailing slash and no path. It is read on the server only and is never exposed through a `NEXT_PUBLIC_` variable.
+
+- Development: a plain-HTTP origin such as `http://localhost:3000` is accepted.
+- Production: the origin must use HTTPS. A plain-HTTP origin is rejected, because the session cookie is issued as `__Host-portfolio-admin` with the `Secure` attribute and could not be set over HTTP.
+
+A missing or invalid origin disables the administration routes (`Administration unavailable`) while public browsing keeps working.
+
+### Signing in
+
+1. Open `/auth/signin` and enter the owner username and password.
+2. The Next.js server route forwards the credentials to `POST /api/v1/auth/login`, the backend verifies them against `OWNER_PASSWORD_HASH`, and the returned token is stored in an HttpOnly, `SameSite=Lax` cookie. The browser never receives the token.
+3. Every mutation is re-authorized by the backend against that token, and the frontend proxies reject requests that do not come from the exact configured origin.
+4. Sessions last 15 minutes and are not extended by activity, so sign in again after expiry.
+
+The login limiter is process-local: 5 attempts per 300 seconds per process, counting successful and failed attempts. Run a single backend worker or replica, otherwise the effective limit scales with the number of workers.
+
 ## API Endpoints
 
-- `GET /api/v1/health` — Health check (returns `{"status": "ok"}`); process liveness only, not a database connectivity check.
+### Backend (apps/api)
+
+| Method   | Path                       | Access       | Description                                                                    |
+| -------- | -------------------------- | ------------ | ------------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/health`           | Public       | Health check (`{"status": "ok"}`); process liveness only, not a database check |
+| `GET`    | `/api/v1/projects`         | Public       | Project list for the landing page                                              |
+| `POST`   | `/api/v1/auth/login`       | Public       | Verify owner credentials and issue a short-lived access token                  |
+| `GET`    | `/api/v1/auth/me`          | Bearer token | Return the verified owner identity and token expiry                            |
+| `POST`   | `/api/v1/projects`         | Bearer token | Create a project (`is_sample` is always `false`)                               |
+| `PUT`    | `/api/v1/projects/{slug}`  | Bearer token | Replace the mutable fields of a project                                        |
+| `PATCH`  | `/api/v1/projects/{slug}`  | Bearer token | Partially update a project; `is_sample` is preserved                           |
+| `DELETE` | `/api/v1/projects/{slug}`  | Bearer token | Delete a project                                                               |
+| `POST`   | `/api/v1/projects/reorder` | Bearer token | Atomically update `display_order` for a batch of slugs; no partial writes      |
+
+OpenAPI documentation is served at `/docs`, with the raw schema at `/openapi.json`.
+
+### Frontend (apps/web)
+
+| Method   | Path                    | Description                                         |
+| -------- | ----------------------- | --------------------------------------------------- |
+| `GET`    | `/api/health`           | Backend liveness proxy                              |
+| `GET`    | `/api/projects`         | Public project list                                 |
+| `POST`   | `/api/projects`         | Authenticated create proxy                          |
+| `PUT`    | `/api/projects/[slug]`  | Authenticated replace proxy                         |
+| `PATCH`  | `/api/projects/[slug]`  | Authenticated partial-update proxy                  |
+| `DELETE` | `/api/projects/[slug]`  | Authenticated delete proxy                          |
+| `POST`   | `/api/projects/reorder` | Authenticated reorder proxy                         |
+| `POST`   | `/api/auth/login`       | Credential proxy that sets the session cookie       |
+| `POST`   | `/api/auth/logout`      | Clears the session cookie                           |
+| `GET`    | `/api/auth/me`          | Identity check used by the administration interface |
+| `POST`   | `/api/auth/check`       | Session status check                                |
+
+Mutation proxies require the exact `ADMIN_WEB_ORIGIN` `Origin`, a custom request header, and a same-origin `Sec-Fetch-Site` value. They never accept a bearer token from the browser.
 
 ## Environment Variables
 
@@ -171,19 +245,28 @@ All backend commands run from `apps/api` so that `app.core.config` loads `apps/a
 
 Loaded from the `apps/api/` working directory by `pydantic-settings`.
 
-| Variable       | Description                                                                                | Default                                                    |
-| -------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `DATABASE_URL` | PostgreSQL connection string (`postgresql+psycopg` driver, used by SQLAlchemy and Alembic) | `postgresql+psycopg://resume:resume@localhost:5432/resume` |
-| `API_HOST`     | Host to bind                                                                               | `0.0.0.0`                                                  |
-| `API_PORT`     | Port to bind                                                                               | `8000`                                                     |
+| Variable              | Description                                                                                | Default                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `DATABASE_URL`        | PostgreSQL connection string (`postgresql+psycopg` driver, used by SQLAlchemy and Alembic) | `postgresql+psycopg://resume:resume@localhost:5432/resume` |
+| `API_HOST`            | Host to bind                                                                               | `0.0.0.0`                                                  |
+| `API_PORT`            | Port to bind                                                                               | `8000`                                                     |
+| `API_ACCESS_SECRET`   | Optional. HMAC signing secret for owner access tokens; at least 32 bytes of random data    | unset (administration disabled)                            |
+| `OWNER_ID`            | Optional. Stable identifier for the owner account                                          | unset (administration disabled)                            |
+| `OWNER_USERNAME`      | Optional. Owner login name                                                                 | unset (administration disabled)                            |
+| `OWNER_PASSWORD_HASH` | Optional. Argon2id hash of the owner password; provision out of band                       | unset (administration disabled)                            |
+
+The four administration variables must be provided together. A partial configuration fails closed: the administration routes report `Administration unavailable` and the public site keeps working.
 
 ### Frontend (apps/web/.env.local)
 
 Loaded by Next.js in development from `apps/web/`. Copied from `apps/web/.env.example` (which documents `.env.local`, not `.env`).
 
-| Variable       | Description                                                          | Default                 |
-| -------------- | -------------------------------------------------------------------- | ----------------------- |
-| `API_BASE_URL` | Backend base URL; server-side only, never exposed via `NEXT_PUBLIC_` | `http://localhost:8000` |
+| Variable           | Description                                                                               | Default                         |
+| ------------------ | ----------------------------------------------------------------------------------------- | ------------------------------- |
+| `API_BASE_URL`     | Backend base URL; server-side only, never exposed via `NEXT_PUBLIC_`                      | `http://localhost:8000`         |
+| `ADMIN_WEB_ORIGIN` | Exact public origin of the site (scheme, host, port; no trailing slash); server-side only | unset (administration disabled) |
+
+`ADMIN_WEB_ORIGIN` must use HTTPS in production; a plain-HTTP origin is rejected because the session cookie is issued as `__Host-portfolio-admin` with the `Secure` attribute. A missing or invalid origin disables the administration routes while public browsing keeps working.
 
 ## Docker Compose
 
