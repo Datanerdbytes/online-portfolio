@@ -6,10 +6,6 @@ export type ResumeContent = {
     label: string;
     items: string[];
   }[];
-  projects: {
-    label: string;
-    items: Project[];
-  }[];
   experience: {
     label: string;
     items: Experience[];
@@ -18,12 +14,6 @@ export type ResumeContent = {
     label: string;
     note: string;
   };
-};
-
-export type Project = {
-  name: string;
-  description: string;
-  stack: string[];
 };
 
 export type Experience = {
@@ -46,19 +36,6 @@ export const resume: ResumeContent = {
     {
       label: "Example skill area (placeholder)",
       items: ["Example skill 1", "Example skill 2", "Example skill 3"],
-    },
-  ],
-  projects: [
-    {
-      label: "Selected projects (placeholder)",
-      items: [
-        {
-          name: "Example project",
-          description:
-            "This project entry is a placeholder. Replace with a real project.",
-          stack: ["Next.js", "TypeScript", "Tailwind CSS"],
-        },
-      ],
     },
   ],
   experience: [

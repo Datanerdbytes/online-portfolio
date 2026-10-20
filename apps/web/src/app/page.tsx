@@ -3,13 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { HealthStatus } from "@/components/health-status";
+import { ProjectsClient } from "@/components/projects";
 
 export default function Home() {
   return (
@@ -77,27 +76,7 @@ export default function Home() {
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
             Selected projects
           </h2>
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {resume.projects.flatMap((group) =>
-              group.items.map((project) => (
-                <Card key={project.name}>
-                  <CardHeader>
-                    <CardTitle>{project.name}</CardTitle>
-                    <CardDescription>{project.description}</CardDescription>
-                  </CardHeader>
-                  <CardFooter>
-                    <div className="flex flex-wrap gap-2">
-                      {project.stack.map((tech) => (
-                        <Badge key={tech} variant="outline">
-                          {tech}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardFooter>
-                </Card>
-              )),
-            )}
-          </div>
+          <ProjectsClient />
         </div>
       </section>
 
