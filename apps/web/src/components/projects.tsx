@@ -89,11 +89,11 @@ function ProjectLinks({ project }: { project: Project }) {
 
 function ProjectCard({ project }: { project: Project }) {
   return (
-    <Card key={project.id} className="min-w-0">
+    <Card key={project.id} className="row-span-3 grid min-w-0 grid-cols-1 grid-rows-subgrid gap-0">
       <CardHeader>
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex flex-col gap-2 min-w-0">
           <CardTitle className="min-w-0 break-words">{project.title}</CardTitle>
-          {project.is_sample && <Badge variant="outline">Sample</Badge>}
+          {project.is_sample && <Badge variant="outline" className="w-fit">Sample</Badge>}
         </div>
         <CardDescription className="break-words">{project.summary}</CardDescription>
       </CardHeader>

@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { HealthStatus } from "@/components/health-status";
 import { ProjectsClient } from "@/components/projects";
 
 export default function Home() {
@@ -25,9 +24,6 @@ export default function Home() {
             <p className="mt-6 text-lg text-muted-foreground">
               {resume.intro}
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <HealthStatus />
-            </div>
           </div>
         </div>
       </section>
