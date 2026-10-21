@@ -6,7 +6,8 @@ import {
   MapPin,
   ChartNoAxesCombined,
 } from "lucide-react";
-import { resume } from "@/content/resume";
+import { resume as staticResume } from "@/content/resume";
+import { fetchResume } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ContactSection } from "@/components/contact-section";
 import { EducationSection } from "@/components/education-section";
@@ -15,7 +16,61 @@ import { HealthStatus } from "@/components/health-status";
 import { ProjectsClient } from "@/components/projects";
 import { SkillsSection } from "@/components/skills-section";
 
-export default function Home() {
+export default async function Home() {
+  // Fetch live resume from the API; fall back to the static file if unavailable.
+  const apiResume = await fetchResume();
+
+  const profile = apiResume?.profile ?? {
+    id: 0,
+    name: staticResume.profile.name,
+    headline: staticResume.profile.headline,
+    introduction: staticResume.profile.introduction,
+    about: staticResume.profile.about,
+    location: staticResume.profile.location ?? null,
+  };
+
+  const skills = apiResume?.skills ?? staticResume.skills.map((g, gi) => ({
+    id: gi,
+    label: g.label,
+    display_order: gi,
+    items: g.items.map((item, ii) => ({ id: ii, item, display_order: ii })),
+  }));
+
+  const experience = apiResume?.experience ?? staticResume.experience.map((e, i) => ({
+    id: i,
+    slug: e.id,
+    role: e.role,
+    organization: e.organization,
+    started: e.started,
+    ended: e.ended ?? null,
+    current: e.current,
+    description: e.description,
+    display_order: i,
+    highlights: (e.highlights ?? []).map((text, hi) => ({ id: hi, text, display_order: hi })),
+  }));
+
+  const education = apiResume?.education ?? staticResume.education.map((e, i) => ({
+    id: i,
+    slug: e.id,
+    qualification: e.qualification,
+    institution: e.institution,
+    started: e.started ?? null,
+    ended: e.ended ?? null,
+    display_order: i,
+  }));
+
+  const contact = apiResume?.contact ?? {
+    id: 0,
+    phone: staticResume.contact.phone ?? null,
+    email: staticResume.contact.email ?? null,
+    links: (staticResume.contact.links ?? []).map((l, i) => ({
+      id: i,
+      label: l.label,
+      url: l.url,
+      display_order: i,
+    })),
+  };
+
   return (
     <>
       <section
@@ -26,17 +81,12 @@ export default function Home() {
         <div className="content-width hero-grid">
           <div className="hero-copy">
             <p className="eyebrow">Hello, welcome to my portfolio</p>
-            {resume.isSample && (
-              <p className="sample-notice">
-                {resume.sampleNotice ?? "Placeholder resume content"}
-              </p>
-            )}
             <h1 id="intro-heading">
-              {resume.profile.name}
+              {profile.name}
               <span className="text-primary">.</span>
             </h1>
-            <p className="hero-headline">{resume.profile.headline}</p>
-            <p className="hero-description">{resume.profile.introduction}</p>
+            <p className="hero-headline">{profile.headline}</p>
+            <p className="hero-description">{profile.introduction}</p>
             <div className="hero-actions">
               <Button asChild size="lg">
                 <a href="#projects">
@@ -51,10 +101,10 @@ export default function Home() {
                 </a>
               </Button>
             </div>
-            {resume.profile.location && (
+            {profile.location && (
               <p className="hero-location">
                 <MapPin size={15} aria-hidden="true" />
-                {resume.profile.location}
+                {profile.location}
               </p>
             )}
           </div>
@@ -122,7 +172,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <SkillsSection />
+      <SkillsSection about={profile.about} skills={skills} />
       <section
         id="projects"
         aria-labelledby="projects-heading"
@@ -139,9 +189,9 @@ export default function Home() {
           <ProjectsClient />
         </div>
       </section>
-      <ExperienceSection />
-      <EducationSection />
-      <ContactSection />
+      <ExperienceSection experience={experience} />
+      <EducationSection education={education} />
+      <ContactSection contact={contact} />
       <div className="content-width system-status">
         <span>Behind this portfolio</span>
         <HealthStatus />

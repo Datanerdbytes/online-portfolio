@@ -1,9 +1,14 @@
 import { Database, CodeXml, ChartNoAxesCombined, Workflow } from "lucide-react";
-import { resume } from "@/content/resume";
+import type { ApiSkillGroup } from "@/lib/api";
 
 const icons = [Database, CodeXml, ChartNoAxesCombined, Workflow];
 
-export function SkillsSection() {
+type Props = {
+  about: string;
+  skills: ApiSkillGroup[];
+};
+
+export function SkillsSection({ about, skills }: Props) {
   return (
     <section
       id="skills"
@@ -15,15 +20,15 @@ export function SkillsSection() {
         <h2 id="skills-heading" className="section-heading">
           Turning data into understanding
         </h2>
-        <p className="section-description">{resume.profile.about}</p>
-        {resume.skills.length === 0 ? (
+        <p className="section-description">{about}</p>
+        {skills.length === 0 ? (
           <p className="section-description">No skill groups defined.</p>
         ) : (
           <div className="skills-grid">
-            {resume.skills.map((group, index) => {
+            {skills.map((group, index) => {
               const Icon = icons[index % icons.length];
               return (
-                <div key={group.label} className="skill-group">
+                <div key={group.id} className="skill-group">
                   <span
                     className={`skill-icon skill-color-${index % icons.length}`}
                   >
@@ -32,7 +37,7 @@ export function SkillsSection() {
                   <h3>{group.label}</h3>
                   <ul>
                     {group.items.map((skill) => (
-                      <li key={skill}>{skill}</li>
+                      <li key={skill.id}>{skill.item}</li>
                     ))}
                   </ul>
                 </div>

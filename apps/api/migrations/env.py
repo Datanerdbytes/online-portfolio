@@ -10,6 +10,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.models import Project  # noqa: E402, F401  (registers model metadata for autogeneration)
+from app.models.resume import (  # noqa: E402, F401
+    Profile,
+    SkillGroup,
+    SkillItem,
+    Experience,
+    ExperienceHighlight,
+    Education,
+    Contact,
+    ContactLink,
+)
 
 config = context.config
 

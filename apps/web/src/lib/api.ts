@@ -1,6 +1,94 @@
 export const API_BASE_URL =
   process.env.API_BASE_URL || "http://localhost:8000";
 
+// ---------------------------------------------------------------------------
+// Resume types (mirrors the FastAPI response schemas)
+// ---------------------------------------------------------------------------
+
+export type ApiProfile = {
+  id: number;
+  name: string;
+  headline: string;
+  introduction: string;
+  about: string;
+  location: string | null;
+};
+
+export type ApiSkillItem = { id: number; item: string; display_order: number };
+export type ApiSkillGroup = {
+  id: number;
+  label: string;
+  display_order: number;
+  items: ApiSkillItem[];
+};
+
+export type ApiHighlight = { id: number; text: string; display_order: number };
+export type ApiExperience = {
+  id: number;
+  slug: string;
+  role: string;
+  organization: string;
+  started: string;
+  ended: string | null;
+  current: boolean;
+  description: string;
+  display_order: number;
+  highlights: ApiHighlight[];
+};
+
+export type ApiEducation = {
+  id: number;
+  slug: string;
+  qualification: string;
+  institution: string;
+  started: string | null;
+  ended: string | null;
+  display_order: number;
+};
+
+export type ApiContactLink = {
+  id: number;
+  label: string;
+  url: string;
+  display_order: number;
+};
+export type ApiContact = {
+  id: number;
+  phone: string | null;
+  email: string | null;
+  links: ApiContactLink[];
+};
+
+export type ApiResume = {
+  profile: ApiProfile | null;
+  skills: ApiSkillGroup[];
+  experience: ApiExperience[];
+  education: ApiEducation[];
+  contact: ApiContact | null;
+};
+
+const RESUME_TIMEOUT_MS = 5000;
+
+export async function fetchResume(): Promise<ApiResume | null> {
+  let controller: AbortController | null = null;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    controller = new AbortController();
+    timeout = setTimeout(() => controller?.abort(), RESUME_TIMEOUT_MS);
+    const response = await fetch(`${API_BASE_URL}/api/v1/resume`, {
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as ApiResume;
+  } catch {
+    return null;
+  } finally {
+    if (timeout !== null) clearTimeout(timeout);
+    controller = null;
+  }
+}
+
 export type HealthStatus = { status: string } | null;
 
 export type Project = {

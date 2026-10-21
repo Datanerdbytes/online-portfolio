@@ -33,6 +33,45 @@ type HeaderProps = {
   links: { label: string; url: string }[];
 };
 
+/** Shows an Admin link only when the session cookie is present. */
+function AdminLink() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const hasSession = document.cookie
+      .split(";")
+      .some(
+        (c) =>
+          c.trim().startsWith("portfolio-admin=") ||
+          c.trim().startsWith("__Host-portfolio-admin="),
+      );
+    setShow(hasSession);
+  }, []);
+  if (!show) return null;
+  return (
+    <Link
+      href="/admin/resume"
+      aria-label="Admin panel"
+      title="Admin panel"
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        fontSize: "0.65rem",
+        fontWeight: 600,
+        lineHeight: 1,
+        padding: "2px 5px",
+        borderRadius: "4px",
+        background: "var(--primary)",
+        color: "var(--primary-foreground)",
+        textDecoration: "none",
+        letterSpacing: "0.04em",
+      }}
+    >
+      ADMIN
+    </Link>
+  );
+}
+
 export function Header({
   name,
   headline,
@@ -110,8 +149,11 @@ export function Header({
         className={`sidebar-content ${open ? "is-open" : ""}`}
       >
         <div className="sidebar-profile">
-          <div className="profile-monogram" aria-hidden="true">
-            {initials}
+          <div className="sidebar-profile-top">
+            <div className="profile-monogram" aria-hidden="true">
+              {initials}
+            </div>
+            <AdminLink />
           </div>
           <p className="sidebar-headline">{headline}</p>
           {isSample && <p className="sidebar-sample">Placeholder profile</p>}

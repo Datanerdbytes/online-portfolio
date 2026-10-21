@@ -1,11 +1,17 @@
 import { ArrowUpRight, Mail, Phone } from "lucide-react";
-import { resume } from "@/content/resume";
+import type { ApiContact } from "@/lib/api";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
 import { Button } from "@/components/ui/button";
 
-export function ContactSection() {
-  const { email, phone, links = [] } = resume.contact;
-  const validLinks = links.filter((link) => isAbsoluteHttpUrl(link.url));
+type Props = {
+  contact: ApiContact | null;
+};
+
+export function ContactSection({ contact }: Props) {
+  const email = contact?.email ?? null;
+  const phone = contact?.phone ?? null;
+  const links = (contact?.links ?? []).filter((l) => isAbsoluteHttpUrl(l.url));
+
   return (
     <section
       id="contact"
@@ -16,7 +22,7 @@ export function ContactSection() {
         <div>
           <p className="eyebrow">Have something in mind?</p>
           <h2 id="contact-heading" className="section-heading">
-            Let’s connect.
+            Let's connect.
           </h2>
           <p className="section-description">
             Start a conversation about data, technology, or an opportunity to
@@ -48,9 +54,9 @@ export function ContactSection() {
             </a>
           )}
           <div className="contact-socials">
-            {validLinks.map((link) => (
+            {links.map((link) => (
               <a
-                key={link.url}
+                key={link.id}
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -60,7 +66,7 @@ export function ContactSection() {
               </a>
             ))}
           </div>
-          {!email && !phone && !validLinks.length && (
+          {!email && !phone && !links.length && (
             <p className="section-description">
               Contact details will be added here.
             </p>

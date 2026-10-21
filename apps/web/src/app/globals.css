@@ -220,6 +220,11 @@ h3 {
 .sidebar-profile {
   text-align: center;
 }
+.sidebar-profile-top {
+  position: relative;
+  display: inline-block;
+}
+
 .profile-monogram {
   display: grid;
   place-items: center;

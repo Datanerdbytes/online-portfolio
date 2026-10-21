@@ -1,9 +1,12 @@
 import { GraduationCap } from "lucide-react";
-import { resume } from "@/content/resume";
-import { Badge } from "@/components/ui/badge";
+import type { ApiEducation } from "@/lib/api";
 import { formatEducationPeriod } from "@/lib/resume";
 
-export function EducationSection() {
+type Props = {
+  education: ApiEducation[];
+};
+
+export function EducationSection({ education }: Props) {
   return (
     <section
       id="education"
@@ -15,28 +18,18 @@ export function EducationSection() {
         <h2 id="education-heading" className="section-heading">
           Education
         </h2>
-        {resume.education.length === 0 ? (
+        {education.length === 0 ? (
           <p className="section-description">No education entries defined.</p>
         ) : (
           <div className="education-list">
-            {resume.education.map((entry) => (
+            {education.map((entry) => (
               <article key={entry.id} className="education-entry">
                 <span className="education-icon">
                   <GraduationCap size={25} aria-hidden="true" />
                 </span>
                 <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3>{entry.qualification}</h3>
-                    {entry.isSample && <Badge variant="outline">Sample</Badge>}
-                  </div>
+                  <h3>{entry.qualification}</h3>
                   <p>{entry.institution}</p>
-                  {!!entry.details?.length && (
-                    <ul>
-                      {entry.details.map((detail) => (
-                        <li key={detail}>{detail}</li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
                 <p className="education-period">
                   {formatEducationPeriod(entry)}
