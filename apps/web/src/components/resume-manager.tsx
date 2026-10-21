@@ -156,11 +156,10 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
 // ---------------------------------------------------------------------------
 
 function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
-  const [editingItem, setEditingItem] = useState<{
-    id: number;
-    item: string;
-  } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: number; item: string } | null>(null);
   const [itemValue, setItemValue] = useState("");
+  const [addingToGroup, setAddingToGroup] = useState<number | null>(null);
+  const [newItemValue, setNewItemValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -169,9 +168,7 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
     if (!editingItem) return;
     setSaving(true);
     setMessage("");
-    const result = await apiPatch(`/skills/items/${editingItem.id}`, {
-      item: itemValue,
-    });
+    const result = await apiPatch(`/skills/items/${editingItem.id}`, { item: itemValue });
     setSaving(false);
     if (result.ok) {
       setIsError(false);
@@ -182,6 +179,39 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
       setMessage(statusMessage(result.status));
     }
   }, [editingItem, itemValue]);
+
+  const addItem = useCallback(async (groupId: number) => {
+    if (!newItemValue.trim()) return;
+    setSaving(true);
+    setMessage("");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(`/api/resume/skills/${groupId}/items`, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({ item: newItemValue.trim(), display_order: 999 }),
+        signal: controller.signal,
+        cache: "no-store",
+      });
+      clearTimeout(timeout);
+      setSaving(false);
+      if (res.ok) {
+        setIsError(false);
+        setMessage("Added. Reload the public page to see it.");
+        setAddingToGroup(null);
+        setNewItemValue("");
+      } else {
+        setIsError(true);
+        setMessage(statusMessage(res.status));
+      }
+    } catch {
+      clearTimeout(timeout);
+      setSaving(false);
+      setIsError(true);
+      setMessage(statusMessage(0));
+    }
+  }, [newItemValue]);
 
   return (
     <div className="space-y-4">
@@ -203,45 +233,42 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                         disabled={saving}
                         autoFocus
                       />
-                      <Button size="sm" onClick={saveItem} disabled={saving}>
-                        {saving ? "…" : "Save"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setEditingItem(null)}
-                      >
-                        Cancel
-                      </Button>
+                      <Button size="sm" onClick={saveItem} disabled={saving}>{saving ? "…" : "Save"}</Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
                     </div>
                   ) : (
                     <>
                       <span>{item.item}</span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setEditingItem(item);
-                          setItemValue(item.item);
-                          setMessage("");
-                        }}
-                      >
-                        Edit
-                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => { setEditingItem(item); setItemValue(item.item); setMessage(""); }}>Edit</Button>
                     </>
                   )}
                 </li>
               ))}
             </ul>
+            {addingToGroup === group.id ? (
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  className="flex-1 rounded-md border bg-background px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                  placeholder="New skill item…"
+                  value={newItemValue}
+                  onChange={(e) => setNewItemValue(e.target.value)}
+                  disabled={saving}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter") addItem(group.id); }}
+                />
+                <Button size="sm" onClick={() => addItem(group.id)} disabled={saving}>{saving ? "…" : "Add"}</Button>
+                <Button size="sm" variant="outline" onClick={() => { setAddingToGroup(null); setNewItemValue(""); }}>Cancel</Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="ghost" className="mt-2 text-xs" onClick={() => { setAddingToGroup(group.id); setNewItemValue(""); setMessage(""); }}>
+                + Add skill
+              </Button>
+            )}
           </CardContent>
         </Card>
       ))}
       {message && (
-        <p
-          className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
-        >
-          {message}
-        </p>
+        <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>
       )}
     </div>
   );
