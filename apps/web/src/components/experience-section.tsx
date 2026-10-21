@@ -7,56 +7,39 @@ export function ExperienceSection() {
     <section
       id="experience"
       aria-labelledby="experience-heading"
-      className="py-12 sm:py-24 bg-muted/30"
+      className="portfolio-section"
     >
-      <div className="container mx-auto px-4">
-        <h2 id="experience-heading" className="text-2xl sm:text-3xl font-bold tracking-tight">
+      <div className="content-width">
+        <p className="eyebrow">The journey so far</p>
+        <h2 id="experience-heading" className="section-heading">
           Experience
         </h2>
         {resume.experience.length === 0 ? (
-          <p className="mt-8 text-lg text-muted-foreground">
-            No experience entries defined.
-          </p>
+          <p className="section-description">No experience entries defined.</p>
         ) : (
-          <div className="mt-8 space-y-6">
-            {resume.experience.map((job) => {
-              const period = formatExperiencePeriod(job);
-              const highlights = job.highlights ?? [];
-              return (
-                <div
-                  key={job.id}
-                  className="grid min-w-0 gap-4 [overflow-wrap:anywhere] lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]"
-                >
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold">{job.role}</h3>
-                      {job.isSample && (
-                        <Badge variant="outline" className="shrink-0 text-xs">Sample</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {job.organization}
-                      {period ? ` · ${period}` : ""}
-                    </p>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm text-muted-foreground">
-                      {job.description}
-                    </p>
-                    {highlights.length > 0 && (
-                      <ul
-                        className="mt-2 text-sm text-muted-foreground list-disc list-inside space-y-1"
-                        aria-label={`${job.role} highlights`}
-                      >
-                        {highlights.map((highlight) => (
-                          <li key={highlight}>{highlight}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+          <div className="experience-timeline">
+            {resume.experience.map((job) => (
+              <article key={job.id} className="timeline-entry">
+                <div className="timeline-meta">
+                  <p>{formatExperiencePeriod(job)}</p>
+                  <span>{job.organization}</span>
                 </div>
-              );
-            })}
+                <div className="timeline-content">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3>{job.role}</h3>
+                    {job.isSample && <Badge variant="outline">Sample</Badge>}
+                  </div>
+                  {job.description && <p>{job.description}</p>}
+                  {!!job.highlights?.length && (
+                    <ul>
+                      {job.highlights.map((highlight) => (
+                        <li key={highlight}>{highlight}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </div>

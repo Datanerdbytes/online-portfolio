@@ -1,66 +1,68 @@
+import { ArrowUpRight, Mail, Phone } from "lucide-react";
 import { resume } from "@/content/resume";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
+import { Button } from "@/components/ui/button";
 
 export function ContactSection() {
   const { email, phone, links = [] } = resume.contact;
   const validLinks = links.filter((link) => isAbsoluteHttpUrl(link.url));
-  const hasContact = Boolean(email) || Boolean(phone) || validLinks.length > 0;
-
   return (
-    <section id="contact" aria-labelledby="contact-heading" className="py-12 sm:py-24">
-      <div className="container mx-auto px-4">
-        <div className="max-w-lg">
-          <h2 id="contact-heading" className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Contact
+    <section
+      id="contact"
+      aria-labelledby="contact-heading"
+      className="portfolio-section"
+    >
+      <div className="content-width contact-grid">
+        <div>
+          <p className="eyebrow">Have something in mind?</p>
+          <h2 id="contact-heading" className="section-heading">
+            Let’s connect.
           </h2>
-          {hasContact ? (
-            <div className="mt-4 space-y-2">
-              {email && (
-                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:gap-4">
-                  <span className="min-w-0 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-                    Email
-                  </span>
-                  <a
-                    href={`mailto:${email}`}
-                    className="min-w-0 text-sm [overflow-wrap:anywhere] text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    {email}
-                  </a>
-                </div>
-              )}
-              {phone && (
-                <div className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:gap-4">
-                  <span className="min-w-0 text-sm text-muted-foreground">Phone</span>
-                  <a
-                    href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
-                    className="min-w-0 text-sm [overflow-wrap:anywhere] text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    {phone}
-                  </a>
-                </div>
-              )}
-              {validLinks.map((link) => (
-                <div
-                  key={link.label}
-                  className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:gap-4"
-                >
-                  <span className="min-w-0 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-                    {link.label}
-                  </span>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="min-w-0 text-sm [overflow-wrap:anywhere] text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    {link.label}
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-4 text-lg text-muted-foreground">
-              No contact details provided.
+          <p className="section-description">
+            Start a conversation about data, technology, or an opportunity to
+            work together.
+          </p>
+          {email && (
+            <Button asChild size="lg" className="mt-6">
+              <a href={`mailto:${email}`}>
+                <Mail size={17} aria-hidden="true" />
+                Say hello
+                <ArrowUpRight size={16} aria-hidden="true" />
+              </a>
+            </Button>
+          )}
+        </div>
+        <div className="contact-details">
+          {email && (
+            <a href={`mailto:${email}`}>
+              <Mail size={18} aria-hidden="true" />
+              <span>{email}</span>
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
+          )}
+          {phone && (
+            <a href={`tel:${phone.replace(/[^+0-9]/g, "")}`}>
+              <Phone size={18} aria-hidden="true" />
+              <span>{phone}</span>
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
+          )}
+          <div className="contact-socials">
+            {validLinks.map((link) => (
+              <a
+                key={link.url}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {link.label}
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+          {!email && !phone && !validLinks.length && (
+            <p className="section-description">
+              Contact details will be added here.
             </p>
           )}
         </div>

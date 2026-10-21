@@ -1,41 +1,43 @@
+import { Database, CodeXml, ChartNoAxesCombined, Workflow } from "lucide-react";
 import { resume } from "@/content/resume";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+
+const icons = [Database, CodeXml, ChartNoAxesCombined, Workflow];
 
 export function SkillsSection() {
   return (
-    <section id="skills" aria-labelledby="skills-heading" className="py-12 sm:py-24 bg-muted/30">
-      <div className="container mx-auto px-4">
-        <h2 id="skills-heading" className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Skills
+    <section
+      id="skills"
+      aria-labelledby="skills-heading"
+      className="portfolio-section"
+    >
+      <div className="content-width">
+        <p className="eyebrow">A little about what I do</p>
+        <h2 id="skills-heading" className="section-heading">
+          Turning data into understanding
         </h2>
+        <p className="section-description">{resume.profile.about}</p>
         {resume.skills.length === 0 ? (
-          <p className="mt-8 text-lg text-muted-foreground">
-            No skill groups defined.
-          </p>
+          <p className="section-description">No skill groups defined.</p>
         ) : (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {resume.skills.map((group) => (
-              <Card key={group.label} className="min-w-0">
-                <CardHeader>
-                  <CardTitle className="[overflow-wrap:anywhere]">{group.label}</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {group.items.map((skill) => (
-                    <div key={skill} className="flex min-w-0 items-center gap-2">
-                      <Badge variant="outline" className="min-w-0 max-w-full">
-                        <span className="min-w-0 [overflow-wrap:anywhere]">{skill}</span>
-                      </Badge>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
+          <div className="skills-grid">
+            {resume.skills.map((group, index) => {
+              const Icon = icons[index % icons.length];
+              return (
+                <div key={group.label} className="skill-group">
+                  <span
+                    className={`skill-icon skill-color-${index % icons.length}`}
+                  >
+                    <Icon size={27} strokeWidth={1.7} aria-hidden="true" />
+                  </span>
+                  <h3>{group.label}</h3>
+                  <ul>
+                    {group.items.map((skill) => (
+                      <li key={skill}>{skill}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

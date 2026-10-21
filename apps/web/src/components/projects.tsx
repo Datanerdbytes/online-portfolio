@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowUpRight, CodeXml, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isProjectsResponse, type Project } from "@/lib/api";
@@ -36,7 +35,10 @@ function isAbsoluteHttpUrl(value: string | null): value is string {
 
 function ProjectSkeleton() {
   return (
-    <Card>
+    <Card className="project-card">
+      <div className="project-visual" aria-hidden="true">
+        <Skeleton className="h-8 w-12" />
+      </div>
       <CardHeader>
         <div className="flex flex-col gap-2">
           <Skeleton className="h-8 w-3/4" />
@@ -65,7 +67,7 @@ function ProjectLinks({ project }: { project: Project }) {
 
   const validLinks = links.filter(
     (link): link is { label: string; url: string } =>
-      isAbsoluteHttpUrl(link.url)
+      isAbsoluteHttpUrl(link.url),
   );
 
   if (validLinks.length === 0) return null;
@@ -78,9 +80,10 @@ function ProjectLinks({ project }: { project: Project }) {
           href={link.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary underline-offset-4 hover:underline"
         >
           {link.label}
+          <ArrowUpRight size={14} aria-hidden="true" />
         </a>
       ))}
     </div>
@@ -89,28 +92,35 @@ function ProjectLinks({ project }: { project: Project }) {
 
 function ProjectCard({ project }: { project: Project }) {
   return (
-    <Card key={project.id} className="row-span-3 grid min-w-0 grid-cols-1 grid-rows-subgrid gap-0">
+    <Card key={project.id} className="project-card flex min-w-0 flex-col">
+      <div className="project-visual" aria-hidden="true">
+        <CodeXml size={31} strokeWidth={1.3} />
+        <span>PORTFOLIO / PROJECT</span>
+        <FolderOpen size={24} strokeWidth={1.3} />
+      </div>
       <CardHeader>
         <div className="flex flex-col gap-2 min-w-0">
-          <CardTitle className="min-w-0 break-words">{project.title}</CardTitle>
-          {project.is_sample && <Badge variant="outline" className="w-fit">Sample</Badge>}
+          <h3 className="min-w-0 break-words">{project.title}</h3>
+          {project.is_sample && (
+            <Badge variant="outline" className="w-fit">
+              Sample
+            </Badge>
+          )}
         </div>
-        <CardDescription className="break-words">{project.summary}</CardDescription>
+        <CardDescription className="break-words text-[13px] leading-relaxed">
+          {project.summary}
+        </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="flex flex-wrap gap-2 min-w-0">
           {project.technologies.map((tech) => (
-            <Badge
-              key={tech}
-              variant="outline"
-              className="min-w-0 max-w-full"
-            >
+            <Badge key={tech} variant="outline" className="min-w-0 max-w-full">
               <span className="min-w-0 [overflow-wrap:anywhere]">{tech}</span>
             </Badge>
           ))}
         </div>
       </CardContent>
-      <CardFooter className="pt-0">
+      <CardFooter className="mt-auto pt-0">
         <ProjectLinks project={project} />
       </CardFooter>
     </Card>
@@ -119,30 +129,24 @@ function ProjectCard({ project }: { project: Project }) {
 
 function EmptyState() {
   return (
-    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
-      <Alert>
-        <AlertTitle>No projects</AlertTitle>
-        <AlertDescription>
-          The backend returned no project entries. Add development data to see
-          projects here.
-        </AlertDescription>
-      </Alert>
+    <div className="project-state">
+      <FolderOpen size={25} className="mb-4 text-primary" aria-hidden="true" />
+      <h3>Projects are on the way</h3>
+      <p>
+        There are no published projects to show yet. Check back for updates.
+      </p>
     </div>
   );
 }
 
 function UnavailableState({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
-      <Alert variant="destructive">
-        <AlertTitle>Projects unavailable</AlertTitle>
-        <AlertDescription>
-          The project list could not be loaded. The rest of the page still
-          works.
-        </AlertDescription>
-      </Alert>
-      <Button onClick={onRetry} className="mt-4">
-        Retry
+    <div className="project-state">
+      <FolderOpen size={25} className="mb-4 text-primary" aria-hidden="true" />
+      <h3>Projects unavailable</h3>
+      <p>The project list couldn’t be loaded right now. Please try again.</p>
+      <Button variant="outline" onClick={onRetry} className="mt-4">
+        Try again
       </Button>
     </div>
   );
@@ -180,7 +184,7 @@ export function ProjectsClient() {
       setState(
         body.items.length === 0
           ? { status: "empty" }
-          : { status: "ok", items: body.items }
+          : { status: "ok", items: body.items },
       );
     } catch {
       if (requestId !== requestIdRef.current) return;
@@ -218,7 +222,7 @@ export function ProjectsClient() {
       <span aria-live="polite" className="sr-only">
         {statusMessage}
       </span>
-      <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="project-grid" aria-busy={pending}>
         {pending ? (
           <>
             {[...Array(SKELETON_COUNT)].map((_, index) => (

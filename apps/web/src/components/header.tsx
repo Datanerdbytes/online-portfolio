@@ -1,133 +1,167 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { HealthStatus } from "@/components/health-status";
+import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import {
+  ArrowUpRight,
+  BriefcaseBusiness,
+  ChartNoAxesCombined,
+  CodeXml,
+  GraduationCap,
+  Mail,
+  Menu,
+  UserRound,
+  X,
+} from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 
-const NAV_ITEMS = [
-  { label: "About", href: "/#about" },
-  { label: "Skills", href: "/#skills" },
-  { label: "Projects", href: "/#projects" },
-  { label: "Experience", href: "/#experience" },
-  { label: "Education", href: "/#education" },
-  { label: "Contact", href: "/#contact" },
-] as const;
+const navigation = [
+  { id: "about", label: "About me", icon: UserRound },
+  { id: "skills", label: "Skills & tools", icon: CodeXml },
+  { id: "projects", label: "Portfolio", icon: ChartNoAxesCombined },
+  { id: "experience", label: "Experience", icon: BriefcaseBusiness },
+  { id: "education", label: "Education", icon: GraduationCap },
+  { id: "contact", label: "Contact", icon: Mail },
+];
 
-export function Header({ isSample }: { isSample: boolean }) {
+type HeaderProps = {
+  name: string;
+  headline: string;
+  isSample: boolean;
+  email?: string;
+  links: { label: string; url: string }[];
+};
+
+export function Header({
+  name,
+  headline,
+  isSample,
+  email,
+  links,
+}: HeaderProps) {
   const [open, setOpen] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-
-  const toggle = useCallback(() => setOpen((current) => !current), []);
-  const close = useCallback(() => setOpen(false), []);
+  const [active, setActive] = useState("about");
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("");
 
   useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
+    function escape(event: KeyboardEvent) {
       if (event.key === "Escape" && open) {
-        close();
-        menuButtonRef.current?.focus();
+        setOpen(false);
+        menuButton.current?.focus();
       }
     }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [open, close]);
+    document.addEventListener("keydown", escape);
+    return () => document.removeEventListener("keydown", escape);
+  }, [open]);
+
+  useEffect(() => {
+    if (pathname !== "/") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting);
+        if (visible.length) setActive(visible[0].target.id);
+      },
+      { rootMargin: "-15% 0px -55% 0px" },
+    );
+    navigation.forEach(({ id }) => {
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
+    });
+    return () => observer.disconnect();
+  }, [pathname]);
 
   return (
-    <header className="sticky top-0 z-20 w-full border-b border-input bg-background/80 backdrop-blur backdrop-filter-backdrop">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-col items-start gap-0 sm:flex-row sm:items-center sm:gap-2">
-            <span className="whitespace-nowrap font-semibold tracking-tight">Online Resume</span>
-            {isSample && (
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                placeholder
-              </span>
-            )}
+    <header className="sidebar">
+      <div className="sidebar-top">
+        <Link
+          href="/#about"
+          className="sidebar-name"
+          onClick={() => setOpen(false)}
+        >
+          {name}
+          <span className="sidebar-name-dot">.</span>
+        </Link>
+        <button
+          ref={menuButton}
+          type="button"
+          className="mobile-menu"
+          aria-label={open ? "Close main menu" : "Open main menu"}
+          aria-expanded={open}
+          aria-controls="sidebar-content"
+          onClick={() => setOpen(!open)}
+        >
+          {open ? (
+            <X size={22} aria-hidden="true" />
+          ) : (
+            <Menu size={22} aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      <div
+        id="sidebar-content"
+        className={`sidebar-content ${open ? "is-open" : ""}`}
+      >
+        <div className="sidebar-profile">
+          <div className="profile-monogram" aria-hidden="true">
+            {initials}
           </div>
-          <nav aria-label="Main" className="hidden md:flex items-center gap-4 shrink-0">
-            {NAV_ITEMS.map((item) => (
+          <p className="sidebar-headline">{headline}</p>
+          {isSample && <p className="sidebar-sample">Placeholder profile</p>}
+          <div className="sidebar-socials">
+            {links.map((link) => (
               <a
-                key={item.label}
-                href={item.href}
-                className="text-sm text-foreground/70 hover:text-foreground transition-colors"
+                key={link.url}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
               >
-                {item.label}
+                {link.label}
+                <ArrowUpRight size={13} aria-hidden="true" />
               </a>
             ))}
-          </nav>
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Compact API health indicator. Rendered once, in the fixed-height
-                row, so it stays visible on mobile and desktop without opening
-                the mobile menu. */}
-            <HealthStatus />
-            <button
-              ref={menuButtonRef}
-              type="button"
-              aria-expanded={open}
-              aria-controls="header-navigation"
-              aria-label={open ? "Close main menu" : "Open main menu"}
-              onClick={toggle}
-              className="md:hidden inline-flex items-center justify-center min-w-[44px] min-h-[44px] px-2 rounded-md text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
-            >
-              {open ? (
-                <>
-                  <span className="sr-only">Close main menu</span>
-                  <svg
-                    aria-hidden="true"
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </>
-              ) : (
-                <>
-                  <span className="sr-only">Open main menu</span>
-                  <svg
-                    aria-hidden="true"
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 6h16M4 12h16M4 18h16"
-                    />
-                  </svg>
-                </>
-              )}
-            </button>
           </div>
         </div>
-
-        {/* Mobile panel: navigation links only. The health indicator remains
-            visible above in the fixed-height row. */}
-        {open && (
-          <nav
-            id="header-navigation"
-            aria-label="Main"
-            className="md:hidden flex flex-col gap-1 border-t border-input bg-background py-2"
-          >
-            {NAV_ITEMS.map((item) => (
-              <a
-                key={item.label}
-                href={item.href}
-                onClick={close}
-                className="block px-3 py-2 text-sm text-foreground rounded-lg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-colors"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+        <nav aria-label="Main" className="sidebar-nav">
+          {navigation.map(({ id, label, icon: Icon }) => (
+            <Link
+              key={id}
+              href={`/#${id}`}
+              aria-current={
+                pathname === "/" && active === id ? "location" : undefined
+              }
+              onClick={() => {
+                setOpen(false);
+                setActive(id);
+              }}
+            >
+              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
+              {label}
+            </Link>
+          ))}
+        </nav>
+        {email && (
+          <a className="sidebar-contact" href={`mailto:${email}`}>
+            <Mail size={17} aria-hidden="true" />
+            Get in touch
+            <ArrowUpRight size={16} aria-hidden="true" />
+          </a>
         )}
+        <div className="sidebar-bottom">
+          <ThemeToggle />
+          <p>
+            Thoughtfully built with
+            <br />
+            Next.js & FastAPI
+          </p>
+        </div>
       </div>
     </header>
   );
