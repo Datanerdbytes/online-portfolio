@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  ArrowUpRight,
   BriefcaseBusiness,
   ChartNoAxesCombined,
   CodeXml,
@@ -126,7 +125,6 @@ export function Header({
                 rel="noopener noreferrer"
               >
                 {link.label}
-                <ArrowUpRight size={13} aria-hidden="true" />
               </a>
             ))}
           </div>
@@ -153,7 +151,6 @@ export function Header({
           <a className="sidebar-contact" href={`mailto:${email}`}>
             <Mail size={17} aria-hidden="true" />
             Get in touch
-            <ArrowUpRight size={16} aria-hidden="true" />
           </a>
         )}
         <div className="sidebar-bottom">

@@ -7,6 +7,7 @@ import {
 import { fetchResume } from "@/lib/api";
 import { AdminSessionControls } from "@/components/admin-session-controls";
 import { ResumeManager } from "@/components/resume-manager";
+import { ProjectsQueryProvider } from "@/components/projects-query-provider";
 
 export const dynamic = "force-dynamic";
 
@@ -57,13 +58,15 @@ export default async function AdminResumePage() {
       <AdminSessionControls />
 
       {resume ? (
-        <ResumeManager
-          profile={resume.profile}
-          skills={resume.skills}
-          experience={resume.experience}
-          education={resume.education}
-          contact={resume.contact}
-        />
+        <ProjectsQueryProvider>
+          <ResumeManager
+            profile={resume.profile}
+            skills={resume.skills}
+            experience={resume.experience}
+            education={resume.education}
+            contact={resume.contact}
+          />
+        </ProjectsQueryProvider>
       ) : (
         <div className="rounded-md border p-4">
           <p className="text-sm text-destructive">

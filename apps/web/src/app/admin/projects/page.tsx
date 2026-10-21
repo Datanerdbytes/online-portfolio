@@ -2,6 +2,7 @@ import Link from "next/link";
 import { fetchProjects } from "@/lib/api";
 import { ProjectManager } from "@/components/project-manager";
 import { AdminSessionControls } from "@/components/admin-session-controls";
+import { ProjectsQueryProvider } from "@/components/projects-query-provider";
 import { adminConfigurationError, readAdminToken, verifyIdentityViaBackend } from "@/lib/auth";
 import { type Project } from "@/lib/api";
 import { isProjectsResponse, projectResponse } from "@/lib/project-management";
@@ -46,7 +47,9 @@ export default async function AdminProjectsPage() {
         <p className="text-sm text-muted-foreground">Sign in again after 15 minutes. Activity does not extend your session.</p>
       </div>
       <AdminSessionControls />
-      <ProjectManager initialProjects={projects} initialListStatus={listStatus} />
+      <ProjectsQueryProvider>
+        <ProjectManager initialProjects={projects} initialListStatus={listStatus} />
+      </ProjectsQueryProvider>
       <p className="text-sm text-muted-foreground">
         <Link href="/" className="underline focus-visible:outline-2 focus-visible:outline-offset-4">
           Return to public resume

@@ -1,33 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --background: 40 20% 99%;
-  --foreground: 155 12% 16%;
+  --background: 42 28% 96%;
+  --foreground: 23 48% 12%;
 
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
+  --card-foreground: 23 48% 12%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
+  --popover-foreground: 23 48% 12%;
 
-  --primary: 151 30% 30%;
-  --primary-foreground: 0 0% 98%;
+  --primary: 199 73% 22%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
+  --secondary: 35 14% 83%;
+  --secondary-foreground: 23 48% 12%;
 
-  --muted: 145 16% 95%;
-  --muted-foreground: 150 5% 40%;
+  --muted: 35 10% 90%;
+  --muted-foreground: 27 9% 45%;
 
-  --accent: 145 22% 93%;
-  --accent-foreground: 0 0% 9%;
+  --accent: 199 45% 92%;
+  --accent-foreground: 199 73% 22%;
 
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 0 62% 42%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 151 30% 30%;
+  --border: 35 14% 83%;
+  --input: 35 14% 83%;
+  --ring: 199 73% 22%;
 
   --radius: 0.4rem;
 
@@ -36,33 +36,33 @@
 }
 
 .dark {
-  --background: 155 14% 10%;
-  --foreground: 0 0% 98%;
+  --background: 21 22% 7%;
+  --foreground: 36 30% 91%;
 
-  --card: 155 12% 13%;
-  --card-foreground: 0 0% 98%;
+  --card: 21 18% 10%;
+  --card-foreground: 36 30% 91%;
 
-  --popover: 0 0% 3.9%;
-  --popover-foreground: 0 0% 98%;
+  --popover: 21 18% 10%;
+  --popover-foreground: 36 30% 91%;
 
-  --primary: 148 37% 68%;
-  --primary-foreground: 155 20% 10%;
+  --primary: 198 43% 65%;
+  --primary-foreground: 199 57% 13%;
 
-  --secondary: 0 0% 14.9%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 16 12% 21%;
+  --secondary-foreground: 36 30% 91%;
 
-  --muted: 155 10% 14%;
-  --muted-foreground: 145 8% 68%;
+  --muted: 21 10% 13%;
+  --muted-foreground: 36 12% 64%;
 
-  --accent: 155 14% 20%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 198 20% 18%;
+  --accent-foreground: 36 30% 91%;
 
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 0 62% 42%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 155 9% 24%;
-  --input: 0 0% 14.9%;
-  --ring: 0 0% 83.1%;
+  --border: 16 12% 21%;
+  --input: 16 12% 21%;
+  --ring: 36 30% 91%;
 }
 
 @theme {
@@ -138,6 +138,19 @@ h2,
 h3 {
   line-height: 1.25;
 }
+h1 {
+  font-size: clamp(40px, 5vw, 60px);
+  font-weight: 700;
+  letter-spacing: -0.05em;
+}
+h2 {
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 700;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 600;
+}
 .site-content {
   margin-left: 272px;
   min-width: 0;
@@ -156,11 +169,10 @@ h3 {
 }
 .eyebrow {
   color: hsl(var(--muted-foreground));
-  font-family: var(--font-mono), monospace;
-  text-transform: uppercase;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 .section-heading {
   border-left: 4px solid hsl(var(--primary));
@@ -197,8 +209,8 @@ h3 {
   z-index: 30;
   width: 272px;
   overflow-y: auto;
-  color: #fff;
-  background: #3d6b57;
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--primary));
   padding: 29px 25px 24px;
 }
 .sidebar-top {
@@ -210,7 +222,7 @@ h3 {
   letter-spacing: -0.045em;
 }
 .sidebar-name-dot {
-  color: #c2e4ce;
+  color: hsl(var(--primary-foreground) / 0.85);
 }
 .sidebar-content {
   display: flex;
@@ -232,19 +244,19 @@ h3 {
   width: 116px;
   height: 116px;
   border-radius: 50%;
-  color: #244c38;
-  background: #d9e8d9;
-  border: 7px solid #ffffff18;
+  color: hsl(var(--primary-foreground));
+  background: hsl(var(--secondary));
+  border: 7px solid hsl(var(--primary-foreground) / 0.2);
   background-clip: padding-box;
   font-size: 39px;
   font-weight: 500;
   letter-spacing: -0.07em;
-  box-shadow: 0 0 0 1px #ffffff30;
+  box-shadow: 0 0 0 1px hsl(var(--primary-foreground) / 0.15);
 }
 .sidebar-headline {
   font-size: 13px;
   line-height: 1.75;
-  color: #f1f6f2;
+  color: hsl(var(--primary-foreground) / 0.9);
   max-width: 200px;
   margin-inline: auto;
 }
@@ -265,18 +277,18 @@ h3 {
   min-height: 35px;
   font-size: 10px;
   font-weight: 600;
-  border: 1px solid #ffffff35;
+  border: 1px solid hsl(var(--primary-foreground) / 0.35);
   border-radius: 4px;
   padding: 3px 9px;
 }
 .sidebar-socials a:hover {
-  background: #ffffff15;
+  background: hsl(var(--primary-foreground) / 0.1);
 }
 .sidebar-nav {
   display: grid;
   gap: 5px;
   margin-top: 29px;
-  border-top: 1px solid #ffffff20;
+  border-top: 1px solid hsl(var(--primary-foreground) / 0.2);
   padding-top: 23px;
 }
 .sidebar-nav a {
@@ -288,16 +300,16 @@ h3 {
   font-size: 13px;
   font-weight: 550;
   border-radius: 4px;
-  color: #f0f5f2;
+  color: hsl(var(--primary-foreground) / 0.9);
   transition: background 0.15s;
 }
 .sidebar-nav a:hover {
-  background: #ffffff12;
+  background: hsl(var(--primary-foreground) / 0.08);
 }
 .sidebar-nav a[aria-current] {
-  background: #ffffff18;
-  box-shadow: inset 3px 0 #c2e4ce;
-  color: #fff;
+  background: hsl(var(--primary-foreground) / 0.12);
+  box-shadow: inset 3px 0 hsl(var(--accent-foreground));
+  color: hsl(var(--primary-foreground));
 }
 .sidebar-contact {
   display: flex;
@@ -310,26 +322,26 @@ h3 {
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  background: #254f3d;
+  background: hsl(var(--primary) / 0.8);
   transition: background 0.15s;
 }
 .sidebar-contact:hover {
-  background: #1d4131;
+  background: hsl(var(--primary));
 }
 .sidebar-bottom {
   margin-top: auto;
   padding-top: 21px;
-  border-top: 1px solid #ffffff20;
+  border-top: 1px solid hsl(var(--primary-foreground) / 0.2);
 }
 .sidebar-bottom p {
   margin-top: 18px;
   text-align: center;
   font-size: 10px;
   line-height: 1.8;
-  color: #e2ece5;
+  color: hsl(var(--primary-foreground) / 0.7);
 }
 .sidebar :focus-visible {
-  outline-color: #fff;
+  outline-color: hsl(var(--primary-foreground));
 }
 .mobile-menu {
   display: none;
@@ -348,8 +360,8 @@ h3 {
   align-items: center;
   width: 30px;
   height: 17px;
-  border: 1px solid #ffffff80;
-  background: #ffffff15;
+  border: 1px solid hsl(var(--primary-foreground) / 0.5);
+  background: hsl(var(--primary-foreground) / 0.15);
   border-radius: 20px;
   padding: 2px;
 }
@@ -358,7 +370,7 @@ h3 {
   height: 11px;
   width: 11px;
   border-radius: 50%;
-  background: #fff;
+  background: hsl(var(--primary-foreground));
   transition: transform 0.15s;
 }
 .theme-toggle[aria-pressed="true"] .theme-track span {
@@ -390,6 +402,7 @@ h3 {
   margin-top: 22px;
   font-size: 14px;
   line-height: 1.9;
+  max-width: 78ch;
   color: hsl(var(--muted-foreground));
 }
 .hero-actions {

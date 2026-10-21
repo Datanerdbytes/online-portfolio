@@ -1,4 +1,4 @@
-import { ArrowUpRight, Mail, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import type { ApiContact } from "@/lib/api";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,6 @@ export function ContactSection({ contact }: Props) {
               <a href={`mailto:${email}`}>
                 <Mail size={17} aria-hidden="true" />
                 Say hello
-                <ArrowUpRight size={16} aria-hidden="true" />
               </a>
             </Button>
           )}
@@ -43,14 +42,12 @@ export function ContactSection({ contact }: Props) {
             <a href={`mailto:${email}`}>
               <Mail size={18} aria-hidden="true" />
               <span>{email}</span>
-              <ArrowUpRight size={16} aria-hidden="true" />
             </a>
           )}
           {phone && (
             <a href={`tel:${phone.replace(/[^+0-9]/g, "")}`}>
               <Phone size={18} aria-hidden="true" />
               <span>{phone}</span>
-              <ArrowUpRight size={16} aria-hidden="true" />
             </a>
           )}
           <div className="contact-socials">
@@ -62,7 +59,6 @@ export function ContactSection({ contact }: Props) {
                 rel="noopener noreferrer"
               >
                 {link.label}
-                <ArrowUpRight size={14} aria-hidden="true" />
               </a>
             ))}
           </div>

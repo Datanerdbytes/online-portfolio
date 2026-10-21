@@ -5,9 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { RecordActionButtons } from "@/components/record-action-buttons";
 import type { Project } from "@/lib/api";
+import { useDeleteProject, useUpdateProject, type ApiError } from "@/lib/project-queries";
 import {
-  changedOrders, isProject, isProjectsResponse, isSlug, LatestProjectRequest, MAX_ORDER,
+  changedOrders, failure, isProject, isProjectsResponse, isSlug, LatestProjectRequest, MAX_ORDER,
   formTechnologies, parseOrder, safeProjectLink,
 } from "@/lib/project-management";
 
@@ -20,16 +22,6 @@ function valuesFor(project: Project): Values {
   return { slug: project.slug, title: project.title, summary: project.summary, technologies: project.technologies.join(", "),
     repository_url: project.repository_url ?? "", demo_url: project.demo_url ?? "", display_order: String(project.display_order) };
 }
-function failure(status: number) {
-  switch (status) {
-    case 400: return "The project values were rejected. Check the fields and try again.";
-    case 401: case 403: return "Your session could not be verified. Sign in in another tab, then retry here. Your draft is preserved.";
-    case 404: return "The project was not found. It may have been removed. Your draft is preserved.";
-    case 409: return "A project with this slug already exists. Choose another slug.";
-    case 429: return "Too many requests. Please try again later.";
-    default: return "The projects service is unavailable. Please try again.";
-  }
-}
 
 export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { initialProjects: Project[]; initialListStatus?: Status }) {
   const [projects, setProjects] = useState(initialProjects);
@@ -40,13 +32,16 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
   const [editing, setEditing] = useState<Project | null>(null);
   const [values, setValues] = useState<Values>(blank);
   const [orders, setOrders] = useState<Record<string, string>>({});
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState(false);
   const [success, setSuccess] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const requests = useRef(new LatestProjectRequest());
   const mutation = useRef<AbortController | null>(null);
+  const updateMutation = useUpdateProject();
+  const deleteMutation = useDeleteProject();
+  const [runPending, setRunPending] = useState(false);
+  const pending = runPending || updateMutation.isPending || deleteMutation.isPending;
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
@@ -114,7 +109,7 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
     const controller = new AbortController();
     mutation.current = controller;
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    setPending(true);
+    setRunPending(true);
     clearMessages();
     try {
       const response = await fetch(path, { method, headers: HEADERS, signal: controller.signal, cache: "no-store",
@@ -141,13 +136,13 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
       if (mutation.current === controller) setError("The projects service is unavailable. Your draft is preserved; please try again.");
     } finally {
       clearTimeout(timeout);
-      if (mutation.current === controller) { mutation.current = null; setPending(false); }
+      if (mutation.current === controller) { mutation.current = null; setRunPending(false); }
     }
   }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (mutation.current) return;
+    if (pending) return;
     clearMessages();
     const title = values.title.trim(), summary = values.summary.trim();
     const technologies = formTechnologies(values.technologies, mode === "edit" ? editing?.technologies : undefined);
@@ -164,8 +159,16 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
     if (mode === "edit" && editing) {
       const body = Object.fromEntries(Object.entries(writable).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(editing[key as keyof Project])));
       if (!Object.keys(body).length) { setError("No changes to save."); return; }
-      void runMutation(`/api/projects/${encodeURIComponent(editing.slug)}`, "PATCH", body, () => {
-        setMode("list"); setEditing(null); setSuccess("Project saved.");
+      updateMutation.mutate({ slug: editing.slug, body }, {
+        onSuccess: (updated) => {
+          setProjects((current) => current.map((p) => (p.slug === editing.slug ? updated : p)));
+          setMode("list"); setEditing(null); setSuccess("Project saved.");
+        },
+        onError: (err) => {
+          const error = err as ApiError;
+          setAuthError(error.status === 401 || error.status === 403);
+          setError(error.message);
+        },
       });
     } else {
       void runMutation("/api/projects", "POST", { slug: values.slug, ...writable }, () => {
@@ -174,7 +177,7 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
     }
   }
   function saveOrder() {
-    if (mutation.current) return;
+    if (pending) return;
     clearMessages();
     const changed = changedOrders(projects, orders);
     if (!changed.orders) { setError(changed.error ?? "Invalid display order."); return; }
@@ -217,7 +220,14 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
           <div><label htmlFor={`order-${project.id}`} className="mb-1 block text-sm font-medium">Display order <span className="sr-only">for {project.title}</span></label><input id={`order-${project.id}`} type="number" min={0} max={MAX_ORDER} step={1} value={orders[project.slug] ?? String(project.display_order)} disabled={pending} onChange={(event) => setOrders({ ...orders, [project.slug]: event.target.value })} className={inputClass} /></div>
           <div className="flex flex-wrap gap-3">{safeProjectLink(project.repository_url) ? <a href={project.repository_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded text-sm underline focus-visible:outline-2 focus-visible:outline-offset-2">Repository</a> : null}{safeProjectLink(project.demo_url) ? <a href={project.demo_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center rounded text-sm underline focus-visible:outline-2 focus-visible:outline-offset-2">Demo</a> : null}</div>
         </CardContent>
-        <CardFooter className="flex flex-wrap gap-2"><Button size="lg" disabled={pending || Boolean(deleteTarget)} onClick={() => { setEditing(project); setValues(valuesFor(project)); clearMessages(); setMode("edit"); }}>Edit<span className="sr-only"> {project.title}</span></Button><Button size="lg" variant="destructive" disabled={pending || Boolean(deleteTarget)} onClick={(event) => { deleteTrigger.current = event.currentTarget; setDeleteTarget(project); clearMessages(); }}>Delete<span className="sr-only"> {project.title}</span></Button></CardFooter>
+        <CardFooter className="flex flex-wrap gap-2">
+          <RecordActionButtons
+            recordTitle={project.title}
+            onEdit={() => { setEditing(project); setValues(valuesFor(project)); clearMessages(); setMode("edit"); }}
+            onDelete={() => { setDeleteTarget(project); clearMessages(); }}
+            disabled={pending}
+          />
+        </CardFooter>
       </Card>)}</div>
     </>}
     <dialog ref={dialog} aria-labelledby="delete-project-title" onKeyDown={(event) => {
@@ -227,13 +237,23 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
       if (!first) { event.preventDefault(); return; }
       if (event.shiftKey && event.target === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && event.target === last) { event.preventDefault(); first.focus(); }
-    }} onCancel={(event) => { event.preventDefault(); if (!mutation.current) setDeleteTarget(null); }} className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-lg border bg-background p-6 text-foreground shadow-lg backdrop:bg-black/40">
+    }} onCancel={(event) => { event.preventDefault(); if (!pending) setDeleteTarget(null); }} className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-lg border bg-background p-6 text-foreground shadow-lg backdrop:bg-black/40">
       <h3 id="delete-project-title" className="mb-3 text-lg font-semibold [overflow-wrap:anywhere]">Delete “{deleteTarget?.title}”?</h3>
       <p className="mb-4 text-sm text-muted-foreground">This cannot be undone.</p>
       {deleteTarget ? messages : null}
       <div className="mt-4 flex flex-wrap gap-3"><Button ref={cancelDelete} size="lg" variant="outline" disabled={pending} onClick={() => setDeleteTarget(null)}>Cancel</Button><Button size="lg" variant="destructive" disabled={pending || !deleteTarget} onClick={() => {
-        if (!deleteTarget || mutation.current) return;
-        void runMutation(`/api/projects/${encodeURIComponent(deleteTarget.slug)}`, "DELETE", undefined, () => { deleteTrigger.current = null; setDeleteTarget(null); setSuccess("Project deleted."); });
+        if (!deleteTarget || pending) return;
+        deleteMutation.mutate(deleteTarget.slug, {
+          onSuccess: () => {
+            setProjects((current) => current.filter((p) => p.slug !== deleteTarget.slug));
+            deleteTrigger.current = null; setDeleteTarget(null); setSuccess("Project deleted.");
+          },
+          onError: (err) => {
+            const error = err as ApiError;
+            setAuthError(error.status === 401 || error.status === 403);
+            setError(error.message);
+          },
+        });
       }}>{pending ? "Deleting…" : "Delete project"}</Button></div>
     </dialog>
   </section>;

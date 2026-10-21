@@ -3,19 +3,32 @@
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { RecordActionButtons } from "@/components/record-action-buttons";
 import type {
   ApiContact,
   ApiEducation,
   ApiExperience,
   ApiProfile,
+  ApiResume,
   ApiSkillGroup,
 } from "@/lib/api";
-
-const TIMEOUT_MS = 10000;
-const HEADERS = {
-  "Content-Type": "application/json",
-  "X-Requested-With": "online-resume-admin",
-};
+import {
+  useResume,
+  useUpdateProfile,
+  useUpdateSkillGroup,
+  useUpdateSkillItem,
+  useDeleteSkillGroup,
+  useDeleteSkillItem,
+  useAddSkillItem,
+  useUpdateExperience,
+  useDeleteExperience,
+  useAddExperience,
+  useUpdateEducation,
+  useDeleteEducation,
+  useAddEducation,
+  useUpdateContact,
+} from "@/lib/project-queries";
 
 type Tab = "profile" | "skills" | "experience" | "education" | "contact";
 
@@ -26,40 +39,12 @@ type Props = {
   education: ApiEducation[];
   contact: ApiContact | null;
 };
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function apiPatch(
-  path: string,
-  body: Record<string, unknown>
-): Promise<{ ok: boolean; status: number }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    const res = await fetch(`/api/resume${path}`, {
-      method: "PATCH",
-      headers: HEADERS,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    return { ok: res.ok, status: res.status };
-  } catch {
-    return { ok: false, status: 0 };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function statusMessage(status: number): string {
-  if (status === 401 || status === 403)
-    return "Session expired. Sign in again in another tab, then retry.";
-  if (status === 404)
-    return "Record not found. Refresh the page and try again.";
-  if (status === 0) return "Request timed out or network error. Try again.";
-  return "Unexpected error. Please try again.";
+function handleMutationError(err: unknown): string {
+  return err instanceof Error ? err.message : "Unexpected error. Please try again.";
 }
 
 // ---------------------------------------------------------------------------
@@ -78,25 +63,28 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
+  const updateProfile = useUpdateProfile();
+
   const save = useCallback(async () => {
     setSaving(true);
     setMessage("");
-    const result = await apiPatch("/profile", {
-      name: values.name,
-      headline: values.headline,
-      introduction: values.introduction,
-      about: values.about,
-      location: values.location || null,
-    });
-    setSaving(false);
-    if (result.ok) {
+    try {
+      await updateProfile.mutateAsync({
+        name: values.name,
+        headline: values.headline,
+        introduction: values.introduction,
+        about: values.about,
+        location: values.location || null,
+      });
+      setSaving(false);
       setIsError(false);
       setMessage("Saved. Reload the public page to see the change.");
-    } else {
+    } catch (err) {
+      setSaving(false);
       setIsError(true);
-      setMessage(statusMessage(result.status));
+      setMessage(handleMutationError(err));
     }
-  }, [values]);
+  }, [values, updateProfile]);
 
   return (
     <Card>
@@ -156,75 +144,148 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
 // ---------------------------------------------------------------------------
 
 function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
-  const [editingItem, setEditingItem] = useState<{ id: number; item: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ id: number; item: string; groupId: number } | null>(null);
   const [itemValue, setItemValue] = useState("");
   const [addingToGroup, setAddingToGroup] = useState<number | null>(null);
   const [newItemValue, setNewItemValue] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [groupLabelValue, setGroupLabelValue] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: "group"; id: number; label: string } | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
+  const updateSkillGroup = useUpdateSkillGroup();
+  const updateSkillItem = useUpdateSkillItem();
+  const deleteSkillGroup = useDeleteSkillGroup();
+  const deleteSkillItem = useDeleteSkillItem();
+  const addSkillItem = useAddSkillItem();
+
+  const saving =
+    updateSkillGroup.isPending ||
+    updateSkillItem.isPending ||
+    addSkillItem.isPending;
+  const deleting = deleteSkillGroup.isPending || deleteSkillItem.isPending;
+  const actionDisabled = saving || deleting;
+
   const saveItem = useCallback(async () => {
     if (!editingItem) return;
-    setSaving(true);
     setMessage("");
-    const result = await apiPatch(`/skills/items/${editingItem.id}`, { item: itemValue });
-    setSaving(false);
-    if (result.ok) {
+    try {
+      await updateSkillItem.mutateAsync({ id: editingItem.id, body: { item: itemValue } });
       setIsError(false);
       setMessage("Saved. Reload the public page to see it.");
       setEditingItem(null);
-    } else {
+    } catch (err) {
       setIsError(true);
-      setMessage(statusMessage(result.status));
+      setMessage(handleMutationError(err));
     }
-  }, [editingItem, itemValue]);
+  }, [editingItem, itemValue, updateSkillItem]);
+
+  const saveGroup = useCallback(async () => {
+    if (editingGroupId === null) return;
+    setMessage("");
+    try {
+      await updateSkillGroup.mutateAsync({ id: editingGroupId, body: { label: groupLabelValue } });
+      setIsError(false);
+      setMessage("Saved. Reload the public page to see it.");
+      setEditingGroupId(null);
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [editingGroupId, groupLabelValue, updateSkillGroup]);
 
   const addItem = useCallback(async (groupId: number) => {
     if (!newItemValue.trim()) return;
-    setSaving(true);
     setMessage("");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      const res = await fetch(`/api/resume/skills/${groupId}/items`, {
-        method: "POST",
-        headers: HEADERS,
-        body: JSON.stringify({ item: newItemValue.trim(), display_order: 999 }),
-        signal: controller.signal,
-        cache: "no-store",
+      await addSkillItem.mutateAsync({
+        groupId,
+        body: { item: newItemValue.trim(), display_order: 999 },
       });
-      clearTimeout(timeout);
-      setSaving(false);
-      if (res.ok) {
-        setIsError(false);
-        setMessage("Added. Reload the public page to see it.");
-        setAddingToGroup(null);
-        setNewItemValue("");
-      } else {
-        setIsError(true);
-        setMessage(statusMessage(res.status));
-      }
-    } catch {
-      clearTimeout(timeout);
-      setSaving(false);
+      setIsError(false);
+      setMessage("Added. Reload the public page to see it.");
+      setAddingToGroup(null);
+      setNewItemValue("");
+    } catch (err) {
       setIsError(true);
-      setMessage(statusMessage(0));
+      setMessage(handleMutationError(err));
     }
-  }, [newItemValue]);
+  }, [newItemValue, addSkillItem]);
+
+  const handleDeleteGroup = useCallback(async () => {
+    if (!deleteTarget) return;
+    setMessage("");
+    try {
+      await deleteSkillGroup.mutateAsync(deleteTarget.id);
+      setIsError(false);
+      setMessage("Deleted. Reload the public page to see it.");
+      setDeleteTarget(null);
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [deleteTarget, deleteSkillGroup]);
+
+  const handleDeleteItem = useCallback(async (id: number) => {
+    setMessage("");
+    try {
+      await deleteSkillItem.mutateAsync(id);
+      setIsError(false);
+      setMessage("Deleted. Reload the public page to see it.");
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [deleteSkillItem]);
 
   return (
     <div className="space-y-4">
       {skills.map((group) => (
         <Card key={group.id}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">{group.label}</CardTitle>
+          <CardHeader className="pb-2 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {editingGroupId === group.id ? (
+                <input
+                  className="flex-1 rounded-md border bg-background px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                  value={groupLabelValue}
+                  onChange={(e) => setGroupLabelValue(e.target.value)}
+                  disabled={saving}
+                  autoFocus
+                />
+              ) : (
+                <CardTitle className="text-base">{group.label}</CardTitle>
+              )}
+              <RecordActionButtons
+                recordTitle={group.label}
+                onEdit={() => {
+                  setEditingGroupId(group.id);
+                  setGroupLabelValue(group.label);
+                  setMessage("");
+                }}
+                onDelete={() => {
+                  setDeleteTarget({ kind: "group", id: group.id, label: group.label });
+                  setMessage("");
+                }}
+                disabled={actionDisabled}
+              />
+            </div>
           </CardHeader>
           <CardContent>
+            {editingGroupId === group.id ? (
+              <div className="mt-2 flex items-center gap-2">
+                <Button size="sm" onClick={saveGroup} disabled={saving}>
+                  {saving ? "…" : "Save"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditingGroupId(null)}>
+                  Cancel
+                </Button>
+              </div>
+            ) : null}
             <ul className="space-y-1">
               {group.items.map((item) => (
                 <li key={item.id} className="flex items-center justify-between text-sm">
-                  {editingItem?.id === item.id ? (
+                  {editingItem?.id === item.id && editingItem?.groupId === group.id ? (
                     <div className="flex flex-1 items-center gap-2">
                       <input
                         className="flex-1 rounded-md border bg-background px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -233,13 +294,28 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                         disabled={saving}
                         autoFocus
                       />
-                      <Button size="sm" onClick={saveItem} disabled={saving}>{saving ? "…" : "Save"}</Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
+                      <Button size="sm" onClick={saveItem} disabled={saving}>
+                        {saving ? "…" : "Save"}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>
+                        Cancel
+                      </Button>
                     </div>
                   ) : (
                     <>
                       <span>{item.item}</span>
-                      <Button size="sm" variant="ghost" onClick={() => { setEditingItem(item); setItemValue(item.item); setMessage(""); }}>Edit</Button>
+                      <RecordActionButtons
+                        recordTitle={item.item}
+                        onEdit={() => {
+                          setEditingItem({ id: item.id, item: item.item, groupId: group.id });
+                          setItemValue(item.item);
+                          setMessage("");
+                        }}
+                        onDelete={() => {
+                          handleDeleteItem(item.id);
+                        }}
+                        disabled={actionDisabled}
+                      />
                     </>
                   )}
                 </li>
@@ -256,8 +332,12 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                   autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter") addItem(group.id); }}
                 />
-                <Button size="sm" onClick={() => addItem(group.id)} disabled={saving}>{saving ? "…" : "Add"}</Button>
-                <Button size="sm" variant="outline" onClick={() => { setAddingToGroup(null); setNewItemValue(""); }}>Cancel</Button>
+                <Button size="sm" onClick={() => addItem(group.id)} disabled={saving}>
+                  {saving ? "…" : "Add"}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => { setAddingToGroup(null); setNewItemValue(""); }}>
+                  Cancel
+                </Button>
               </div>
             ) : (
               <Button size="sm" variant="ghost" className="mt-2 text-xs" onClick={() => { setAddingToGroup(group.id); setNewItemValue(""); setMessage(""); }}>
@@ -267,6 +347,18 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
           </CardContent>
         </Card>
       ))}
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          title={`Delete skill group “${deleteTarget.label}”?`}
+          description="This cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDeleteGroup}
+          onCancel={() => setDeleteTarget(null)}
+          pending={deleting}
+        />
+      )}
       {message && (
         <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>
       )}
@@ -298,9 +390,17 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
     current: false,
     description: "",
   });
-  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+
+  const updateExperience = useUpdateExperience();
+  const deleteExperience = useDeleteExperience();
+  const addExperience = useAddExperience();
+
+  const saving = updateExperience.isPending || addExperience.isPending;
+  const deleting = deleteExperience.isPending;
+  const actionDisabled = saving || deleting;
 
   const startEdit = (exp: ApiExperience) => {
     setAdding(false);
@@ -318,65 +418,64 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
 
   const save = useCallback(async () => {
     if (!editing) return;
-    setSaving(true);
-    const result = await apiPatch(`/experience/${editing.id}`, {
-      role: values.role,
-      organization: values.organization,
-      started: values.started,
-      ended: values.ended || null,
-      current: values.current,
-      description: values.description,
-    });
-    setSaving(false);
-    if (result.ok) {
+    setMessage("");
+    try {
+      await updateExperience.mutateAsync({
+        id: editing.id,
+        body: {
+          role: values.role,
+          organization: values.organization,
+          started: values.started,
+          ended: values.ended || null,
+          current: values.current,
+          description: values.description,
+        },
+      });
       setIsError(false);
       setMessage("Saved. Reload the public page to see the change.");
-    } else {
+      setEditing(null);
+    } catch (err) {
       setIsError(true);
-      setMessage(statusMessage(result.status));
+      setMessage(handleMutationError(err));
     }
-  }, [editing, values]);
+  }, [editing, values, updateExperience]);
 
   const saveNew = useCallback(async () => {
-    setSaving(true);
     setMessage("");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      const res = await fetch("/api/resume/experience", {
-        method: "POST",
-        headers: HEADERS,
-        body: JSON.stringify({
-          slug: newValues.slug,
-          role: newValues.role,
-          organization: newValues.organization,
-          started: newValues.started,
-          ended: newValues.ended || null,
-          current: newValues.current,
-          description: newValues.description,
-          display_order: experience.length,
-        }),
-        signal: controller.signal,
-        cache: "no-store",
+      await addExperience.mutateAsync({
+        slug: newValues.slug,
+        role: newValues.role,
+        organization: newValues.organization,
+        started: newValues.started,
+        ended: newValues.ended || null,
+        current: newValues.current,
+        description: newValues.description,
+        display_order: experience.length,
       });
-      clearTimeout(timeout);
-      setSaving(false);
-      if (res.ok) {
-        setIsError(false);
-        setMessage("Added. Refresh to see the new entry in the list.");
-        setAdding(false);
-        setNewValues({ slug: "", role: "", organization: "", started: "", ended: "", current: false, description: "" });
-      } else {
-        setIsError(true);
-        setMessage(statusMessage(res.status));
-      }
-    } catch {
-      clearTimeout(timeout);
-      setSaving(false);
+      setIsError(false);
+      setMessage("Added. Reload the public page to see it.");
+      setAdding(false);
+      setNewValues({ slug: "", role: "", organization: "", started: "", ended: "", current: false, description: "" });
+    } catch (err) {
       setIsError(true);
-      setMessage(statusMessage(0));
+      setMessage(handleMutationError(err));
     }
-  }, [newValues, experience.length]);
+  }, [newValues, experience.length, addExperience]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setMessage("");
+    try {
+      await deleteExperience.mutateAsync(deleteTarget.id);
+      setIsError(false);
+      setMessage("Deleted. Reload the public page to see it.");
+      setDeleteTarget(null);
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [deleteTarget, deleteExperience]);
 
   return (
     <div className="space-y-4">
@@ -392,9 +491,15 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
                 {exp.organization} · {exp.started}–{exp.ended ?? "Present"}
               </p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => startEdit(exp)}>
-              Edit
-            </Button>
+            <RecordActionButtons
+              recordTitle={exp.role}
+              onEdit={() => startEdit(exp)}
+              onDelete={() => {
+                setDeleteTarget({ id: exp.id, label: exp.role });
+                setMessage("");
+              }}
+              disabled={actionDisabled}
+            />
           </div>
         ))}
       </div>
@@ -499,6 +604,19 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
           </CardContent>
         </Card>
       )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          title={`Delete experience “${deleteTarget.label}”?`}
+          description="This cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          pending={deleting}
+        />
+      )}
     </div>
   );
 }
@@ -512,9 +630,17 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
   const [adding, setAdding] = useState(false);
   const [values, setValues] = useState({ qualification: "", institution: "", started: "", ended: "" });
   const [newValues, setNewValues] = useState({ slug: "", qualification: "", institution: "", started: "", ended: "" });
-  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+
+  const updateEducation = useUpdateEducation();
+  const deleteEducation = useDeleteEducation();
+  const addEducation = useAddEducation();
+
+  const saving = updateEducation.isPending || addEducation.isPending;
+  const deleting = deleteEducation.isPending;
+  const actionDisabled = saving || deleting;
 
   const startEdit = (edu: ApiEducation) => {
     setAdding(false);
@@ -525,56 +651,60 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
 
   const save = useCallback(async () => {
     if (!editing) return;
-    setSaving(true);
-    const result = await apiPatch(`/education/${editing.id}`, {
-      qualification: values.qualification,
-      institution: values.institution,
-      started: values.started || null,
-      ended: values.ended || null,
-    });
-    setSaving(false);
-    if (result.ok) { setIsError(false); setMessage("Saved. Reload the public page to see the change."); }
-    else { setIsError(true); setMessage(statusMessage(result.status)); }
-  }, [editing, values]);
+    setMessage("");
+    try {
+      await updateEducation.mutateAsync({
+        id: editing.id,
+        body: {
+          qualification: values.qualification,
+          institution: values.institution,
+          started: values.started || null,
+          ended: values.ended || null,
+        },
+      });
+      setIsError(false);
+      setMessage("Saved. Reload the public page to see the change.");
+      setEditing(null);
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [editing, values, updateEducation]);
 
   const saveNew = useCallback(async () => {
-    setSaving(true);
     setMessage("");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
-      const res = await fetch("/api/resume/education", {
-        method: "POST",
-        headers: HEADERS,
-        body: JSON.stringify({
-          slug: newValues.slug,
-          qualification: newValues.qualification,
-          institution: newValues.institution,
-          started: newValues.started || null,
-          ended: newValues.ended || null,
-          display_order: education.length,
-        }),
-        signal: controller.signal,
-        cache: "no-store",
+      await addEducation.mutateAsync({
+        slug: newValues.slug,
+        qualification: newValues.qualification,
+        institution: newValues.institution,
+        started: newValues.started || null,
+        ended: newValues.ended || null,
+        display_order: education.length,
       });
-      clearTimeout(timeout);
-      setSaving(false);
-      if (res.ok) {
-        setIsError(false);
-        setMessage("Added. Refresh to see it in the list.");
-        setAdding(false);
-        setNewValues({ slug: "", qualification: "", institution: "", started: "", ended: "" });
-      } else {
-        setIsError(true);
-        setMessage(statusMessage(res.status));
-      }
-    } catch {
-      clearTimeout(timeout);
-      setSaving(false);
+      setIsError(false);
+      setMessage("Added. Reload the public page to see it.");
+      setAdding(false);
+      setNewValues({ slug: "", qualification: "", institution: "", started: "", ended: "" });
+    } catch (err) {
       setIsError(true);
-      setMessage(statusMessage(0));
+      setMessage(handleMutationError(err));
     }
-  }, [newValues, education.length]);
+  }, [newValues, education.length, addEducation]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setMessage("");
+    try {
+      await deleteEducation.mutateAsync(deleteTarget.id);
+      setIsError(false);
+      setMessage("Deleted. Reload the public page to see it.");
+      setDeleteTarget(null);
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [deleteTarget, deleteEducation]);
 
   return (
     <div className="space-y-4">
@@ -584,7 +714,15 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
             <p className="font-medium text-sm">{edu.qualification}</p>
             <p className="text-xs text-muted-foreground">{edu.institution} · {edu.started}–{edu.ended}</p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => startEdit(edu)}>Edit</Button>
+          <RecordActionButtons
+            recordTitle={edu.qualification}
+            onEdit={() => startEdit(edu)}
+            onDelete={() => {
+              setDeleteTarget({ id: edu.id, label: edu.qualification });
+              setMessage("");
+            }}
+            disabled={actionDisabled}
+          />
         </div>
       ))}
 
@@ -651,6 +789,19 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
           </CardContent>
         </Card>
       )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          title={`Delete education “${deleteTarget.label}”?`}
+          description="This cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          pending={deleting}
+        />
+      )}
     </div>
   );
 }
@@ -664,26 +815,27 @@ function ContactTab({ contact }: { contact: ApiContact | null }) {
     phone: contact?.phone ?? "",
     email: contact?.email ?? "",
   });
-  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
+  const updateContact = useUpdateContact();
+
+  const saving = updateContact.isPending;
+
   const save = useCallback(async () => {
-    setSaving(true);
     setMessage("");
-    const result = await apiPatch("/contact", {
-      phone: values.phone || null,
-      email: values.email || null,
-    });
-    setSaving(false);
-    if (result.ok) {
+    try {
+      await updateContact.mutateAsync({
+        phone: values.phone || null,
+        email: values.email || null,
+      });
       setIsError(false);
       setMessage("Saved. Reload the public page to see the change.");
-    } else {
+    } catch (err) {
       setIsError(true);
-      setMessage(statusMessage(result.status));
+      setMessage(handleMutationError(err));
     }
-  }, [values]);
+  }, [values, updateContact]);
 
   return (
     <Card>
@@ -751,6 +903,10 @@ export function ResumeManager({
 }: Props) {
   const [tab, setTab] = useState<Tab>("profile");
 
+  const resume = useResume({
+    initialData: { profile, skills, experience, education, contact } as ApiResume,
+  });
+
   const tabs: { id: Tab; label: string }[] = [
     { id: "profile", label: "Profile" },
     { id: "skills", label: "Skills" },
@@ -773,11 +929,11 @@ export function ResumeManager({
           </Button>
         ))}
       </nav>
-      {tab === "profile" && <ProfileTab profile={profile} />}
-      {tab === "skills" && <SkillsTab skills={skills} />}
-      {tab === "experience" && <ExperienceTab experience={experience} />}
-      {tab === "education" && <EducationTab education={education} />}
-      {tab === "contact" && <ContactTab contact={contact} />}
+      {tab === "profile" && <ProfileTab profile={resume.data?.profile ?? profile} />}
+      {tab === "skills" && <SkillsTab skills={resume.data?.skills ?? skills} />}
+      {tab === "experience" && <ExperienceTab experience={resume.data?.experience ?? experience} />}
+      {tab === "education" && <EducationTab education={resume.data?.education ?? education} />}
+      {tab === "contact" && <ContactTab contact={resume.data?.contact ?? contact} />}
     </div>
   );
 }

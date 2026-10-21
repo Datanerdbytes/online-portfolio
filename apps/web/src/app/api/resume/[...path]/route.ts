@@ -38,11 +38,14 @@ async function proxy(
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
   try {
-    const body = await req.text();
+    const body =
+      req.method === "GET" || req.method === "HEAD" || req.method === "DELETE"
+        ? undefined
+        : await req.text();
     const upstream = await fetch(`${API_BASE_URL}${upstreamPath}`, {
       method: req.method,
       headers: {
-        "Content-Type": "application/json",
+        ...(body ? { "Content-Type": "application/json" } : {}),
         Authorization: `Bearer ${token}`,
       },
       body,
@@ -68,5 +71,6 @@ async function proxy(
   }
 }
 
+export const GET = proxy;
 export const PATCH = proxy;
 export const POST = proxy;

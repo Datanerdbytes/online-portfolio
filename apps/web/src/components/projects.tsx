@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowUpRight, CodeXml, FolderOpen } from "lucide-react";
+import { CodeXml, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -83,7 +83,6 @@ function ProjectLinks({ project }: { project: Project }) {
           className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary underline-offset-4 hover:underline"
         >
           {link.label}
-          <ArrowUpRight size={14} aria-hidden="true" />
         </a>
       ))}
     </div>

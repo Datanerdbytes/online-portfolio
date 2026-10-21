@@ -38,7 +38,8 @@ export function validateMutation(request: Request): AuthError | null {
   const configurationError = adminConfigurationError();
   if (configurationError) return configurationError;
   const site = request.headers.get("sec-fetch-site");
-  if (request.headers.get("origin") !== canonicalOrigin() ||
+  const origin = request.headers.get("origin");
+  if (origin !== canonicalOrigin() ||
       request.headers.get("x-requested-with") !== CUSTOM_HEADER_VALUE ||
       (site !== null && site !== "same-origin")) {
     return { status: 403, detail: "Request not permitted" };

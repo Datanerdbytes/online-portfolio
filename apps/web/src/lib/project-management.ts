@@ -64,6 +64,17 @@ export function changedOrders(projects: Project[], drafts: Record<string, string
     : { orders, error: null };
 }
 
+export function failure(status: number) {
+  switch (status) {
+    case 400: return "The project values were rejected. Check the fields and try again.";
+    case 401: case 403: return "Your session could not be verified. Sign in in another tab, then retry here. Your draft is preserved.";
+    case 404: return "The project was not found. It may have been removed. Your draft is preserved.";
+    case 409: return "A project with this slug already exists. Choose another slug.";
+    case 429: return "Too many requests. Please try again later.";
+    default: return "The projects service is unavailable. Please try again.";
+  }
+}
+
 /** Only the latest list request may publish state; cancel also invalidates completed responses. */
 export class LatestProjectRequest {
   private active: AbortController | null = null;

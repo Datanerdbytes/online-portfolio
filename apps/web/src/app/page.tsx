@@ -1,6 +1,5 @@
 import {
   ArrowDown,
-  ArrowRight,
   Database,
   Layers3,
   MapPin,
@@ -90,7 +89,6 @@ export default async function Home() {
             <div className="hero-actions">
               <Button asChild size="lg">
                 <a href="#projects">
-                  <ArrowRight size={17} aria-hidden="true" />
                   View portfolio
                 </a>
               </Button>
