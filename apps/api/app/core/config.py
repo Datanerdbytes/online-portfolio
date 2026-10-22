@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     DATABASE_URL: str = "postgresql+psycopg://resume:resume@localhost:5432/resume"
+    WEB_APP_URL: str = "http://localhost:3000"
 
     # Optional so missing/invalid admin configuration never prevents public startup.
     API_ACCESS_SECRET: str | None = None
