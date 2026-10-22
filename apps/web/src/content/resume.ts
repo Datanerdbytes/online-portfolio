@@ -155,37 +155,6 @@ export const resume: ResumeContent = {
   projects: [
     {
       isSample: false,
-      id: "resume-site",
-      title: "Resume site",
-      summary: "Portfolio application.",
-      technologies: [],
-    },
-    {
-      isSample: true,
-      id: "sample-task-board",
-      title: "Sample: Task Board",
-      summary:
-        "Illustrative project entry for development; not a completed portfolio project.",
-      technologies: ["Next.js", "FastAPI", "PostgreSQL"],
-    },
-    {
-      isSample: true,
-      id: "sample-api-gateway",
-      title: "Sample: API Gateway",
-      summary:
-        "Illustrative project entry for development; not a completed portfolio project.",
-      technologies: ["FastAPI", "PostgreSQL", "Docker"],
-    },
-    {
-      isSample: true,
-      id: "sample-portfolio-frontend",
-      title: "Sample: Portfolio Frontend",
-      summary:
-        "Illustrative project entry for development; not a completed portfolio project.",
-      technologies: ["Next.js", "Tailwind CSS", "shadcn/ui"],
-    },
-    {
-      isSample: false,
       id: "enterprise-edw-pipeline-observability-analytics",
       title: "Enterprise EDW, Pipeline Observability & Analytics Platform",
       summary:
