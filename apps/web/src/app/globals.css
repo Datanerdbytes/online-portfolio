@@ -940,14 +940,12 @@ h3 {
   padding-block: 56px 76px;
 }
 .resume-toolbar {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 18px 24px;
+  padding-top: 44px;
+  justify-content: center;
 }
 .resume-toolbar-title {
-  margin-top: 10px;
   font-size: clamp(28px, 3.4vw, 40px);
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -955,7 +953,11 @@ h3 {
 .resume-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
+  position: absolute;
+  top: -12px;
+  right: 0;
 }
 .resume-notice {
   margin-top: 26px;
@@ -1241,7 +1243,7 @@ h3 {
     padding-block: 36px 48px;
   }
   .resume-toolbar {
-    align-items: flex-start;
+    padding-top: 48px;
   }
   .resume-toolbar-actions {
     width: 100%;

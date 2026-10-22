@@ -5,8 +5,7 @@ export default function ResumeLoading() {
     <section className="resume-page" aria-busy="true">
       <div className="content-width resume-toolbar">
         <div>
-          <p className="eyebrow">Curriculum vitae</p>
-          <h1 className="resume-toolbar-title">Resume</h1>
+          <h1 className="resume-toolbar-title">Online Resume</h1>
         </div>
       </div>
       <div className="content-width resume-shell">
