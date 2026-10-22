@@ -407,7 +407,7 @@ h3 {
   border: 1px solid hsl(var(--border));
   border-radius: 7px;
   background: hsl(var(--muted));
-  box-shadow: 8px 8px 0 hsl(var(--primary) / 0.06);
+  box-shadow: none;
 }
 .hero-banner img {
   display: block;
