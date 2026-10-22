@@ -22,7 +22,7 @@ export function ContactSection({ contact }: Props) {
         <div>
           <p className="eyebrow">Have something in mind?</p>
           <h2 id="contact-heading" className="section-heading">
-            Let's connect.
+            Let&apos;s connect.
           </h2>
           <p className="section-description">
             Start a conversation about data, technology, or an opportunity to

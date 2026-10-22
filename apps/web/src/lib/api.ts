@@ -166,6 +166,19 @@ export async function fetchHealth(): Promise<HealthStatus> {
   }
 }
 
+/**
+ * Fetches projects without throwing, so a page can render partial content
+ * when the API is unavailable instead of failing the whole route.
+ */
+export async function fetchProjectsSafe(): Promise<Project[]> {
+  try {
+    const response = await fetchProjects();
+    return response.items;
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchProjects(): Promise<ProjectsResponse> {
   let controller: AbortController | null = null;
   let timeout: ReturnType<typeof setTimeout> | null = null;

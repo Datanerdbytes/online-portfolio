@@ -19,7 +19,7 @@ const SKELETON_COUNT = 3;
 
 type ProjectsState =
   | { status: "idle" | "loading" }
-  | { status: "ok"; items: Project[] }
+  | { status: "ok"; items: Project[]; source: "api" | "fallback" }
   | { status: "empty" }
   | { status: "unavailable" };
 
@@ -151,10 +151,27 @@ function UnavailableState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export function ProjectsClient() {
+export function ProjectsClient({
+  fallbackItems,
+}: {
+  fallbackItems?: Project[];
+}) {
   const [state, setState] = useState<ProjectsState>({ status: "idle" });
   const requestIdRef = useRef(0);
   const controllerRef = useRef<AbortController | null>(null);
+  const fallbackRef = useRef<Project[]>(fallbackItems ?? []);
+  useEffect(() => {
+    fallbackRef.current = fallbackItems ?? [];
+  }, [fallbackItems]);
+
+  const markUnavailable = useCallback(() => {
+    const fallback = fallbackRef.current;
+    setState(
+      fallback.length > 0
+        ? { status: "ok", items: fallback, source: "fallback" }
+        : { status: "unavailable" },
+    );
+  }, []);
 
   const load = useCallback(async () => {
     const requestId = ++requestIdRef.current;
@@ -171,27 +188,27 @@ export function ProjectsClient() {
       });
       if (requestId !== requestIdRef.current) return;
       if (!response.ok) {
-        setState({ status: "unavailable" });
+        markUnavailable();
         return;
       }
       const body = (await response.json()) as unknown;
       if (!isProjectsResponse(body)) {
-        setState({ status: "unavailable" });
+        markUnavailable();
         return;
       }
       if (requestId !== requestIdRef.current) return;
       setState(
         body.items.length === 0
           ? { status: "empty" }
-          : { status: "ok", items: body.items },
+          : { status: "ok", items: body.items, source: "api" },
       );
     } catch {
       if (requestId !== requestIdRef.current) return;
-      setState({ status: "unavailable" });
+      markUnavailable();
     } finally {
       if (timeout !== null) clearTimeout(timeout);
     }
-  }, []);
+  }, [markUnavailable]);
 
   useEffect(() => {
     (async () => {
@@ -213,7 +230,9 @@ export function ProjectsClient() {
       : state.status === "empty"
         ? "No projects"
         : state.status === "ok"
-          ? `${state.items.length} projects loaded`
+          ? state.source === "fallback"
+            ? `${state.items.length} projects shown from the last synced copy`
+            : `${state.items.length} projects loaded`
           : "Loading projects";
 
   return (
@@ -221,6 +240,11 @@ export function ProjectsClient() {
       <span aria-live="polite" className="sr-only">
         {statusMessage}
       </span>
+      {state.status === "ok" && state.source === "fallback" ? (
+        <p role="status" className="mb-4 text-sm text-muted-foreground">
+          Showing the last synced copy of the project list.
+        </p>
+      ) : null}
       <div className="project-grid" aria-busy={pending}>
         {pending ? (
           <>

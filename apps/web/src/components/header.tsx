@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   ChartNoAxesCombined,
   CodeXml,
+  FileText,
   GraduationCap,
   Mail,
   Menu,
@@ -16,12 +17,28 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const navigation = [
-  { id: "about", label: "About me", icon: UserRound },
-  { id: "skills", label: "Skills & tools", icon: CodeXml },
-  { id: "projects", label: "Portfolio", icon: ChartNoAxesCombined },
-  { id: "experience", label: "Experience", icon: BriefcaseBusiness },
-  { id: "education", label: "Education", icon: GraduationCap },
-  { id: "contact", label: "Contact", icon: Mail },
+  { id: "about", label: "About me", icon: UserRound, href: "/#about" },
+  { id: "skills", label: "Skills & tools", icon: CodeXml, href: "/#skills" },
+  {
+    id: "projects",
+    label: "Portfolio",
+    icon: ChartNoAxesCombined,
+    href: "/#projects",
+  },
+  {
+    id: "experience",
+    label: "Experience",
+    icon: BriefcaseBusiness,
+    href: "/#experience",
+  },
+  {
+    id: "education",
+    label: "Education",
+    icon: GraduationCap,
+    href: "/#education",
+  },
+  { id: "resume", label: "Resume", icon: FileText, href: "/resume" },
+  { id: "contact", label: "Contact", icon: Mail, href: "/#contact" },
 ];
 
 type HeaderProps = {
@@ -130,12 +147,18 @@ export function Header({
           </div>
         </div>
         <nav aria-label="Main" className="sidebar-nav">
-          {navigation.map(({ id, label, icon: Icon }) => (
+          {navigation.map(({ id, label, icon: Icon, href }) => (
             <Link
               key={id}
-              href={`/#${id}`}
+              href={href}
               aria-current={
-                pathname === "/" && active === id ? "location" : undefined
+                id === "resume"
+                  ? pathname === "/resume"
+                    ? "location"
+                    : undefined
+                  : pathname === "/" && active === id
+                    ? "location"
+                    : undefined
               }
               onClick={() => {
                 setOpen(false);

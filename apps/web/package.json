@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "sync:resume-content": "node scripts/sync-resume-content.mjs",
+    "sync:resume-content:check": "node scripts/sync-resume-content.mjs --check",
+    "test": "node --test tests/*.test.mjs",
     "test:auth": "node --test tests/auth.test.mjs"
   },
   "dependencies": {

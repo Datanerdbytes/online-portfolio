@@ -1,12 +1,14 @@
 import {
   ArrowDown,
   Database,
+  FileText,
   Layers3,
   MapPin,
   ChartNoAxesCombined,
 } from "lucide-react";
-import { resume as staticResume } from "@/content/resume";
+import Link from "next/link";
 import { fetchResume } from "@/lib/api";
+import { resolveResume, staticResumeProjects } from "@/lib/resume";
 import { Button } from "@/components/ui/button";
 import { ContactSection } from "@/components/contact-section";
 import { EducationSection } from "@/components/education-section";
@@ -18,57 +20,8 @@ import { SkillsSection } from "@/components/skills-section";
 export default async function Home() {
   // Fetch live resume from the API; fall back to the static file if unavailable.
   const apiResume = await fetchResume();
-
-  const profile = apiResume?.profile ?? {
-    id: 0,
-    name: staticResume.profile.name,
-    headline: staticResume.profile.headline,
-    introduction: staticResume.profile.introduction,
-    about: staticResume.profile.about,
-    location: staticResume.profile.location ?? null,
-  };
-
-  const skills = apiResume?.skills ?? staticResume.skills.map((g, gi) => ({
-    id: gi,
-    label: g.label,
-    display_order: gi,
-    items: g.items.map((item, ii) => ({ id: ii, item, display_order: ii })),
-  }));
-
-  const experience = apiResume?.experience ?? staticResume.experience.map((e, i) => ({
-    id: i,
-    slug: e.id,
-    role: e.role,
-    organization: e.organization,
-    started: e.started,
-    ended: e.ended ?? null,
-    current: e.current,
-    description: e.description,
-    display_order: i,
-    highlights: (e.highlights ?? []).map((text, hi) => ({ id: hi, text, display_order: hi })),
-  }));
-
-  const education = apiResume?.education ?? staticResume.education.map((e, i) => ({
-    id: i,
-    slug: e.id,
-    qualification: e.qualification,
-    institution: e.institution,
-    started: e.started ?? null,
-    ended: e.ended ?? null,
-    display_order: i,
-  }));
-
-  const contact = apiResume?.contact ?? {
-    id: 0,
-    phone: staticResume.contact.phone ?? null,
-    email: staticResume.contact.email ?? null,
-    links: (staticResume.contact.links ?? []).map((l, i) => ({
-      id: i,
-      label: l.label,
-      url: l.url,
-      display_order: i,
-    })),
-  };
+  const { profile, skills, experience, education, contact } =
+    resolveResume(apiResume);
 
   return (
     <>
@@ -93,10 +46,10 @@ export default async function Home() {
                 </a>
               </Button>
               <Button asChild variant="outline" size="lg">
-                <a href="#experience">
-                  <ArrowDown size={17} aria-hidden="true" />
-                  My experience
-                </a>
+                <Link href="/resume">
+                  <FileText size={17} aria-hidden="true" />
+                  View Resume
+                </Link>
               </Button>
             </div>
             {profile.location && (
@@ -184,7 +137,7 @@ export default async function Home() {
           <p className="section-description">
             A closer look at the projects, tools, and ideas behind my work.
           </p>
-          <ProjectsClient />
+          <ProjectsClient fallbackItems={staticResumeProjects()} />
         </div>
       </section>
       <ExperienceSection experience={experience} />
