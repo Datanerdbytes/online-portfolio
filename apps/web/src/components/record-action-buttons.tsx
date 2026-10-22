@@ -20,7 +20,7 @@ export function RecordActionButtons({
     <div className="flex items-center gap-2">
       <Button
         size="icon"
-        variant="outline"
+        variant="ghost"
         disabled={disabled}
         onClick={onEdit}
         aria-label={`Edit ${recordTitle}`}
@@ -30,7 +30,8 @@ export function RecordActionButtons({
       </Button>
       <Button
         size="icon"
-        variant="destructive"
+        variant="ghost"
+        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={disabled}
         onClick={onDelete}
         aria-label={`Delete ${recordTitle}`}

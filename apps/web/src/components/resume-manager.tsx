@@ -454,9 +454,9 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                 </Button>
               </div>
             ) : null}
-            <ul className="space-y-1">
+            <ul className="divide-y divide-border">
               {group.items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between text-sm">
+                <li key={item.id} className="flex items-center justify-between py-2 text-sm">
                   {editingItem?.id === item.id && editingItem?.groupId === group.id ? (
                     <div className="flex flex-1 items-center gap-2">
                       <input
