@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   adminConfigurationError,
   readAdminToken,
@@ -15,14 +16,13 @@ export default async function AdminResumePage() {
   const configurationError = adminConfigurationError();
   const token = await readAdminToken();
   if (configurationError) return <Unavailable hasSession={Boolean(token)} />;
-  if (!token) return <SignInGate />;
+  if (!token) redirect("/auth/signin?next=%2Fadmin%2Fresume");
   const result = await verifyIdentityViaBackend(token);
   if (result.error) {
-    return [401, 403].includes(result.error.status) ? (
-      <SignInGate />
-    ) : (
-      <Unavailable hasSession={Boolean(token)} />
-    );
+    if ([401, 403].includes(result.error.status)) {
+      redirect("/auth/signin?next=%2Fadmin%2Fresume");
+    }
+    return <Unavailable hasSession={Boolean(token)} />;
   }
 
   const resume = await fetchResume();
@@ -90,23 +90,6 @@ export default async function AdminResumePage() {
           Return to public resume
         </Link>
       </div>
-    </section>
-  );
-}
-
-function SignInGate() {
-  return (
-    <section className="mx-auto max-w-md space-y-4 px-4 py-8">
-      <h1 className="text-2xl font-bold">Sign in required</h1>
-      <p className="text-sm text-muted-foreground">
-        Administration is restricted to the portfolio owner.
-      </p>
-      <Link
-        href="/auth/signin"
-        className="inline-flex min-h-11 items-center rounded underline focus-visible:outline-2 focus-visible:outline-offset-4"
-      >
-        Go to sign in
-      </Link>
     </section>
   );
 }

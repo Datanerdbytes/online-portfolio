@@ -1,20 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import type { Project } from "@/lib/api";
-import { useDeleteProject, useUpdateProject, type ApiError } from "@/lib/project-queries";
 import {
-  changedOrders, failure, isProject, isProjectsResponse, isSlug, LatestProjectRequest, MAX_ORDER,
+  useCreateProject,
+  useDeleteProject,
+  useProjects,
+  useReorderProjects,
+  useUpdateProject,
+  type ApiError,
+} from "@/lib/project-queries";
+import {
+  changedOrders, isSlug, MAX_ORDER,
   formTechnologies, parseOrder, safeProjectLink,
 } from "@/lib/project-management";
 
-const TIMEOUT_MS = 10000; // Leaves time for the proxy's 8-second deadline to return a sanitized error.
-const HEADERS = { "Content-Type": "application/json", "X-Requested-With": "online-resume-admin" };
 type Values = { slug: string; title: string; summary: string; technologies: string; repository_url: string; demo_url: string; display_order: string };
 type Status = "loading" | "ok" | "unavailable";
 const blank = (): Values => ({ slug: "", title: "", summary: "", technologies: "", repository_url: "", demo_url: "", display_order: "0" });
@@ -24,10 +29,18 @@ function valuesFor(project: Project): Values {
 }
 
 export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { initialProjects: Project[]; initialListStatus?: Status }) {
-  const [projects, setProjects] = useState(initialProjects);
-  const projectsRef = useRef(initialProjects);
-  const [listStatus, setListStatus] = useState<Status>(initialListStatus);
-  const settledListStatus = useRef<Status>(initialListStatus === "loading" ? "unavailable" : initialListStatus);
+  const projectsQuery = useProjects({
+    initialData: initialListStatus === "ok" ? { items: initialProjects } : undefined,
+  });
+  const projects = useMemo(
+    () => projectsQuery.data?.items ?? [],
+    [projectsQuery.data?.items],
+  );
+  const listStatus: Status = projectsQuery.isPending
+    ? "loading"
+    : projectsQuery.isError
+      ? "unavailable"
+      : "ok";
   const [mode, setMode] = useState<"list" | "create" | "edit">("list");
   const [editing, setEditing] = useState<Project | null>(null);
   const [values, setValues] = useState<Values>(blank);
@@ -36,12 +49,16 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
   const [authError, setAuthError] = useState(false);
   const [success, setSuccess] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
-  const requests = useRef(new LatestProjectRequest());
-  const mutation = useRef<AbortController | null>(null);
+  const previousProjects = useRef(projects);
+  const createMutation = useCreateProject();
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
-  const [runPending, setRunPending] = useState(false);
-  const pending = runPending || updateMutation.isPending || deleteMutation.isPending;
+  const reorderMutation = useReorderProjects();
+  const pending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    reorderMutation.isPending;
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
@@ -50,41 +67,25 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
   const previousMode = useRef(mode);
 
   const clearMessages = useCallback(() => { setError(""); setAuthError(false); setSuccess(""); }, []);
-  const loadProjects = useCallback(async () => {
-    const controller = requests.current.start();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    setListStatus("loading");
-    try {
-      const response = await fetch("/api/projects", { signal: controller.signal, cache: "no-store" });
-      if (!response.ok) throw new Error("Unavailable");
-      const body: unknown = await response.json();
-      if (!isProjectsResponse(body)) throw new Error("Invalid project list");
-      if (!requests.current.owns(controller)) return;
-      const previous = new Map(projectsRef.current.map((project) => [project.slug, project.display_order]));
-      setOrders((drafts) => Object.fromEntries(body.items.map((project) => {
-        const draft = drafts[project.slug];
-        const unsaved = draft !== undefined && draft !== String(previous.get(project.slug));
-        return [project.slug, unsaved ? draft : String(project.display_order)];
-      })));
-      projectsRef.current = body.items;
-      setProjects(body.items);
-      settledListStatus.current = "ok";
-      setListStatus("ok");
-    } catch {
-      if (requests.current.owns(controller)) {
-        settledListStatus.current = "unavailable";
-        setListStatus("unavailable");
-      }
-    } finally {
-      clearTimeout(timeout);
-      requests.current.finish(controller);
-    }
-  }, []);
-
   useEffect(() => {
-    const listRequests = requests.current;
-    return () => { listRequests.cancel(); const active = mutation.current; mutation.current = null; active?.abort(); };
-  }, []);
+    const previous = new Map(
+      previousProjects.current.map((project) => [project.slug, project.display_order]),
+    );
+    setOrders((drafts) =>
+      Object.fromEntries(
+        projects.map((project) => {
+          const draft = drafts[project.slug];
+          const unsaved =
+            draft !== undefined && draft !== String(previous.get(project.slug));
+          return [
+            project.slug,
+            unsaved ? draft : String(project.display_order),
+          ];
+        }),
+      ),
+    );
+    previousProjects.current = projects;
+  }, [projects]);
   useEffect(() => {
     if (previousMode.current !== mode) heading.current?.focus();
     previousMode.current = mode;
@@ -101,44 +102,6 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
     }
     if (deleteTarget && !pending) cancelDelete.current?.focus();
   }, [deleteTarget, pending]);
-
-  async function runMutation(path: string, method: string, body: unknown, onSuccess: () => void) {
-    if (mutation.current) return;
-    requests.current.cancel();
-    setListStatus(settledListStatus.current);
-    const controller = new AbortController();
-    mutation.current = controller;
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    setRunPending(true);
-    clearMessages();
-    try {
-      const response = await fetch(path, { method, headers: HEADERS, signal: controller.signal, cache: "no-store",
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-      if (mutation.current !== controller) return;
-      if (!response.ok) {
-        setAuthError([401, 403].includes(response.status));
-        setError(failure(response.status));
-        return;
-      }
-      if (method === "DELETE") {
-        if (response.status !== 204) throw new Error("Unexpected deletion response");
-      } else {
-        const result: unknown = await response.json();
-        if (method === "POST" && path === "/api/projects/reorder") {
-          const expected = (body as { orders: unknown[] }).orders.length;
-          if (!result || typeof result !== "object" || !("updated" in result) || result.updated !== expected) throw new Error("Invalid reorder response");
-        } else if (!isProject(result)) throw new Error("Invalid project response");
-      }
-      if (mutation.current !== controller) return;
-      onSuccess();
-      void loadProjects();
-    } catch {
-      if (mutation.current === controller) setError("The projects service is unavailable. Your draft is preserved; please try again.");
-    } finally {
-      clearTimeout(timeout);
-      if (mutation.current === controller) { mutation.current = null; setRunPending(false); }
-    }
-  }
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -160,8 +123,7 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
       const body = Object.fromEntries(Object.entries(writable).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(editing[key as keyof Project])));
       if (!Object.keys(body).length) { setError("No changes to save."); return; }
       updateMutation.mutate({ slug: editing.slug, body }, {
-        onSuccess: (updated) => {
-          setProjects((current) => current.map((p) => (p.slug === editing.slug ? updated : p)));
+        onSuccess: () => {
           setMode("list"); setEditing(null); setSuccess("Project saved.");
         },
         onError: (err) => {
@@ -171,8 +133,15 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
         },
       });
     } else {
-      void runMutation("/api/projects", "POST", { slug: values.slug, ...writable }, () => {
-        setMode("list"); setValues(blank()); setSuccess("Project created.");
+      createMutation.mutate({ slug: values.slug, ...writable }, {
+        onSuccess: () => {
+          setMode("list"); setValues(blank()); setSuccess("Project created.");
+        },
+        onError: (err) => {
+          const error = err as ApiError;
+          setAuthError(error.status === 401 || error.status === 403);
+          setError(error.message);
+        },
       });
     }
   }
@@ -183,9 +152,16 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
     if (!changed.orders) { setError(changed.error ?? "Invalid display order."); return; }
     if (!changed.orders.length) return;
     const submitted = new Set(changed.orders.map((entry) => entry.slug));
-    void runMutation("/api/projects/reorder", "POST", { orders: changed.orders }, () => {
-      setOrders((drafts) => Object.fromEntries(Object.entries(drafts).filter(([slug]) => !submitted.has(slug))));
-      setSuccess("Order saved.");
+    reorderMutation.mutate(changed.orders, {
+      onSuccess: () => {
+        setOrders((drafts) => Object.fromEntries(Object.entries(drafts).filter(([slug]) => !submitted.has(slug))));
+        setSuccess("Order saved.");
+      },
+      onError: (err) => {
+        const error = err as ApiError;
+        setAuthError(error.status === 401 || error.status === 403);
+        setError(error.message);
+      },
     });
   }
   const orderChanges = changedOrders(projects, orders);
@@ -211,7 +187,7 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
       <div><label htmlFor="project-order" className="mb-1 block text-sm font-medium">Display order</label><input id="project-order" type="number" min={0} max={MAX_ORDER} step={1} className={inputClass} value={values.display_order} disabled={pending} onChange={(event) => setValues({ ...values, display_order: event.target.value })} /></div>
       <div className="flex flex-wrap gap-3"><Button type="submit" size="lg" disabled={pending}>{pending ? "Saving…" : mode === "create" ? "Create project" : "Save changes"}</Button><Button type="button" size="lg" variant="outline" disabled={pending} onClick={() => { setMode("list"); clearMessages(); }}>Cancel</Button></div>
     </form> : <>
-      <div className="flex flex-wrap gap-3"><Button size="lg" variant="outline" disabled={pending || listStatus === "loading"} onClick={() => void loadProjects()}>{listStatus === "loading" ? "Loading…" : "Refresh projects"}</Button><Button size="lg" disabled={pending || Boolean(deleteTarget) || (!orderChanges.error && !orderChanges.orders?.length)} onClick={saveOrder}>{pending ? "Saving…" : "Save order"}</Button></div>
+      <div className="flex flex-wrap gap-3"><Button size="lg" variant="outline" disabled={pending || projectsQuery.isFetching} onClick={() => void projectsQuery.refetch()}>{projectsQuery.isFetching ? "Loading…" : "Refresh projects"}</Button><Button size="lg" disabled={pending || Boolean(deleteTarget) || (!orderChanges.error && !orderChanges.orders?.length)} onClick={saveOrder}>{pending ? "Saving…" : "Save order"}</Button></div>
       {listStatus === "unavailable" ? <p role="status" className="text-sm text-destructive">Projects unavailable. Any cards below are from the last successful load. Use Refresh projects to retry.</p> : null}
       {!projects.length && listStatus === "ok" ? <p className="py-8 text-sm text-muted-foreground">No projects yet. Add one above.</p> : null}
       <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">{projects.map((project) => <Card key={project.id} className="flex min-w-0 flex-col">
@@ -245,7 +221,6 @@ export function ProjectManager({ initialProjects, initialListStatus = "ok" }: { 
         if (!deleteTarget || pending) return;
         deleteMutation.mutate(deleteTarget.slug, {
           onSuccess: () => {
-            setProjects((current) => current.filter((p) => p.slug !== deleteTarget.slug));
             deleteTrigger.current = null; setDeleteTarget(null); setSuccess("Project deleted.");
           },
           onError: (err) => {

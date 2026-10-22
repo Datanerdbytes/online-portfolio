@@ -34,6 +34,8 @@ async function proxy(
 
   const { path } = await params;
   const upstreamPath = `/api/v1/resume/${path.join("/")}`;
+  const idempotencyKey =
+    req.method === "POST" ? req.headers.get("idempotency-key") : null;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
@@ -46,6 +48,9 @@ async function proxy(
       method: req.method,
       headers: {
         ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(idempotencyKey
+          ? { "Idempotency-Key": idempotencyKey }
+          : {}),
         Authorization: `Bearer ${token}`,
       },
       body,
@@ -54,7 +59,7 @@ async function proxy(
     });
 
     const responseBody = await upstream.text();
-    return new NextResponse(responseBody, {
+    return new NextResponse(upstream.status === 204 ? null : responseBody, {
       status: upstream.status,
       headers: {
         "Content-Type": "application/json",
@@ -74,3 +79,4 @@ async function proxy(
 export const GET = proxy;
 export const PATCH = proxy;
 export const POST = proxy;
+export const DELETE = proxy;

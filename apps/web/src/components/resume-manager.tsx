@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -28,7 +29,18 @@ import {
   useDeleteEducation,
   useAddEducation,
   useUpdateContact,
+  useUploadProfileImage,
+  useRemoveProfileImage,
 } from "@/lib/project-queries";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import {
+  AVATAR_ACCEPT,
+  AVATAR_PATH,
+  BANNER_PATH,
+  profileImageUrl,
+  validateAvatarFile,
+  type ProfileImageKind,
+} from "@/lib/avatar";
 
 type Tab = "profile" | "skills" | "experience" | "education" | "contact";
 
@@ -45,6 +57,156 @@ type Props = {
 
 function handleMutationError(err: unknown): string {
   return err instanceof Error ? err.message : "Unexpected error. Please try again.";
+}
+
+function ProfileImageControl({
+  kind,
+  profile,
+  name,
+}: {
+  kind: ProfileImageKind;
+  profile: ApiProfile | null;
+  name: string;
+}) {
+  const [message, setMessage] = useState("");
+  const [isError, setIsError] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const upload = useUploadProfileImage(kind);
+  const remove = useRemoveProfileImage(kind);
+
+  const isAvatar = kind === "avatar";
+  const label = isAvatar ? "Profile photo" : "Hero banner photo";
+  const imageUrl = isAvatar ? profile?.avatar_url : profile?.banner_url;
+  const updatedAt = isAvatar
+    ? profile?.avatar_updated_at
+    : profile?.banner_updated_at;
+  const imagePath = isAvatar ? AVATAR_PATH : BANNER_PATH;
+  const imageSrc = profileImageUrl(imageUrl, updatedAt, imagePath);
+  const busy = upload.isPending || remove.isPending;
+
+  const onFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      setMessage("");
+      setIsError(false);
+      const error = validateAvatarFile(file);
+      if (error) {
+        setIsError(true);
+        setMessage(error);
+        event.target.value = "";
+        return;
+      }
+      try {
+        await upload.mutateAsync(file);
+        setMessage(`${label} updated. Reload the public page to see it.`);
+      } catch (err) {
+        setIsError(true);
+        setMessage(handleMutationError(err));
+      } finally {
+        event.target.value = "";
+      }
+    },
+    [label, upload],
+  );
+
+  const onRemove = useCallback(async () => {
+    setMessage("");
+    setIsError(false);
+    try {
+      await remove.mutateAsync();
+      setMessage(`${label} removed. Reload the public page to see it.`);
+      setConfirmRemove(false);
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [label, remove]);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">{label}</p>
+      <div className="flex flex-wrap items-center gap-4">
+        {isAvatar ? (
+          <ProfileAvatar
+            src={imageSrc}
+            alt="Profile photo preview"
+            name={name}
+            size="sm"
+            lazy={false}
+          />
+        ) : (
+          <div className="relative size-40 overflow-hidden rounded-md border bg-muted">
+            {imageSrc ? (
+              <Image
+                src={imageSrc}
+                alt="Square hero banner preview"
+                fill
+                sizes="160px"
+                className="object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="flex size-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
+                Square banner preview
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+            >
+              {busy ? "Uploading…" : imageUrl ? "Replace photo" : "Upload photo"}
+            </Button>
+            {imageUrl && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmRemove(true)}
+                disabled={busy}
+              >
+                Remove photo
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            JPEG, PNG, or WebP up to 2 MB.
+            {!isAvatar && " Displayed as a square crop."}
+          </p>
+          {message && (
+            <p
+              className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+              role={isError ? "alert" : undefined}
+            >
+              {message}
+            </p>
+          )}
+        </div>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={AVATAR_ACCEPT}
+        className="hidden"
+        onChange={onFileChange}
+      />
+      <ConfirmDialog
+        open={confirmRemove}
+        title={`Remove ${label.toLowerCase()}?`}
+        description="This cannot be undone."
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={onRemove}
+        onCancel={() => setConfirmRemove(false)}
+        pending={remove.isPending}
+      />
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +253,17 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
       <CardHeader>
         <CardTitle>Profile</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        <ProfileImageControl
+          kind="avatar"
+          profile={profile}
+          name={profile?.name ?? values.name}
+        />
+        <ProfileImageControl
+          kind="banner"
+          profile={profile}
+          name={profile?.name ?? values.name}
+        />
         {(
           [
             ["Name", "name", false],

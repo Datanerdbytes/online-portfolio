@@ -25,8 +25,15 @@ function harness(options = {}) {
           QueryClient: class {},
           useMutation: () => ({}),
           useQueryClient: () => ({}),
+          useQuery: () => ({}),
         };
+        if (id === "react") return { useRef: (current) => ({ current }) };
         if (id === "@/lib/project-management") return load("lib/project-management");
+        if (id === "@/lib/avatar") return {
+          AVATAR_PATH: "/api/resume/profile/avatar",
+          AVATAR_UPLOAD_MAX_BYTES: 2 * 1024 * 1024 + 64 * 1024,
+          BANNER_PATH: "/api/resume/profile/banner",
+        };
         if (id === "@/lib/api") return ({});
         throw new Error(`Unexpected import: ${id}`);
       },
@@ -93,4 +100,26 @@ test("deleteProject rejects 503 upstream as 503 outage", async () => {
   const err = await runDelete(h, "resume-site");
   assert.equal(err.status, 503);
   assert.equal(err.message, "The projects service is unavailable. Please try again.");
+});
+
+test("addSkillItem forwards its stable idempotency key", async () => {
+  const h = harness();
+  let captured;
+  h.setFetch(async (url, init) => {
+    captured = { url, init };
+    return Response.json({ id: 4, item: "Python", display_order: 1 }, { status: 201 });
+  });
+
+  await h.load("lib/project-queries").addSkillItem(
+    2,
+    { item: "Python", display_order: 1 },
+    "a49ca978-f74c-46d9-9462-41ddc513f66c",
+  );
+
+  assert.equal(captured.url, "/api/resume/skills/2/items");
+  assert.equal(captured.init.method, "POST");
+  assert.equal(
+    captured.init.headers["idempotency-key"],
+    "a49ca978-f74c-46d9-9462-41ddc513f66c",
+  );
 });

@@ -11,10 +11,13 @@ import {
   GraduationCap,
   Mail,
   Menu,
+  Settings2,
   UserRound,
   X,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import { profileImageUrl } from "@/lib/avatar";
 
 const navigation = [
   { id: "about", label: "About me", icon: UserRound, href: "/#about" },
@@ -47,6 +50,8 @@ type HeaderProps = {
   isSample: boolean;
   email?: string;
   links: { label: string; url: string }[];
+  avatarUrl?: string | null;
+  avatarUpdatedAt?: string | null;
 };
 
 export function Header({
@@ -55,17 +60,14 @@ export function Header({
   isSample,
   email,
   links,
+  avatarUrl,
+  avatarUpdatedAt,
 }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("about");
   const menuButton = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("");
+  const avatarSrc = profileImageUrl(avatarUrl, avatarUpdatedAt);
 
   useEffect(() => {
     function escape(event: KeyboardEvent) {
@@ -127,9 +129,13 @@ export function Header({
       >
         <div className="sidebar-profile">
           <div className="sidebar-profile-top">
-            <div className="profile-monogram" aria-hidden="true">
-              {initials}
-            </div>
+            <ProfileAvatar
+              src={avatarSrc}
+              alt=""
+              name={name}
+              size="sm"
+              lazy={false}
+            />
           </div>
           <p className="sidebar-headline">{headline}</p>
           {isSample && <p className="sidebar-sample">Placeholder profile</p>}
@@ -169,6 +175,16 @@ export function Header({
               {label}
             </Link>
           ))}
+          <Link
+            href="/admin/resume"
+            aria-current={
+              pathname.startsWith("/admin/") ? "location" : undefined
+            }
+            onClick={() => setOpen(false)}
+          >
+            <Settings2 size={18} strokeWidth={1.8} aria-hidden="true" />
+            Admin
+          </Link>
         </nav>
         {email && (
           <a className="sidebar-contact" href={`mailto:${email}`}>

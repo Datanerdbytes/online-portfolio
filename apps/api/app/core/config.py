@@ -1,4 +1,5 @@
 import base64
+from pathlib import Path
 from typing import ClassVar
 
 from argon2 import Type, extract_parameters
@@ -11,6 +12,10 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     DATABASE_URL: str = "postgresql+psycopg://resume:resume@localhost:5432/resume"
     WEB_APP_URL: str = "http://localhost:3000"
+
+    # Directory that holds stored avatars. parents[2] resolves to apps/api.
+    MEDIA_ROOT: Path = Path(__file__).resolve().parents[2] / "media"
+    MAX_AVATAR_BYTES: int = 2097152
 
     # Optional so missing/invalid admin configuration never prevents public startup.
     API_ACCESS_SECRET: str | None = None

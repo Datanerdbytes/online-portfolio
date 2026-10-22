@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Geist, Geist_Mono } from "next/font/google";
 import { resume } from "@/content/resume";
 import { Header } from "@/components/header";
-import { isAbsoluteHttpUrl } from "@/lib/resume";
+import { isAbsoluteHttpUrl, resolveResume } from "@/lib/resume";
+import { getResumeCached } from "@/lib/resume-server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -21,11 +22,18 @@ export const metadata: Metadata = {
   description: `${resume.profile.headline}. ${resume.profile.introduction}`,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const apiResume = await getResumeCached();
+  const resolved = resolveResume(apiResume);
+  const profile = resolved.profile;
+  const contact = resolved.contact;
+  const links = (contact.links ?? []).filter((link) =>
+    isAbsoluteHttpUrl(link.url),
+  );
   return (
     <html
       lang="en"
@@ -42,13 +50,13 @@ export default function RootLayout({
           Skip to content
         </a>
         <Header
-          name={resume.profile.name}
-          headline={resume.profile.headline}
-          isSample={resume.isSample}
-          email={resume.contact.email}
-          links={(resume.contact.links ?? []).filter((link) =>
-            isAbsoluteHttpUrl(link.url),
-          )}
+          name={profile.name}
+          headline={profile.headline}
+          isSample={resolved.isSample}
+          email={contact.email ?? undefined}
+          links={links}
+          avatarUrl={profile.avatar_url}
+          avatarUpdatedAt={profile.avatar_updated_at}
         />
         <div className="site-content">
           <main id="main-content" tabIndex={-1}>
@@ -57,9 +65,9 @@ export default function RootLayout({
           <footer className="site-footer">
             <div className="content-width footer-inner">
               <p>
-                {resume.isSample
+                {resolved.isSample
                   ? "Illustrative sample resume. Example entries are labeled as samples."
-                  : `${resume.profile.name} · Personal portfolio`}
+                  : `${profile.name} · Personal portfolio`}
               </p>
               <Link href="/#about">Back to top ↑</Link>
             </div>

@@ -239,19 +239,26 @@ h3 {
 }
 
 .profile-monogram {
-  display: grid;
-  place-items: center;
-  width: 116px;
-  height: 116px;
-  border-radius: 50%;
-  color: hsl(var(--primary-foreground));
+  display: none !important;
+}
+
+.profile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
   background: hsl(var(--secondary));
   border: 7px solid hsl(var(--primary-foreground) / 0.2);
   background-clip: padding-box;
-  font-size: 39px;
+  object-fit: cover;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px hsl(var(--primary-foreground) / 0.15);
+}
+
+.profile-avatar-fallback {
+  color: hsl(var(--primary-foreground));
   font-weight: 500;
   letter-spacing: -0.07em;
-  box-shadow: 0 0 0 1px hsl(var(--primary-foreground) / 0.15);
 }
 .sidebar-headline {
   font-size: 13px;
@@ -377,14 +384,62 @@ h3 {
   transform: translateX(12px);
 }
 
-.hero-section {
-  padding-block: 62px;
-}
 .hero-grid {
   display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 45px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: clamp(32px, 8vw, 72px);
   align-items: center;
+}
+.hero-copy {
+  grid-column: 1 / 8;
+}
+.hero-visual {
+  grid-column: 8 / -1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+.hero-banner {
+  position: relative;
+  width: min(100%, 420px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  background: hsl(var(--muted));
+  box-shadow: 8px 8px 0 hsl(var(--primary) / 0.06);
+}
+.hero-banner img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-banner .hero-banner-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: cover;
+}
+.hero-banner-placeholder {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 28px;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  font-size: 13px;
+}
+@media (max-width: 639px) {
+  .hero-copy,
+  .hero-visual {
+    grid-column: 1 / -1;
+  }
+  .hero-visual {
+    align-items: center;
+  }
 }
 .hero-copy h1 {
   margin-top: 14px;
@@ -428,134 +483,6 @@ h3 {
   font-size: 12px;
   color: hsl(var(--primary));
 }
-.data-illustration {
-  border: 1px solid hsl(var(--border));
-  padding: 22px;
-  background: hsl(var(--card));
-  border-radius: 7px;
-  box-shadow: 8px 8px 0 hsl(var(--primary) / 0.06);
-}
-.illustration-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 25px;
-}
-.illustration-mark {
-  font:
-    9px var(--font-mono),
-    monospace;
-  letter-spacing: 0.12em;
-  color: hsl(var(--muted-foreground));
-}
-.illustration-dots {
-  display: flex;
-  gap: 4px;
-}
-.illustration-dots i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: hsl(var(--border));
-}
-.workflow-step {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 64px;
-}
-.workflow-icon {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  flex-shrink: 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  color: hsl(var(--primary));
-  background: hsl(var(--muted));
-}
-.workflow-step small {
-  display: block;
-  font:
-    8px var(--font-mono),
-    monospace;
-  letter-spacing: 0.09em;
-  color: hsl(var(--muted-foreground));
-}
-.workflow-step strong {
-  display: block;
-  margin-top: 5px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.workflow-format {
-  font:
-    8px var(--font-mono),
-    monospace;
-  margin-left: auto;
-  color: hsl(var(--muted-foreground));
-  white-space: nowrap;
-}
-.workflow-connector {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  height: 24px;
-  padding-left: 22px;
-}
-.workflow-connector span:first-child {
-  height: 24px;
-  border-left: 1px dashed hsl(var(--primary) / 0.4);
-}
-.workflow-connector span:last-child {
-  font:
-    8px var(--font-mono),
-    monospace;
-  color: hsl(var(--muted-foreground));
-}
-.workflow-final .workflow-icon {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border-color: transparent;
-}
-.mini-bars {
-  display: flex;
-  gap: 4px;
-  align-items: end;
-  height: 27px;
-  margin-left: auto;
-}
-.mini-bars i {
-  display: block;
-  width: 5px;
-  height: 14px;
-  background: hsl(var(--primary) / 0.65);
-  border-radius: 1px;
-}
-.mini-bars i:nth-child(2) {
-  height: 21px;
-}
-.mini-bars i:nth-child(3) {
-  height: 17px;
-}
-.mini-bars i:nth-child(4) {
-  height: 27px;
-}
-.mini-bars i:nth-child(5) {
-  height: 23px;
-}
-.illustration-caption {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 24px;
-  border-top: 1px solid hsl(var(--border));
-  padding-top: 14px;
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
-}
-
 .skills-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -854,12 +781,6 @@ h3 {
   .hero-headline {
     font-size: 17px;
   }
-  .data-illustration {
-    padding: 17px;
-  }
-  .workflow-format {
-    display: none;
-  }
   .skills-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 32px;
@@ -946,12 +867,6 @@ h3 {
   }
   .hero-description {
     margin-top: 18px;
-  }
-  .data-illustration {
-    padding: 22px;
-  }
-  .workflow-format {
-    display: block;
   }
   .portfolio-section {
     padding-block: 44px;
@@ -1130,18 +1045,22 @@ h3 {
   gap: 20px;
   align-items: flex-start;
 }
-.resume-doc-avatar {
+.resume-doc-avatar.profile-avatar {
   flex: none;
   display: grid;
   place-items: center;
   width: 78px;
   height: 78px;
+  border: 0;
   border-radius: 50%;
   background: hsl(var(--primary) / 0.1);
   color: hsl(var(--primary));
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+.resume-doc-avatar.profile-avatar-fallback {
+  color: hsl(var(--primary));
 }
 .resume-doc-intro {
   font-size: 14px;
@@ -1336,7 +1255,7 @@ h3 {
   .resume-doc-profile-body {
     flex-direction: column;
   }
-  .resume-doc-avatar {
+  .resume-doc-avatar.profile-avatar {
     width: 62px;
     height: 62px;
     font-size: 19px;
@@ -1385,9 +1304,7 @@ h3 {
     font-size: 10.5pt;
   }
   .resume-doc-avatar {
-    background: transparent;
-    border: 1.5pt solid #000000;
-    color: #000000;
+    border: 0;
   }
   .resume-notice {
     margin-top: 0;

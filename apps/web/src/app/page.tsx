@@ -1,13 +1,10 @@
 import {
-  ArrowDown,
-  Database,
   FileText,
-  Layers3,
   MapPin,
-  ChartNoAxesCombined,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { fetchResume } from "@/lib/api";
+import { getResumeCached } from "@/lib/resume-server";
 import { resolveResume, staticResumeProjects } from "@/lib/resume";
 import { Button } from "@/components/ui/button";
 import { ContactSection } from "@/components/contact-section";
@@ -16,12 +13,17 @@ import { ExperienceSection } from "@/components/experience-section";
 import { HealthStatus } from "@/components/health-status";
 import { ProjectsClient } from "@/components/projects";
 import { SkillsSection } from "@/components/skills-section";
+import { profileImageUrl, BANNER_PATH } from "@/lib/avatar";
 
 export default async function Home() {
-  // Fetch live resume from the API; fall back to the static file if unavailable.
-  const apiResume = await fetchResume();
+  const apiResume = await getResumeCached();
   const { profile, skills, experience, education, contact } =
     resolveResume(apiResume);
+  const bannerSrc = profileImageUrl(
+    profile.banner_url,
+    profile.banner_updated_at,
+    BANNER_PATH,
+  );
 
   return (
     <>
@@ -35,15 +37,12 @@ export default async function Home() {
             <p className="eyebrow">Hello, welcome to my portfolio</p>
             <h1 id="intro-heading">
               {profile.name}
-              <span className="text-primary">.</span>
             </h1>
             <p className="hero-headline">{profile.headline}</p>
             <p className="hero-description">{profile.introduction}</p>
             <div className="hero-actions">
               <Button asChild size="lg">
-                <a href="#projects">
-                  View portfolio
-                </a>
+                <a href="#projects">View portfolio</a>
               </Button>
               <Button asChild variant="outline" size="lg">
                 <Link href="/resume">
@@ -59,66 +58,24 @@ export default async function Home() {
               </p>
             )}
           </div>
-          <div
-            className="data-illustration"
-            role="img"
-            aria-label="Illustration of a data workflow: raw data, transformation, and actionable insights."
-          >
-            <div className="illustration-top">
-              <span className="illustration-mark">DATA / WORKFLOW</span>
-              <span className="illustration-dots">
-                <i />
-                <i />
-                <i />
-              </span>
-            </div>
-            <div className="workflow-step">
-              <span className="workflow-icon">
-                <Database size={24} />
-              </span>
-              <div>
-                <small>01 / INGEST</small>
-                <strong>Raw data</strong>
-              </div>
-              <span className="workflow-format">CSV · SQL · API</span>
-            </div>
-            <div className="workflow-connector">
-              <span />
-              <span>clean · test · model</span>
-            </div>
-            <div className="workflow-step">
-              <span className="workflow-icon">
-                <Layers3 size={24} />
-              </span>
-              <div>
-                <small>02 / TRANSFORM</small>
-                <strong>Trusted models</strong>
-              </div>
-              <span className="workflow-format">dbt · Python</span>
-            </div>
-            <div className="workflow-connector">
-              <span />
-              <span>explore · visualize</span>
-            </div>
-            <div className="workflow-step workflow-final">
-              <span className="workflow-icon">
-                <ChartNoAxesCombined size={24} />
-              </span>
-              <div>
-                <small>03 / UNDERSTAND</small>
-                <strong>Actionable insights</strong>
-              </div>
-              <div className="mini-bars">
-                <i />
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-            </div>
-            <div className="illustration-caption">
-              <span>From source to story.</span>
-              <ArrowDown size={16} />
+          <div className="hero-visual">
+            <div className="hero-banner">
+              {bannerSrc ? (
+                <Image
+                  src={bannerSrc}
+                  alt={`${profile.name} hero banner`}
+                  width={1200}
+                  height={1200}
+                  priority
+                  sizes="(max-width: 639px) calc(100vw - 40px), (max-width: 1199px) 38vw, 420px"
+                  className="hero-banner-image"
+                  unoptimized
+                />
+              ) : (
+                <div className="hero-banner-placeholder">
+                  Add a banner photo from the profile settings.
+                </div>
+              )}
             </div>
           </div>
         </div>

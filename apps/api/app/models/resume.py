@@ -4,10 +4,15 @@ Sections: profile, skill_groups + skill_items, experience +
 experience_highlights, education, contact + contact_links.
 """
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.avatar import AVATAR_URL
 from app.db.base import Base
+
+PROFILE_BANNER_URL = "/api/v1/resume/profile/banner"
 
 
 class Profile(Base):
@@ -21,6 +26,32 @@ class Profile(Base):
     introduction: Mapped[str] = mapped_column(Text, nullable=False)
     about: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Portrait metadata. All three are NULL when no portrait exists; the absence of
+    # a portrait is expressed by the absence of metadata, never by a sentinel name.
+    avatar_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    avatar_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    avatar_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    banner_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    banner_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    banner_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    @property
+    def avatar_url(self) -> str | None:
+        """Canonical URL of the portrait, or None when there is none.
+
+        The stored filename stays inside the API: this is the only reference a
+        client ever receives.
+        """
+        return AVATAR_URL if self.avatar_filename else None
+
+    @property
+    def banner_url(self) -> str | None:
+        """Canonical URL of the hero banner, or None when there is none."""
+        return PROFILE_BANNER_URL if self.banner_filename else None
 
 
 class SkillGroup(Base):
@@ -46,6 +77,7 @@ class SkillItem(Base):
     group_id: Mapped[int] = mapped_column(ForeignKey("skill_groups.id", ondelete="CASCADE"), nullable=False)
     item: Mapped[str] = mapped_column(String(200), nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    idempotency_key: Mapped[str | None] = mapped_column(String(36), unique=True, nullable=True)
 
     group: Mapped["SkillGroup"] = relationship("SkillGroup", back_populates="items")
 

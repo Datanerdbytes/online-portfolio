@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
@@ -19,6 +21,14 @@ class ProfileBase(BaseModel):
 
 class ProfileResponse(ProfileBase):
     id: int
+    # Canonical URL of the portrait, or None when no portrait exists. The stored
+    # filename is never exposed.
+    avatar_url: str | None = None
+    avatar_updated_at: datetime | None = None
+    avatar_content_type: str | None = None
+    banner_url: str | None = None
+    banner_updated_at: datetime | None = None
+    banner_content_type: str | None = None
     model_config = ConfigDict(from_attributes=True)
 
 

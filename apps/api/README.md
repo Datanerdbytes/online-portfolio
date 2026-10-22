@@ -33,6 +33,8 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 
 - `GET /api/v1/health` — `{"status": "ok"}`. Process liveness only; never claims PostgreSQL is connected.
 - `GET /api/v1/projects` — Returns `{"items": [...]}` of project entries ordered by `display_order` ascending, then `id` ascending. Returns `{"items": []}` when none exist. A database failure returns a controlled HTTP 503 without exposing connection strings or raw exceptions. Public: no authentication required.
+- `GET /api/v1/resume/profile/avatar` and `GET /api/v1/resume/profile/banner` — Public image reads for the independent sidebar profile photo and square hero banner. Both return the image bytes with an ETag; absent images return 404.
+- `PUT` and `DELETE` on those image paths — Owner-only uploads and removals. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default). Image files are stored beneath `MEDIA_ROOT`; the database stores only generated filenames and image metadata.
 
 ## Protected project management (owner only)
 

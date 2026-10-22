@@ -74,12 +74,3 @@ export function failure(status: number) {
     default: return "The projects service is unavailable. Please try again.";
   }
 }
-
-/** Only the latest list request may publish state; cancel also invalidates completed responses. */
-export class LatestProjectRequest {
-  private active: AbortController | null = null;
-  start() { this.cancel(); const controller = new AbortController(); this.active = controller; return controller; }
-  owns(controller: AbortController) { return this.active === controller; }
-  finish(controller: AbortController) { if (this.owns(controller)) this.active = null; }
-  cancel() { const previous = this.active; this.active = null; previous?.abort(); }
-}

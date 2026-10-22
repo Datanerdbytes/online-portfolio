@@ -71,6 +71,9 @@ build/
 *.sqlite3
 *.db
 
+# Stored avatar media (never committed)
+apps/api/media/
+
 # Misc
 *.local
 .cache/

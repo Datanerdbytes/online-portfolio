@@ -96,6 +96,12 @@ function staticProfile(): ApiProfile {
     introduction: staticResume.profile.introduction,
     about: staticResume.profile.about,
     location: staticResume.profile.location ?? null,
+    avatar_url: null,
+    avatar_updated_at: null,
+    avatar_content_type: null,
+    banner_url: null,
+    banner_updated_at: null,
+    banner_content_type: null,
   };
 }
 

@@ -12,6 +12,12 @@ export type ApiProfile = {
   introduction: string;
   about: string;
   location: string | null;
+  avatar_url: string | null;
+  avatar_updated_at: string | null;
+  avatar_content_type: string | null;
+  banner_url: string | null;
+  banner_updated_at: string | null;
+  banner_content_type: string | null;
 };
 
 export type ApiSkillItem = { id: number; item: string; display_order: number };

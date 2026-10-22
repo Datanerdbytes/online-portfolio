@@ -7,6 +7,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Project } from "@/lib/api";
+import { ProfileAvatar } from "@/components/profile-avatar";
+import { profileImageUrl } from "@/lib/avatar";
 import {
   formatEducationPeriod,
   formatExperiencePeriod,
@@ -19,16 +21,6 @@ type Props = {
   projects: Project[];
 };
 
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .toUpperCase();
-}
-
 function telHref(phone: string): string {
   return `tel:${phone.replace(/[^+\d]/g, "")}`;
 }
@@ -39,6 +31,10 @@ export function ResumeDocument({ resume, projects }: Props) {
     isAbsoluteHttpUrl(link.url),
   );
   const publishedProjects = projects;
+  const profileImage = profileImageUrl(
+    profile.avatar_url,
+    profile.avatar_updated_at,
+  );
 
   return (
     <article className="resume-paper" aria-label={`${profile.name} resume`}>
@@ -86,9 +82,13 @@ export function ResumeDocument({ resume, projects }: Props) {
           Career profile
         </h2>
         <div className="resume-doc-profile-body">
-          <p className="resume-doc-avatar" aria-hidden="true">
-            {initialsOf(profile.name)}
-          </p>
+          <ProfileAvatar
+            src={profileImage}
+            name={profile.name}
+            size="resume"
+            className="resume-doc-avatar"
+            lazy={false}
+          />
           <div>
             <p className="resume-doc-intro">{profile.introduction}</p>
             <p className="resume-doc-about">{profile.about}</p>

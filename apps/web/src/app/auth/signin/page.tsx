@@ -38,7 +38,12 @@ export default function SignInPage() {
       else if (!response.ok) setError("Administration is unavailable. Please try again.");
       else {
         form.reset();
-        router.replace("/admin/projects");
+        const next = new URLSearchParams(window.location.search).get("next");
+        const destination =
+          next === "/admin/resume" || next === "/admin/projects"
+            ? next
+            : "/admin/projects";
+        router.replace(destination);
         router.refresh();
       }
     } catch {

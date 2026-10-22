@@ -464,20 +464,6 @@ test("reorder submits only changed targets in collections larger than 100", () =
   assert.equal(changedOrders(projects, { "p-0": "1.5" }).orders, null);
 });
 
-test("obsolete list requests are aborted and cannot publish or clear a newer request", () => {
-  const { LatestProjectRequest } = harness().load("lib/project-management");
-  const requests = new LatestProjectRequest();
-  const old = requests.start();
-  const newer = requests.start();
-  assert.equal(old.signal.aborted, true);
-  assert.equal(requests.owns(old), false);
-  requests.finish(old);
-  assert.equal(requests.owns(newer), true);
-  requests.cancel();
-  assert.equal(newer.signal.aborted, true);
-  assert.equal(requests.owns(newer), false);
-});
-
 test("admin links omit unsafe or malformed URLs", () => {
   const { safeProjectLink } = harness().load("lib/project-management");
   for (const value of [null, "javascript:alert(1)", "data:text/plain,x", "/relative", "https://exa mple.com", "http:/example.com"]) assert.equal(safeProjectLink(value), false);

@@ -4,7 +4,10 @@ Public reads (GET). Authenticated writes (POST / PATCH / DELETE) use the same
 bearer token pattern as the projects router.
 """
 
+import re
+
 from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.auth import AuthRoute
@@ -176,15 +179,63 @@ def delete_skill_group(
 def add_skill_item(
     group_id: int,
     body: SkillItemCreate,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),  # noqa: B008
     _owner: TokenClaims = Depends(get_current_owner),  # noqa: B008
 ):
+    if idempotency_key is not None:
+        if not re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-"
+            r"[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}",
+            idempotency_key,
+        ):
+            raise HTTPException(status_code=400, detail="Invalid idempotency key")
+        existing = (
+            db.query(SkillItem)
+            .filter(SkillItem.idempotency_key == idempotency_key)
+            .one_or_none()
+        )
+        if existing:
+            if (
+                existing.group_id != group_id
+                or existing.item != body.item
+                or existing.display_order != body.display_order
+            ):
+                raise HTTPException(status_code=409, detail="Idempotency key was already used")
+            return existing
+
     group = db.get(SkillGroup, group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Skill group not found")
-    item = SkillItem(group_id=group_id, item=body.item, display_order=body.display_order)
+    item = SkillItem(
+        group_id=group_id,
+        item=body.item,
+        display_order=body.display_order,
+        idempotency_key=idempotency_key,
+    )
     db.add(item)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        if idempotency_key is not None:
+            existing = (
+                db.query(SkillItem)
+                .filter(SkillItem.idempotency_key == idempotency_key)
+                .one_or_none()
+            )
+            if existing:
+                if (
+                    existing.group_id != group_id
+                    or existing.item != body.item
+                    or existing.display_order != body.display_order
+                ):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Idempotency key was already used",
+                    ) from None
+                return existing
+        raise
     db.refresh(item)
     return item
 
