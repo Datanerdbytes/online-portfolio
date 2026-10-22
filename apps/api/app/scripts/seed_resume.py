@@ -1,9 +1,13 @@
-"""Seed the resume content tables from the existing resume.ts data.
+"""Seed and repair the resume content tables from the canonical resume data.
 
 Run from apps/api with the venv active:
     python -m app.scripts.seed_resume
 
-Safe to re-run — skips rows that already exist (idempotent via slug/id checks).
+Safe to re-run. Profile, experience, education, and contact rows are inserted
+only when missing. Skill groups are *synchronised*: canonical entries are
+inserted when missing, legacy names are normalised, duplicates are removed, and
+display order is reset so the canonical entries lead each group. Entries added
+through the admin UI are preserved and kept after the canonical ones.
 """
 
 import sys
@@ -28,6 +32,133 @@ from app.models.resume import (
 )
 
 engine = create_engine(settings.DATABASE_URL)
+
+# Canonical skill groups, in resume order. This is the single source of truth
+# for the skills section and is mirrored by the web fallback generator.
+CANONICAL_SKILL_GROUPS: list[tuple[str, list[str]]] = [
+    ("Data Engineering & Cloud Warehousing", [
+        "Medallion Architecture (Bronze/Silver/Gold)",
+        "Google BigQuery", "Snowflake", "dbt Core",
+        "Microsoft SQL Server", "PostgreSQL", "Star Schema Design",
+        "ETL/ELT Pipelines", "Watermarking", "Cryptographic Hashing (SHA-256)",
+    ]),
+    ("Programming & Tools", [
+        "Python (Pandas, SQLAlchemy)", "T-SQL", "Docker",
+        "Google Cloud Run", "GitHub Actions (CI/CD)", "uv", "Git/GitHub",
+    ]),
+    ("Data Visualization & Analytics", [
+        "Tableau (Desktop & Public)", "Plotly Dash",
+        "Executive Dashboard Design", "Data Storytelling",
+        "Advanced Excel (Power Query, Pivot Tables)",
+    ]),
+    ("Core Strengths", [
+        "Analytical Troubleshooting", "Pipeline Observability",
+        "Cross-Functional Communication",
+    ]),
+]
+
+# Names written before the canonical list existed. Each maps to the canonical
+# entry it becomes. When the canonical entry already exists in the same group
+# the legacy row is a duplicate and is removed instead of renamed.
+LEGACY_SKILL_ITEMS: dict[str, str] = {
+    "Python": "Python (Pandas, SQLAlchemy)",
+    "UV": "uv",
+}
+
+
+def _group_items(session: Session, group_id: int) -> list[SkillItem]:
+    return list(
+        session.execute(
+            select(SkillItem)
+            .where(SkillItem.group_id == group_id)
+            .order_by(SkillItem.display_order, SkillItem.id)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def sync_skills(session: Session) -> None:
+    """Reconcile the skill tables with the canonical list.
+
+    Canonical entries are added when missing, legacy names are normalised,
+    duplicate rows are removed, and display order is rewritten so the
+    canonical entries lead each group. Entries that are not part of the
+    canonical list are preserved and keep their relative order after it.
+    """
+    groups = {
+        group.label: group
+        for group in session.execute(select(SkillGroup)).scalars().all()
+    }
+
+    for order, (label, canonical_items) in enumerate(CANONICAL_SKILL_GROUPS):
+        group = groups.get(label)
+        if group is None:
+            group = SkillGroup(label=label, display_order=order)
+            session.add(group)
+            session.flush()
+            groups[label] = group
+            print(f"  ✓ Skill group '{label}' created")
+        elif group.display_order != order:
+            group.display_order = order
+
+        items = _group_items(session, group.id)
+
+        # Normalise legacy names; drop rows that duplicate a canonical entry.
+        for item in list(items):
+            canonical = LEGACY_SKILL_ITEMS.get(item.item)
+            if canonical is None:
+                continue
+            duplicate = next(
+                (
+                    other
+                    for other in items
+                    if other.id != item.id and other.item == canonical
+                ),
+                None,
+            )
+            if duplicate is not None:
+                session.delete(item)
+                print(f"  ✓ Removed duplicate skill '{item.item}' from '{label}'")
+            else:
+                print(f"  ✓ Renamed skill '{item.item}' to '{canonical}' in '{label}'")
+                item.item = canonical
+        session.flush()
+
+        # Remove exact duplicates of the same name inside one group.
+        items = _group_items(session, group.id)
+        seen: set[str] = set()
+        for item in items:
+            if item.item in seen:
+                session.delete(item)
+                print(f"  ✓ Removed duplicate skill '{item.item}' from '{label}'")
+            else:
+                seen.add(item.item)
+        session.flush()
+
+        # Add canonical entries that are missing.
+        items = _group_items(session, group.id)
+        present = {item.item for item in items}
+        for name in canonical_items:
+            if name in present:
+                continue
+            session.add(SkillItem(group_id=group.id, item=name, display_order=0))
+            print(f"  ✓ Skill '{name}' added to '{label}'")
+        session.flush()
+
+        # Canonical entries lead the group, extra entries follow in their
+        # existing relative order.
+        items = _group_items(session, group.id)
+        extras = [item for item in items if item.item not in canonical_items]
+        for index, name in enumerate(canonical_items):
+            for item in items:
+                if item.item == name:
+                    item.display_order = index
+                    break
+        for offset, item in enumerate(extras):
+            item.display_order = 900 + offset
+
+    session.flush()
 
 
 def seed():
@@ -56,38 +187,7 @@ def seed():
             print("  - Profile already exists, skipping")
 
         # --- Skills ---
-        skills_data = [
-            ("Data Engineering & Cloud Warehousing", [
-                "Medallion Architecture (Bronze/Silver/Gold)",
-                "Google BigQuery", "Snowflake", "dbt Core",
-                "Microsoft SQL Server", "PostgreSQL", "Star Schema Design",
-                "ETL/ELT Pipelines", "Watermarking", "Cryptographic Hashing (SHA-256)",
-            ]),
-            ("Programming & Tools", [
-                "Python (Pandas, SQLAlchemy)", "T-SQL", "Docker",
-                "Google Cloud Run", "GitHub Actions (CI/CD)", "uv", "Git/GitHub",
-            ]),
-            ("Data Visualization & Analytics", [
-                "Tableau (Desktop & Public)", "Plotly Dash",
-                "Executive Dashboard Design", "Data Storytelling",
-                "Advanced Excel (Power Query, Pivot Tables)",
-            ]),
-            ("Core Strengths", [
-                "Analytical Troubleshooting", "Pipeline Observability",
-                "Cross-Functional Communication",
-            ]),
-        ]
-        existing_groups = session.execute(select(SkillGroup)).scalars().all()
-        if not existing_groups:
-            for order, (label, items) in enumerate(skills_data):
-                group = SkillGroup(label=label, display_order=order)
-                session.add(group)
-                session.flush()  # get group.id
-                for i, item in enumerate(items):
-                    session.add(SkillItem(group_id=group.id, item=item, display_order=i))
-            print("  ✓ Skills seeded")
-        else:
-            print("  - Skills already exist, skipping")
+        sync_skills(session)
 
         # --- Experience ---
         experience_data = [
