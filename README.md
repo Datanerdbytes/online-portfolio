@@ -124,19 +124,38 @@ curl http://localhost:3000/api/health
 
 `GET /api/v1/health` is a process-liveness check only. It never claims that PostgreSQL is connected. Database connectivity is established separately by running PostgreSQL via Compose (step 2) and applying migrations (step 4). If database readiness is ever added, it belongs on a separate endpoint such as `GET /api/v1/ready`, never on `/api/v1/health`.
 
+### 7. Seed the resume content
+
+**Starting directory:** repository root (the subshell runs the script from `apps/api`)
+
+```bash
+(cd apps/api && uv run python -m app.scripts.seed_resume)
+```
+
+The script inserts the resume content that is missing and is safe to run repeatedly. It also synchronizes the skill list: canonical skills from the resume PDF are created or restored, renamed entries are normalized, and duplicate skills inside a group are removed. Rows added through the administration interface are preserved.
+
+Refresh the frontend fallback copy after seeding (the API must be running):
+
+```bash
+(cd apps/web && API_BASE_URL=http://127.0.0.1:8000 npm run sync:resume-content)
+```
+
 ## Available Commands
 
 ### Frontend (apps/web)
 
 Root workspace scripts run from the repository root; equivalently run `npm run <command>` from `apps/web`.
 
-| Command                 | Description                                      | Directory  |
-| ----------------------- | ------------------------------------------------ | ---------- |
-| `npm run dev:web`       | Start development server (http://localhost:3000) | Root       |
-| `npm run build:web`     | Production build                                 | Root       |
-| `npm run start`         | Start production server                          | `apps/web` |
-| `npm run lint:web`      | Run ESLint                                       | Root       |
-| `npm run typecheck:web` | Run TypeScript compiler check                    | Root       |
+| Command                             | Description                                      | Directory  |
+| ----------------------------------- | ------------------------------------------------ | ---------- |
+| `npm run dev:web`                   | Start development server (http://localhost:3000) | Root       |
+| `npm run build:web`                 | Production build                                 | Root       |
+| `npm run start`                     | Start production server                          | `apps/web` |
+| `npm run lint:web`                  | Run ESLint                                       | Root       |
+| `npm run typecheck:web`             | Run TypeScript compiler check                    | Root       |
+| `npm run test`                      | Run the frontend test suite                      | `apps/web` |
+| `npm run sync:resume-content`       | Regenerate the fallback copy from the API        | `apps/web` |
+| `npm run sync:resume-content:check` | Fail when the fallback copy is stale             | `apps/web` |
 
 ### Backend (apps/api)
 
@@ -150,6 +169,7 @@ All backend commands run from `apps/api` so that `app.core.config` loads `apps/a
 | `uv run alembic revision --autogenerate -m "message"` | Create migration                                 |
 | `uv run ruff check .`                                 | Lint                                             |
 | `uv run ruff format .`                                | Format                                           |
+| `uv run python -m app.scripts.seed_resume`            | Seed or synchronize resume content               |
 
 ### Root
 
@@ -162,6 +182,29 @@ All backend commands run from `apps/api` so that `app.core.config` loads `apps/a
 | `npm run typecheck:web` | Type-check frontend            |
 | `npm run format`        | Format all files with Prettier |
 | `npm run format:check`  | Check formatting with Prettier |
+
+## Resume Content and Fallback
+
+The `/resume` page and the homepage read their content from the API, which serves the rows stored in PostgreSQL.
+
+```
+PostgreSQL → GET /api/v1/resume, GET /api/v1/projects → frontend
+```
+
+When the API is unavailable the frontend falls back to `apps/web/src/content/resume.ts`, a repository copy of the same content, and says so on the page. The fallback file is generated, not edited by hand:
+
+| File                                       | Role                                                      |
+| ------------------------------------------ | --------------------------------------------------------- |
+| `apps/web/src/content/resume-types.ts`     | Hand-written types shared by the API and fallback shapes  |
+| `apps/web/src/content/resume.ts`           | Generated fallback content (skills, experience, projects) |
+| `apps/web/scripts/sync-resume-content.mjs` | Reads the API and rewrites the fallback file              |
+
+Regenerate it after seeding or editing content, and use the check mode in CI to catch drift:
+
+```bash
+(cd apps/web && API_BASE_URL=http://127.0.0.1:8000 npm run sync:resume-content)
+(cd apps/web && API_BASE_URL=http://127.0.0.1:8000 npm run sync:resume-content:check)
+```
 
 ## Administration
 
