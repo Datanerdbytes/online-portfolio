@@ -18,7 +18,13 @@ export function createProfileImageHandlers(
       const ifNoneMatch = req.headers.get("if-none-match");
       if (ifNoneMatch) headers.set("if-none-match", ifNoneMatch);
 
-      const upstream = await fetch(`${API_BASE_URL}${apiPath}`, {
+      // Keep the upload version in both cache keys. Otherwise the backend CDN
+      // can return old bytes even when the browser requests a new image version.
+      const upstreamUrl = new URL(`${API_BASE_URL}${apiPath}`);
+      const version = new URL(req.url).searchParams.get("v");
+      if (version) upstreamUrl.searchParams.set("v", version);
+
+      const upstream = await fetch(upstreamUrl, {
         method: "GET",
         headers,
         cache: "no-store",

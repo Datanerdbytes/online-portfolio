@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import TokenClaims, verify_owner_token
 from app.core.avatar import AvatarValidationError, validate_avatar_payload
 from app.core.config import settings
+from app.core.screenshots import InvalidScreenshot, optimize_screenshot
 from app.core.storage import (
     ProfileImageError,
     ProfileImageNotFound,
@@ -160,7 +161,7 @@ def upload_project_screenshot(
     size = _uploaded_size(file)
     data = file.file.read(limit + 1)
     try:
-        detected = validate_avatar_payload(
+        validate_avatar_payload(
             declared_content_type=file.content_type,
             declared_size=size,
             data=data,
@@ -169,6 +170,12 @@ def upload_project_screenshot(
     except AvatarValidationError as exc:
         detail = "Screenshot too large" if exc.status_code == 413 else exc.detail
         raise HTTPException(status_code=exc.status_code, detail=detail) from None
+
+    try:
+        data = optimize_screenshot(data)
+    except InvalidScreenshot:
+        raise HTTPException(status_code=400, detail="Invalid request") from None
+    detected = "image/webp"
 
     try:
         filename = store.save(data, detected)

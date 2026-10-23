@@ -33,6 +33,12 @@ from sqlalchemy.orm import Session
 from app.core.auth import TokenClaims, verify_owner_token
 from app.core.avatar import AvatarValidationError, validate_avatar_payload
 from app.core.config import settings
+from app.core.image_processing import (
+    HERO_BANNER_MAX_EDGE,
+    PROFILE_PHOTO_MAX_EDGE,
+    InvalidImage,
+    optimize_image,
+)
 from app.core.storage import (
     ProfileImageError,
     ProfileImageNotFound,
@@ -225,7 +231,7 @@ def _upload_profile_image(
     # without buffering the whole file.
     data = file.file.read(limit + 1)
     try:
-        detected = validate_avatar_payload(
+        validate_avatar_payload(
             declared_content_type=file.content_type,
             declared_size=size,
             data=data,
@@ -233,6 +239,16 @@ def _upload_profile_image(
         )
     except AvatarValidationError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from None
+
+    try:
+        data = optimize_image(
+            data,
+            max_edge=PROFILE_PHOTO_MAX_EDGE if image_kind == "avatar" else HERO_BANNER_MAX_EDGE,
+            quality=85,
+        )
+    except InvalidImage:
+        raise HTTPException(status_code=400, detail="Invalid request") from None
+    detected = "image/webp"
 
     filename_field, content_type_field, updated_at_field = _IMAGE_FIELDS[image_kind]
     previous_filename = getattr(profile, filename_field)
@@ -281,9 +297,7 @@ def upload_banner(
     return _upload_profile_image("banner", file, db, store)
 
 
-def _delete_profile_image(
-    image_kind: ImageKind, db: Session, store: ProfileImageStore
-) -> None:
+def _delete_profile_image(image_kind: ImageKind, db: Session, store: ProfileImageStore) -> None:
     profile = db.query(Profile).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")

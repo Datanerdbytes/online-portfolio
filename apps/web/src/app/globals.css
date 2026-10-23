@@ -414,6 +414,7 @@ h3 {
 .hero-banner {
   position: relative;
   width: min(100%, 420px);
+  margin-block: clamp(24px, 3vw, 40px);
   aspect-ratio: 1;
   overflow: hidden;
   border: 1px solid hsl(var(--border));

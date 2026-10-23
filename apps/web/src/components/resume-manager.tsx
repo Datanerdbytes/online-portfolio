@@ -56,7 +56,9 @@ type Props = {
 // ---------------------------------------------------------------------------
 
 function handleMutationError(err: unknown): string {
-  return err instanceof Error ? err.message : "Unexpected error. Please try again.";
+  return err instanceof Error
+    ? err.message
+    : "Unexpected error. Please try again.";
 }
 
 function ProfileImageControl({
@@ -100,7 +102,9 @@ function ProfileImageControl({
       }
       try {
         await upload.mutateAsync(file);
-        setMessage(`${label} updated. Reload the public page to see it.`);
+        setMessage(
+          `${label} resized and saved successfully. Reload the public page to see it.`
+        );
       } catch (err) {
         setIsError(true);
         setMessage(handleMutationError(err));
@@ -108,7 +112,7 @@ function ProfileImageControl({
         event.target.value = "";
       }
     },
-    [label, upload],
+    [label, upload]
   );
 
   const onRemove = useCallback(async () => {
@@ -125,43 +129,49 @@ function ProfileImageControl({
   }, [label, remove]);
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3 rounded-lg border p-4">
       <p className="text-sm font-medium">{label}</p>
-      <div className="flex flex-wrap items-center gap-4">
-        {isAvatar ? (
-          <ProfileAvatar
-            src={imageSrc}
-            alt="Profile photo preview"
-            name={name}
-            size="sm"
-            lazy={false}
-          />
-        ) : (
-          <div className="relative size-40 overflow-hidden rounded-md border bg-muted">
-            {imageSrc ? (
-              <Image
-                src={imageSrc}
-                alt="Square hero banner preview"
-                fill
-                sizes="160px"
-                className="object-cover"
-                unoptimized
-              />
-            ) : (
-              <div className="flex size-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-                Square banner preview
-              </div>
-            )}
-          </div>
-        )}
-        <div className="flex flex-col gap-2">
+      <div className="flex flex-col items-start gap-3">
+        <div className="flex h-32 items-center">
+          {isAvatar ? (
+            <ProfileAvatar
+              src={imageSrc}
+              alt="Profile photo preview"
+              name={name}
+              size="sm"
+              lazy={false}
+            />
+          ) : (
+            <div className="relative size-32 overflow-hidden rounded-md border bg-muted">
+              {imageSrc ? (
+                <Image
+                  src={imageSrc}
+                  alt="Square hero banner preview"
+                  fill
+                  sizes="128px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <div className="flex size-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
+                  Square banner preview
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex w-full min-w-0 flex-col gap-2">
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={busy}
             >
-              {busy ? "Uploading…" : imageUrl ? "Replace photo" : "Upload photo"}
+              {busy
+                ? "Uploading…"
+                : imageUrl
+                  ? "Replace photo"
+                  : "Upload photo"}
             </Button>
             {imageUrl && (
               <Button
@@ -175,13 +185,13 @@ function ProfileImageControl({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            JPEG, PNG, or WebP up to 2 MB.
+            JPEG, PNG, or WebP up to 2 MB. Automatically resized and compressed.
             {!isAvatar && " Displayed as a square crop."}
           </p>
           {message && (
             <p
               className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
-              role={isError ? "alert" : undefined}
+              role={isError ? "alert" : "status"}
             >
               {message}
             </p>
@@ -254,16 +264,18 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
         <CardTitle>Profile</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <ProfileImageControl
-          kind="avatar"
-          profile={profile}
-          name={profile?.name ?? values.name}
-        />
-        <ProfileImageControl
-          kind="banner"
-          profile={profile}
-          name={profile?.name ?? values.name}
-        />
+        <div className="grid gap-4 md:grid-cols-2">
+          <ProfileImageControl
+            kind="avatar"
+            profile={profile}
+            name={profile?.name ?? values.name}
+          />
+          <ProfileImageControl
+            kind="banner"
+            profile={profile}
+            name={profile?.name ?? values.name}
+          />
+        </div>
         {(
           [
             ["Name", "name", false],
@@ -316,13 +328,21 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
 // ---------------------------------------------------------------------------
 
 function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
-  const [editingItem, setEditingItem] = useState<{ id: number; item: string; groupId: number } | null>(null);
+  const [editingItem, setEditingItem] = useState<{
+    id: number;
+    item: string;
+    groupId: number;
+  } | null>(null);
   const [itemValue, setItemValue] = useState("");
   const [addingToGroup, setAddingToGroup] = useState<number | null>(null);
   const [newItemValue, setNewItemValue] = useState("");
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [groupLabelValue, setGroupLabelValue] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<{ kind: "group"; id: number; label: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    kind: "group";
+    id: number;
+    label: string;
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
@@ -343,7 +363,10 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
     if (!editingItem) return;
     setMessage("");
     try {
-      await updateSkillItem.mutateAsync({ id: editingItem.id, body: { item: itemValue } });
+      await updateSkillItem.mutateAsync({
+        id: editingItem.id,
+        body: { item: itemValue },
+      });
       setIsError(false);
       setMessage("Saved. Reload the public page to see it.");
       setEditingItem(null);
@@ -357,7 +380,10 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
     if (editingGroupId === null) return;
     setMessage("");
     try {
-      await updateSkillGroup.mutateAsync({ id: editingGroupId, body: { label: groupLabelValue } });
+      await updateSkillGroup.mutateAsync({
+        id: editingGroupId,
+        body: { label: groupLabelValue },
+      });
       setIsError(false);
       setMessage("Saved. Reload the public page to see it.");
       setEditingGroupId(null);
@@ -367,23 +393,26 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
     }
   }, [editingGroupId, groupLabelValue, updateSkillGroup]);
 
-  const addItem = useCallback(async (groupId: number) => {
-    if (!newItemValue.trim()) return;
-    setMessage("");
-    try {
-      await addSkillItem.mutateAsync({
-        groupId,
-        body: { item: newItemValue.trim(), display_order: 999 },
-      });
-      setIsError(false);
-      setMessage("Added. Reload the public page to see it.");
-      setAddingToGroup(null);
-      setNewItemValue("");
-    } catch (err) {
-      setIsError(true);
-      setMessage(handleMutationError(err));
-    }
-  }, [newItemValue, addSkillItem]);
+  const addItem = useCallback(
+    async (groupId: number) => {
+      if (!newItemValue.trim()) return;
+      setMessage("");
+      try {
+        await addSkillItem.mutateAsync({
+          groupId,
+          body: { item: newItemValue.trim(), display_order: 999 },
+        });
+        setIsError(false);
+        setMessage("Added. Reload the public page to see it.");
+        setAddingToGroup(null);
+        setNewItemValue("");
+      } catch (err) {
+        setIsError(true);
+        setMessage(handleMutationError(err));
+      }
+    },
+    [newItemValue, addSkillItem]
+  );
 
   const handleDeleteGroup = useCallback(async () => {
     if (!deleteTarget) return;
@@ -399,17 +428,20 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
     }
   }, [deleteTarget, deleteSkillGroup]);
 
-  const handleDeleteItem = useCallback(async (id: number) => {
-    setMessage("");
-    try {
-      await deleteSkillItem.mutateAsync(id);
-      setIsError(false);
-      setMessage("Deleted. Reload the public page to see it.");
-    } catch (err) {
-      setIsError(true);
-      setMessage(handleMutationError(err));
-    }
-  }, [deleteSkillItem]);
+  const handleDeleteItem = useCallback(
+    async (id: number) => {
+      setMessage("");
+      try {
+        await deleteSkillItem.mutateAsync(id);
+        setIsError(false);
+        setMessage("Deleted. Reload the public page to see it.");
+      } catch (err) {
+        setIsError(true);
+        setMessage(handleMutationError(err));
+      }
+    },
+    [deleteSkillItem]
+  );
 
   return (
     <div className="space-y-4">
@@ -436,7 +468,11 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                   setMessage("");
                 }}
                 onDelete={() => {
-                  setDeleteTarget({ kind: "group", id: group.id, label: group.label });
+                  setDeleteTarget({
+                    kind: "group",
+                    id: group.id,
+                    label: group.label,
+                  });
                   setMessage("");
                 }}
                 disabled={actionDisabled}
@@ -449,15 +485,23 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                 <Button size="sm" onClick={saveGroup} disabled={saving}>
                   {saving ? "…" : "Save"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setEditingGroupId(null)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setEditingGroupId(null)}
+                >
                   Cancel
                 </Button>
               </div>
             ) : null}
             <ul className="divide-y divide-border">
               {group.items.map((item) => (
-                <li key={item.id} className="flex items-center justify-between py-2 text-sm">
-                  {editingItem?.id === item.id && editingItem?.groupId === group.id ? (
+                <li
+                  key={item.id}
+                  className="flex items-center justify-between py-2 text-sm"
+                >
+                  {editingItem?.id === item.id &&
+                  editingItem?.groupId === group.id ? (
                     <div className="flex flex-1 items-center gap-2">
                       <input
                         className="flex-1 rounded-md border bg-background px-2 py-1 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
@@ -469,7 +513,11 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                       <Button size="sm" onClick={saveItem} disabled={saving}>
                         {saving ? "…" : "Save"}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditingItem(null)}
+                      >
                         Cancel
                       </Button>
                     </div>
@@ -479,7 +527,11 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                       <RecordActionButtons
                         recordTitle={item.item}
                         onEdit={() => {
-                          setEditingItem({ id: item.id, item: item.item, groupId: group.id });
+                          setEditingItem({
+                            id: item.id,
+                            item: item.item,
+                            groupId: group.id,
+                          });
                           setItemValue(item.item);
                           setMessage("");
                         }}
@@ -502,17 +554,39 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
                   onChange={(e) => setNewItemValue(e.target.value)}
                   disabled={saving}
                   autoFocus
-                  onKeyDown={(e) => { if (e.key === "Enter") addItem(group.id); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addItem(group.id);
+                  }}
                 />
-                <Button size="sm" onClick={() => addItem(group.id)} disabled={saving}>
+                <Button
+                  size="sm"
+                  onClick={() => addItem(group.id)}
+                  disabled={saving}
+                >
                   {saving ? "…" : "Add"}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => { setAddingToGroup(null); setNewItemValue(""); }}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setAddingToGroup(null);
+                    setNewItemValue("");
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
             ) : (
-              <Button size="sm" variant="ghost" className="mt-2 text-xs" onClick={() => { setAddingToGroup(group.id); setNewItemValue(""); setMessage(""); }}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-2 text-xs"
+                onClick={() => {
+                  setAddingToGroup(group.id);
+                  setNewItemValue("");
+                  setMessage("");
+                }}
+              >
                 + Add skill
               </Button>
             )}
@@ -532,7 +606,11 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
         />
       )}
       {message && (
-        <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>
+        <p
+          className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+        >
+          {message}
+        </p>
       )}
     </div>
   );
@@ -562,7 +640,10 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
     current: false,
     description: "",
   });
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
@@ -628,7 +709,15 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
       setIsError(false);
       setMessage("Added. Reload the public page to see it.");
       setAdding(false);
-      setNewValues({ slug: "", role: "", organization: "", started: "", ended: "", current: false, description: "" });
+      setNewValues({
+        slug: "",
+        role: "",
+        organization: "",
+        started: "",
+        ended: "",
+        current: false,
+        description: "",
+      });
     } catch (err) {
       setIsError(true);
       setMessage(handleMutationError(err));
@@ -677,14 +766,24 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
       </div>
 
       {!adding && (
-        <Button variant="outline" size="sm" onClick={() => { setAdding(true); setEditing(null); setMessage(""); }}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setAdding(true);
+            setEditing(null);
+            setMessage("");
+          }}
+        >
           + Add experience
         </Button>
       )}
 
       {adding && (
         <Card>
-          <CardHeader><CardTitle className="text-base">New experience entry</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">New experience entry</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             {(
               [
@@ -700,29 +799,60 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
                 <input
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   value={newValues[key] as string}
-                  onChange={(e) => setNewValues((v) => ({ ...v, [key]: e.target.value }))}
+                  onChange={(e) =>
+                    setNewValues((v) => ({ ...v, [key]: e.target.value }))
+                  }
                   disabled={saving}
                 />
               </div>
             ))}
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="new-current" checked={newValues.current}
-                onChange={(e) => setNewValues((v) => ({ ...v, current: e.target.checked }))} disabled={saving} />
-              <label htmlFor="new-current" className="text-sm">Currently working here</label>
+              <input
+                type="checkbox"
+                id="new-current"
+                checked={newValues.current}
+                onChange={(e) =>
+                  setNewValues((v) => ({ ...v, current: e.target.checked }))
+                }
+                disabled={saving}
+              />
+              <label htmlFor="new-current" className="text-sm">
+                Currently working here
+              </label>
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium">Description (optional)</label>
+              <label className="block text-sm font-medium">
+                Description (optional)
+              </label>
               <textarea
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[60px] focus-visible:outline-2 focus-visible:outline-offset-2"
                 value={newValues.description}
-                onChange={(e) => setNewValues((v) => ({ ...v, description: e.target.value }))}
+                onChange={(e) =>
+                  setNewValues((v) => ({ ...v, description: e.target.value }))
+                }
                 disabled={saving}
               />
             </div>
-            {message && <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>}
+            {message && (
+              <p
+                className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {message}
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button onClick={saveNew} disabled={saving}>{saving ? "Saving…" : "Add entry"}</Button>
-              <Button variant="outline" onClick={() => { setAdding(false); setMessage(""); }}>Cancel</Button>
+              <Button onClick={saveNew} disabled={saving}>
+                {saving ? "Saving…" : "Add entry"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAdding(false);
+                  setMessage("");
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -749,29 +879,60 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
                 <input
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   value={values[key] as string}
-                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [key]: e.target.value }))
+                  }
                   disabled={saving}
                 />
               </div>
             ))}
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="exp-current" checked={values.current}
-                onChange={(e) => setValues((v) => ({ ...v, current: e.target.checked }))} disabled={saving} />
-              <label htmlFor="exp-current" className="text-sm">Currently working here</label>
+              <input
+                type="checkbox"
+                id="exp-current"
+                checked={values.current}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, current: e.target.checked }))
+                }
+                disabled={saving}
+              />
+              <label htmlFor="exp-current" className="text-sm">
+                Currently working here
+              </label>
             </div>
             <div className="space-y-1">
-              <label className="block text-sm font-medium">Description (optional)</label>
+              <label className="block text-sm font-medium">
+                Description (optional)
+              </label>
               <textarea
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[60px] focus-visible:outline-2 focus-visible:outline-offset-2"
                 value={values.description}
-                onChange={(e) => setValues((v) => ({ ...v, description: e.target.value }))}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, description: e.target.value }))
+                }
                 disabled={saving}
               />
             </div>
-            {message && <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>}
+            {message && (
+              <p
+                className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {message}
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-              <Button variant="outline" onClick={() => { setEditing(null); setMessage(""); }}>Cancel</Button>
+              <Button onClick={save} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditing(null);
+                  setMessage("");
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -800,9 +961,23 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
 function EducationTab({ education }: { education: ApiEducation[] }) {
   const [editing, setEditing] = useState<ApiEducation | null>(null);
   const [adding, setAdding] = useState(false);
-  const [values, setValues] = useState({ qualification: "", institution: "", started: "", ended: "" });
-  const [newValues, setNewValues] = useState({ slug: "", qualification: "", institution: "", started: "", ended: "" });
-  const [deleteTarget, setDeleteTarget] = useState<{ id: number; label: string } | null>(null);
+  const [values, setValues] = useState({
+    qualification: "",
+    institution: "",
+    started: "",
+    ended: "",
+  });
+  const [newValues, setNewValues] = useState({
+    slug: "",
+    qualification: "",
+    institution: "",
+    started: "",
+    ended: "",
+  });
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
@@ -817,7 +992,12 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
   const startEdit = (edu: ApiEducation) => {
     setAdding(false);
     setEditing(edu);
-    setValues({ qualification: edu.qualification, institution: edu.institution, started: edu.started ?? "", ended: edu.ended ?? "" });
+    setValues({
+      qualification: edu.qualification,
+      institution: edu.institution,
+      started: edu.started ?? "",
+      ended: edu.ended ?? "",
+    });
     setMessage("");
   };
 
@@ -857,7 +1037,13 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
       setIsError(false);
       setMessage("Added. Reload the public page to see it.");
       setAdding(false);
-      setNewValues({ slug: "", qualification: "", institution: "", started: "", ended: "" });
+      setNewValues({
+        slug: "",
+        qualification: "",
+        institution: "",
+        started: "",
+        ended: "",
+      });
     } catch (err) {
       setIsError(true);
       setMessage(handleMutationError(err));
@@ -881,10 +1067,15 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
   return (
     <div className="space-y-4">
       {education.map((edu) => (
-        <div key={edu.id} className="flex items-center justify-between rounded-md border p-3">
+        <div
+          key={edu.id}
+          className="flex items-center justify-between rounded-md border p-3"
+        >
           <div>
             <p className="font-medium text-sm">{edu.qualification}</p>
-            <p className="text-xs text-muted-foreground">{edu.institution} · {edu.started}–{edu.ended}</p>
+            <p className="text-xs text-muted-foreground">
+              {edu.institution} · {edu.started}–{edu.ended}
+            </p>
           </div>
           <RecordActionButtons
             recordTitle={edu.qualification}
@@ -899,14 +1090,24 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
       ))}
 
       {!adding && (
-        <Button variant="outline" size="sm" onClick={() => { setAdding(true); setEditing(null); setMessage(""); }}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setAdding(true);
+            setEditing(null);
+            setMessage("");
+          }}
+        >
           + Add education
         </Button>
       )}
 
       {adding && (
         <Card>
-          <CardHeader><CardTitle className="text-base">New education entry</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">New education entry</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             {(
               [
@@ -922,15 +1123,33 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
                 <input
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   value={newValues[key]}
-                  onChange={(e) => setNewValues((v) => ({ ...v, [key]: e.target.value }))}
+                  onChange={(e) =>
+                    setNewValues((v) => ({ ...v, [key]: e.target.value }))
+                  }
                   disabled={saving}
                 />
               </div>
             ))}
-            {message && <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>}
+            {message && (
+              <p
+                className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {message}
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button onClick={saveNew} disabled={saving}>{saving ? "Saving…" : "Add entry"}</Button>
-              <Button variant="outline" onClick={() => { setAdding(false); setMessage(""); }}>Cancel</Button>
+              <Button onClick={saveNew} disabled={saving}>
+                {saving ? "Saving…" : "Add entry"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAdding(false);
+                  setMessage("");
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -938,25 +1157,52 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
 
       {editing && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Editing: {editing.qualification}</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Editing: {editing.qualification}
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             {(
-              [["Qualification", "qualification"], ["Institution", "institution"], ["Started (YYYY-MM)", "started"], ["Ended (YYYY-MM)", "ended"]] as [string, keyof typeof values][]
+              [
+                ["Qualification", "qualification"],
+                ["Institution", "institution"],
+                ["Started (YYYY-MM)", "started"],
+                ["Ended (YYYY-MM)", "ended"],
+              ] as [string, keyof typeof values][]
             ).map(([label, key]) => (
               <div key={key} className="space-y-1">
                 <label className="block text-sm font-medium">{label}</label>
                 <input
                   className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   value={values[key]}
-                  onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+                  onChange={(e) =>
+                    setValues((v) => ({ ...v, [key]: e.target.value }))
+                  }
                   disabled={saving}
                 />
               </div>
             ))}
-            {message && <p className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}>{message}</p>}
+            {message && (
+              <p
+                className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {message}
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
-              <Button variant="outline" onClick={() => { setEditing(null); setMessage(""); }}>Cancel</Button>
+              <Button onClick={save} disabled={saving}>
+                {saving ? "Saving…" : "Save"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditing(null);
+                  setMessage("");
+                }}
+              >
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -1020,7 +1266,9 @@ function ContactTab({ contact }: { contact: ApiContact | null }) {
           <input
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
             value={values.email}
-            onChange={(e) => setValues((v) => ({ ...v, email: e.target.value }))}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, email: e.target.value }))
+            }
             disabled={saving}
           />
         </div>
@@ -1029,7 +1277,9 @@ function ContactTab({ contact }: { contact: ApiContact | null }) {
           <input
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
             value={values.phone}
-            onChange={(e) => setValues((v) => ({ ...v, phone: e.target.value }))}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, phone: e.target.value }))
+            }
             disabled={saving}
           />
         </div>
@@ -1076,7 +1326,13 @@ export function ResumeManager({
   const [tab, setTab] = useState<Tab>("profile");
 
   const resume = useResume({
-    initialData: { profile, skills, experience, education, contact } as ApiResume,
+    initialData: {
+      profile,
+      skills,
+      experience,
+      education,
+      contact,
+    } as ApiResume,
   });
 
   const tabs: { id: Tab; label: string }[] = [
@@ -1101,11 +1357,19 @@ export function ResumeManager({
           </Button>
         ))}
       </nav>
-      {tab === "profile" && <ProfileTab profile={resume.data?.profile ?? profile} />}
+      {tab === "profile" && (
+        <ProfileTab profile={resume.data?.profile ?? profile} />
+      )}
       {tab === "skills" && <SkillsTab skills={resume.data?.skills ?? skills} />}
-      {tab === "experience" && <ExperienceTab experience={resume.data?.experience ?? experience} />}
-      {tab === "education" && <EducationTab education={resume.data?.education ?? education} />}
-      {tab === "contact" && <ContactTab contact={resume.data?.contact ?? contact} />}
+      {tab === "experience" && (
+        <ExperienceTab experience={resume.data?.experience ?? experience} />
+      )}
+      {tab === "education" && (
+        <EducationTab education={resume.data?.education ?? education} />
+      )}
+      {tab === "contact" && (
+        <ContactTab contact={resume.data?.contact ?? contact} />
+      )}
     </div>
   );
 }

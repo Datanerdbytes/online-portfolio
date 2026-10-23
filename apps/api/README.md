@@ -166,6 +166,28 @@ Neon rather than on ephemeral local disks. Local development defaults to
 `MEDIA_STORAGE=local` and `MEDIA_ROOT`. The application does not automatically
 transfer existing files when this setting changes.
 
+Project screenshots are decoded on upload, oriented, and resized to fit within
+400 × 400 pixels without stretching, cropping, or enlarging small images. They
+are stored as WebP at quality 80 without source metadata. Uploads still accept
+JPEG, PNG, or WebP up to 2 MiB; screenshots above 20 million pixels are rejected.
+Profile photos use the same processing with a 512 × 512 bound; hero banners use
+a 1200 × 1200 bound. Both use WebP quality 85. Proportions are preserved without
+upscaling, and the frontend's existing crops still control the displayed shape.
+The same 2 MiB upload and 20-million-pixel input limits apply to all three types.
+
+To convert existing screenshots, run from `apps/api` with the intended database
+and media settings configured. Preview first; applying requires a new backup
+directory. Original bytes, checksums, and metadata are written there before
+database references change. Keep the backup outside deployment uploads:
+
+```bash
+uv run python -m app.scripts.optimize_screenshots
+uv run python -m app.scripts.optimize_screenshots --apply --backup-dir media/backups/screenshots-YYYYMMDD
+```
+
+Already-small WebP screenshots are skipped. Do not run this command at startup
+or as part of a deployment build.
+
 `uv run pytest` covers auth without PostgreSQL, including malformed configuration,
 strict claims, absolute expiry/key rotation, rate limits and credential-free
 validation errors. PostgreSQL integration tests still require their existing

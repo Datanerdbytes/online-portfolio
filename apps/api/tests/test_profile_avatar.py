@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import contextmanager
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.avatar import get_current_owner
@@ -43,9 +45,29 @@ OWNER_CLAIMS = TokenClaims(
     jti="test-jti",
 )
 
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 32
-WEBP_BYTES = b"RIFF" + b"\x00\x00\x00\x00" + b"WEBP" + b"\x00" * 16
+
+def _image_bytes(format):
+    output = BytesIO()
+    Image.new("RGB", (1600, 900), "navy").save(output, format=format)
+    return output.getvalue()
+
+
+PNG_BYTES = _image_bytes("PNG")
+JPEG_BYTES = _image_bytes("JPEG")
+WEBP_BYTES = _image_bytes("WEBP")
+
+
+@pytest.mark.parametrize("kind", ["avatar", "banner"])
+def test_corrupt_profile_image_is_rejected_before_storage(kind):
+    store = StubStore()
+    with _client(StubSession(first=_profile()), store) as client:
+        response = client.put(
+            f"/api/v1/resume/profile/{kind}",
+            files=_upload(data=b"\x89PNG\r\n\x1a\n" + b"\x00" * 32),
+        )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid request"}
+    assert not store.saved
 
 
 # ---------------------------------------------------------------------------
@@ -281,7 +303,9 @@ class TestBanner:
         assert response.status_code == 200
         body = response.json()
         assert body["banner_url"] == "/api/v1/resume/profile/banner"
-        assert body["banner_content_type"] == "image/png"
+        assert body["banner_content_type"] == "image/webp"
+        with Image.open(BytesIO(store.saved[0][1])) as banner:
+            assert banner.size == (1200, 675)
         assert profile.banner_filename is not None
         assert profile.avatar_filename == "profile-photo.jpg"
         assert "profile-photo.jpg" in store.files
@@ -403,13 +427,15 @@ class TestUpload:
         assert response.status_code == 200
         body = response.json()
         assert body["avatar_url"] == "/api/v1/resume/profile/avatar"
-        assert body["avatar_content_type"] == "image/png"
+        assert body["avatar_content_type"] == "image/webp"
         assert body["avatar_updated_at"] is not None
         assert profile.avatar_filename is not None
         assert profile.avatar_filename not in body.values()
         assert len(store.saved) == 1
-        assert store.saved[0][1] == PNG_BYTES
-        assert store.saved[0][2] == "image/png"
+        with Image.open(BytesIO(store.saved[0][1])) as photo:
+            assert photo.size == (512, 288)
+            assert photo.format == "WEBP"
+        assert store.saved[0][2] == "image/webp"
         assert session.committed is True
 
     @pytest.mark.parametrize(
@@ -422,7 +448,7 @@ class TestUpload:
         with _client(session, store) as client:
             response = client.put(AVATAR_PATH, files=_upload(data=data, content_type=content_type))
         assert response.status_code == 200
-        assert response.json()["avatar_content_type"] == content_type
+        assert response.json()["avatar_content_type"] == "image/webp"
 
     def test_upload_ignores_the_client_filename(self):
         session = StubSession(first=_profile())
@@ -597,7 +623,7 @@ class TestValidator:
             declared_content_type="image/png; charset=binary",
             declared_size=len(PNG_BYTES),
             data=PNG_BYTES,
-            max_bytes=1024,
+            max_bytes=len(PNG_BYTES),
         )
         assert detected == "image/png"
 

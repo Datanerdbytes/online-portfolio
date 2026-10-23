@@ -142,7 +142,7 @@ function ProjectCard({ project }: { project: Project }) {
           </div>
           {screenshotSrc ? (
             <div
-              className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md border border-input bg-muted sm:w-28"
+              className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden rounded-md border border-input bg-muted sm:w-34"
               aria-label={`${project.title} screenshot thumbnail`}
             >
               {demoUrl ? (
@@ -156,7 +156,7 @@ function ProjectCard({ project }: { project: Project }) {
                     src={screenshotSrc}
                     alt={`${project.title} screenshot`}
                     fill
-                    sizes="(max-width: 640px) 96px, 112px"
+                    sizes="(max-width: 639px) 112px, 136px"
                     className="object-cover"
                     unoptimized
                   />
@@ -166,7 +166,7 @@ function ProjectCard({ project }: { project: Project }) {
                   src={screenshotSrc}
                   alt={`${project.title} screenshot`}
                   fill
-                  sizes="(max-width: 640px) 96px, 112px"
+                  sizes="(max-width: 639px) 112px, 136px"
                   className="object-cover"
                   unoptimized
                 />

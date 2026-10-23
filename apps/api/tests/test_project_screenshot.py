@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from io import BytesIO
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.project_screenshot import get_current_owner
@@ -15,7 +17,9 @@ from app.main import app
 from app.models.project import Project
 
 SCREENSHOT_PATH = "/api/v1/projects/sample-project/screenshot"
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+_png = BytesIO()
+Image.new("RGB", (800, 450), "navy").save(_png, format="PNG")
+PNG_BYTES = _png.getvalue()
 
 
 class StubQuery:
@@ -64,7 +68,8 @@ class StubStore:
         self.deleted = []
 
     def save(self, data, content_type):
-        filename = f"screenshot-{len(self.saved) + 1}.png"
+        extension = "webp" if content_type == "image/webp" else "png"
+        filename = f"screenshot-{len(self.saved) + 1}.{extension}"
         self.files[filename] = data
         self.saved.append((filename, data, content_type))
         return filename
@@ -160,8 +165,10 @@ def test_upload_saves_metadata_and_returns_public_url():
     assert response.json()["screenshot_url"] == SCREENSHOT_PATH
     assert response.json()["screenshot_updated_at"]
     assert "screenshot_filename" not in response.json()
-    assert project.screenshot_content_type == "image/png"
-    assert store.saved[0][1] == PNG_BYTES
+    assert project.screenshot_content_type == "image/webp"
+    with Image.open(BytesIO(store.saved[0][1])) as thumbnail:
+        assert thumbnail.format == "WEBP"
+        assert thumbnail.size == (400, 225)
     assert session.committed
 
 
@@ -179,7 +186,7 @@ def test_upload_replaces_previous_file_after_commit():
 
     assert response.status_code == 200
     assert store.deleted == ["old.png"]
-    assert project.screenshot_filename == "screenshot-1.png"
+    assert project.screenshot_filename == "screenshot-1.webp"
 
 
 def test_upload_validation_failure_does_not_store_file():
@@ -205,7 +212,7 @@ def test_upload_database_failure_removes_new_file_and_sanitizes_error():
 
     assert response.status_code == 503
     assert "private database details" not in response.text
-    assert store.deleted == ["screenshot-1.png"]
+    assert store.deleted == ["screenshot-1.webp"]
     assert session.rolled_back
 
 
@@ -236,3 +243,15 @@ def test_upload_requires_authenticated_owner(monkeypatch):
 
     assert response.status_code == 401
     assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_upload_rejects_forged_image_signature_before_storage():
+    store = StubStore()
+    with _client(StubSession(_project()), store) as client:
+        response = client.put(
+            SCREENSHOT_PATH,
+            files={"file": ("broken.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 32, "image/png")},
+        )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Invalid request"}
+    assert not store.saved

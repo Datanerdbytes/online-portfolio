@@ -78,6 +78,10 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{
+    name: string;
+    updatedAt: Project["screenshot_updated_at"];
+  } | null>(null);
   const upload = useUploadProjectScreenshot();
   const remove = useRemoveProjectScreenshot();
   const busy = upload.isPending || remove.isPending;
@@ -86,6 +90,10 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
     project.screenshot_updated_at,
     `/api/projects/${encodeURIComponent(project.slug)}/screenshot`
   );
+  const screenshotName =
+    uploadedFile && uploadedFile.updatedAt === project.screenshot_updated_at
+      ? uploadedFile.name
+      : "Saved screenshot";
 
   async function onFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -100,8 +108,12 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
       return;
     }
     try {
-      await upload.mutateAsync({ slug: project.slug, file });
-      setMessage("Project screenshot updated.");
+      const updated = await upload.mutateAsync({ slug: project.slug, file });
+      setUploadedFile({
+        name: file.name,
+        updatedAt: updated.screenshot_updated_at,
+      });
+      setMessage("Screenshot uploaded and saved successfully.");
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -117,6 +129,7 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
     setIsError(false);
     try {
       await remove.mutateAsync(project.slug);
+      setUploadedFile(null);
       setMessage("Project screenshot removed.");
       setConfirmRemove(false);
     } catch (error) {
@@ -131,55 +144,66 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
     <div className="space-y-3 rounded-md border p-4">
       <h3 className="text-sm font-semibold">Project screenshot</h3>
       <p className="text-sm text-muted-foreground">
-        Screenshots save as soon as an upload completes. Save changes only
-        applies to the project details below.
+        Screenshot uploads save automatically. Use Save project details for the
+        fields below.
       </p>
-      <div className="relative aspect-video w-full overflow-hidden rounded-md border bg-muted">
-        {imageSrc ? (
-          <Image
-            src={imageSrc}
-            alt={`${project.title} screenshot preview`}
-            fill
-            sizes="(max-width: 640px) 100vw, 640px"
-            className="object-contain"
-            unoptimized
-          />
-        ) : (
-          <div className="flex size-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-            No screenshot uploaded.
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-md border bg-muted">
+          {imageSrc ? (
+            <Image
+              src={imageSrc}
+              alt={`${project.title} screenshot preview`}
+              fill
+              sizes="128px"
+              className="object-contain"
+              unoptimized
+            />
+          ) : (
+            <div className="flex size-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
+              No image
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-sm font-medium [overflow-wrap:anywhere]">
+            {imageSrc ? screenshotName : "No screenshot uploaded."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={busy}
+            >
+              {busy
+                ? "Uploading…"
+                : imageSrc
+                  ? "Replace screenshot"
+                  : "Upload screenshot"}
+            </Button>
+            {imageSrc ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setConfirmRemove(true)}
+                disabled={busy}
+              >
+                Remove screenshot
+              </Button>
+            ) : null}
           </div>
-        )}
+          <p className="text-xs text-muted-foreground">
+            JPEG, PNG, or WebP up to 2 MB. Automatically resized to a thumbnail.
+          </p>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          onClick={() => fileInput.current?.click()}
-          disabled={busy}
-        >
-          {busy
-            ? "Uploading…"
-            : imageSrc
-              ? "Replace screenshot"
-              : "Upload screenshot"}
-        </Button>
-        {imageSrc ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setConfirmRemove(true)}
-            disabled={busy}
-          >
-            Remove screenshot
-          </Button>
-        ) : null}
-      </div>
-      <p className="text-xs text-muted-foreground">
-        JPEG, PNG, or WebP up to 2 MB.
-      </p>
       {message ? (
         <p
           role={isError ? "alert" : "status"}
-          className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
+          className={`rounded-md border px-3 py-2 text-sm ${
+            isError
+              ? "border-destructive/30 bg-destructive/5 text-destructive"
+              : "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+          }`}
         >
           {message}
         </p>
@@ -492,6 +516,7 @@ export function ProjectManager({
           ) : null}
           {mode === "edit" && editing ? (
             <ProjectScreenshotControl
+              key={editing.slug}
               project={
                 projects.find((project) => project.slug === editing.slug) ??
                 editing
@@ -637,7 +662,7 @@ export function ProjectManager({
                 ? "Saving…"
                 : mode === "create"
                   ? "Create project"
-                  : "Save changes"}
+                  : "Save project details"}
             </Button>
             <Button
               type="button"
