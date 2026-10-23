@@ -19,7 +19,7 @@ from PIL import Image
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.avatar import get_current_owner
-from app.core.auth import TokenClaims, create_access_token, hash_password
+from app.core.auth import TokenClaims
 from app.core.avatar import AvatarValidationError, validate_avatar_payload
 from app.core.config import settings
 from app.core.middleware import MULTIPART_OVERHEAD_BYTES, RequestBodyLimitMiddleware
@@ -28,9 +28,10 @@ from app.core.storage import (
     ProfileImageStorageUnavailable,
     get_image_store,
 )
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.main import app
 from app.models.resume import Profile
+from tests.neon_support import configure_neon, create_access_token, hash_password
 
 AVATAR_PATH = "/api/v1/resume/profile/avatar"
 
@@ -177,6 +178,7 @@ def _client(session=None, store=None, override_owner=True):
 
 
 def _configure_auth(monkeypatch):
+    configure_neon(monkeypatch)
     monkeypatch.setattr(settings, "API_ACCESS_SECRET", TEST_SECRET)
     monkeypatch.setattr(settings, "OWNER_ID", "portfolio-owner")
     monkeypatch.setattr(settings, "OWNER_USERNAME", "owner-login")
@@ -184,6 +186,7 @@ def _configure_auth(monkeypatch):
 
 
 def _unconfigure_auth(monkeypatch):
+    monkeypatch.setattr(settings, "NEON_AUTH_BASE_URL", None)
     monkeypatch.setattr(settings, "API_ACCESS_SECRET", None)
     monkeypatch.setattr(settings, "OWNER_ID", None)
     monkeypatch.setattr(settings, "OWNER_USERNAME", None)
@@ -232,7 +235,7 @@ class TestPublicRead:
         assert response.status_code == 200
         assert response.content == PNG_BYTES
         assert response.headers["content-type"] == "image/png"
-        assert response.headers["cache-control"] == "public, max-age=300, must-revalidate"
+        assert response.headers["cache-control"] == "private, no-store"
         assert response.headers["etag"].startswith('"')
         assert len(response.headers["etag"]) == 66  # quoted sha256 hex
 
@@ -343,13 +346,13 @@ class TestUpload:
 
     def test_upload_with_non_owner_token_403(self, monkeypatch):
         _configure_auth(monkeypatch)
-        token = create_access_token("someone-else", TEST_SECRET)
+        token = create_access_token("someone-else", "foreign")
         session = StubSession(first=_profile())
         with _client(session, StubStore(), override_owner=False) as client:
             response = client.put(
                 AVATAR_PATH, files=_upload(), headers={"Authorization": f"Bearer {token}"}
             )
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_upload_unconfigured_auth_503(self, monkeypatch):
         _unconfigure_auth(monkeypatch)

@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.models.project import Project
 
 router = APIRouter()

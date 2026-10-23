@@ -44,7 +44,7 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 
 ## Protected project management (owner only)
 
-All mutation routes require a valid FastAPI bearer token issued by `POST /api/v1/auth/login`. Every mutation independently verifies the bearer token and owner; cookies, supplied owner headers, and frontend checks are never used for authorization. Missing/invalid/expired tokens return 401 (`WWW-Authenticate: Bearer`); tokens for a different owner return 403. When administration is unconfigured, mutations return 503.
+All mutation routes require a valid bearer token issued by Neon Managed Better Auth. Every mutation independently verifies the bearer token and owner; cookies, supplied owner headers, and frontend checks are never used for authorization. Missing/invalid/expired tokens return 401 (`WWW-Authenticate: Bearer`); valid users can edit only their own rows; another owner’s IDs return 404. When administration is unconfigured, mutations return 503.
 
 - `POST /api/v1/projects` — Create a project. Requires `slug`, `title`, `summary`, `technologies`; `repository_url`/`demo_url` default null; `display_order` defaults 0. Returns 201 with the full `ProjectResponse` including generated `id` and `is_sample:false`. `is_sample` is always false on creation and read-only thereafter. Duplicate slug (including unique-constraint races) returns a sanitized 409 after rollback.
 - `PUT /api/v1/projects/{slug}` — Full replacement of all writable fields. Every writable field is required; omitted fields fail validation. `slug`, `id`, `is_sample`, and unknown fields are rejected. `slug` is immutable; `is_sample` is preserved. Missing target returns 404. Returns 200 with the full `ProjectResponse`.
@@ -131,34 +131,22 @@ TEST_DATABASE_ADMIN_URL=postgresql+psycopg://resume:resume@localhost:5432/postgr
 
 Do not run integration tests against a developer's existing database without separate authorization.
 
-## Owner authentication (A0)
+## Neon managed identities
 
-Public health and project listing do not require admin configuration. To enable
-administration, provision all four settings in `apps/api/.env`: `OWNER_ID` (stable
-subject), `OWNER_USERNAME`, `OWNER_PASSWORD_HASH` (Argon2id), and
-`API_ACCESS_SECRET` (at least 32 random bytes). Never commit the real values.
-Generate the key locally with `uv run python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-Generate the hash without putting the password in shell history:
+Set `NEON_AUTH_BASE_URL` in `apps/api/.env` and apply Alembic before enabling
+editor access. Neon's public JWKS verifies EdDSA signatures, issuer, audience,
+subject and expiration. All identity is derived from that verified token.
+`GET /api/v1/auth/me` provisions a blank application portfolio idempotently and
+returns the safe portfolio ID and credential expiry. There is no backend
+password login/register endpoint and no application password database.
 
-```bash
-# From apps/api/; enter the password only at the hidden prompt.
-uv run python -c 'from getpass import getpass; from argon2 import PasswordHasher; print(PasswordHasher().hash(getpass("Owner password: ")))'
-```
-
-`POST /api/v1/auth/login` accepts JSON username/password and issues a backend-only
-HS256 bearer credential. `GET /api/v1/auth/me` verifies it independently. Tokens
-expire at their original 900-second deadline; reads never renew them. No backend
-logout/refresh route exists. The Next.js logout route deletes its browser cookie;
-a copied bearer token remains valid until expiry. Rotating `API_ACCESS_SECRET`
-invalidates all outstanding tokens immediately.
-
-Login permits five attempts per fixed 300-second window, including failed logins
-and unknown usernames. By default the bucket is process-local, uses a monotonic
-clock, and requires **one worker/replica**. Set
-`LOGIN_RATE_LIMIT_STORAGE=database` on stateless/multiple-instance hosts to use an
-atomic PostgreSQL bucket and the database clock instead. Database limiter
-failures return 503. Invalid/missing configuration gives admin endpoints a generic
-503; public startup and liveness remain independent.
+Existing resume/project GET routes are public for the configured default owner
+without a credential, or return the caller's content with a valid credential.
+`/api/v1/public/users/{user_id}/resume` and `/projects` expose public account data.
+All mutations use verified identity; body/query IDs never select another owner.
+Nested records have composite ownership foreign keys. See the
+[Neon setup guide](../../docs/neon-auth.md) for the compatibility migration,
+operator binding of legacy content, and exact verification results.
 
 For Vercel, set `MEDIA_STORAGE=database` after applying migrations. Images remain
 behind the existing API routes and upload validation, but their bytes persist in
@@ -191,4 +179,4 @@ or as part of a deployment build.
 `uv run pytest` covers auth without PostgreSQL, including malformed configuration,
 strict claims, absolute expiry/key rotation, rate limits and credential-free
 validation errors. PostgreSQL integration tests still require their existing
-explicit opt-in; A0 introduces no migration or database writes.
+explicit opt-in. Managed-auth ownership is added by revision `6e0a9b12c345`.

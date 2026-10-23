@@ -14,6 +14,7 @@
     "test:auth": "node --test tests/auth.test.mjs"
   },
   "dependencies": {
+    "@neondatabase/auth": "0.7.0-beta",
     "@radix-ui/react-separator": "^1.2.0",
     "@radix-ui/react-slot": "^1.5.0",
     "@tanstack/react-query": "^5.104.5",

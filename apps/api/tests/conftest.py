@@ -19,10 +19,11 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine.url import make_url
-from sqlalchemy.orm import Session
 
-from app.db.session import get_db
+from app.db.tenant import TenantSession
+from app.db.tenant import get_content_db as get_db
 from app.main import app
+from app.models.owner import LEGACY_OWNER_ID
 
 
 def pytest_addoption(parser):
@@ -164,7 +165,7 @@ def db_session(integration_db):
         with engine.connect() as connection:
             transaction = connection.begin()
             try:
-                with Session(bind=connection) as session:
+                with TenantSession(bind=connection, user_id=LEGACY_OWNER_ID) as session:
                     yield session
             finally:
                 transaction.rollback()

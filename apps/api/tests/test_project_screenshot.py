@@ -9,12 +9,12 @@ from PIL import Image
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.project_screenshot import get_current_owner
-from app.core.auth import hash_password
 from app.core.config import settings
 from app.core.storage import ProfileImageNotFound, get_image_store
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.main import app
 from app.models.project import Project
+from tests.neon_support import configure_neon, hash_password
 
 SCREENSHOT_PATH = "/api/v1/projects/sample-project/screenshot"
 _png = BytesIO()
@@ -126,6 +126,7 @@ def _client(session=None, store=None, *, override_owner=True):
 
 
 def _configure_auth(monkeypatch):
+    configure_neon(monkeypatch)
     monkeypatch.setattr(settings, "API_ACCESS_SECRET", "test-secret-key-at-least-32-chars-long!")
     monkeypatch.setattr(settings, "OWNER_ID", "portfolio-owner")
     monkeypatch.setattr(settings, "OWNER_USERNAME", "owner-login")
@@ -148,7 +149,7 @@ def test_public_screenshot_read_has_etag_and_does_not_require_owner():
     assert first.status_code == 200
     assert first.content == PNG_BYTES
     assert first.headers["content-type"] == "image/png"
-    assert first.headers["cache-control"] == "public, max-age=300, must-revalidate"
+    assert first.headers["cache-control"] == "private, no-store"
     assert cached.status_code == 304
 
 

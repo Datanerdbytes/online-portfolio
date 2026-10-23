@@ -24,12 +24,12 @@ from app.core.storage import (
     ProfileImageStore,
     get_image_store,
 )
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.models.project import Project
 from app.schemas.project import ProjectResponse
 
 logger = logging.getLogger(__name__)
-SCREENSHOT_CACHE_CONTROL = "public, max-age=300, must-revalidate"
+SCREENSHOT_CACHE_CONTROL = "private, no-store"
 _PUBLIC_400_DETAILS = frozenset(
     {
         "Invalid request",

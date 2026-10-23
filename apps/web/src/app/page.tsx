@@ -1,7 +1,6 @@
-import {
-  FileText,
-  MapPin,
-} from "lucide-react";
+import type { Metadata } from "next";
+import { resume } from "@/content/resume";
+import { FileText, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { getResumeCached } from "@/lib/resume-server";
@@ -11,9 +10,15 @@ import { ContactSection } from "@/components/contact-section";
 import { EducationSection } from "@/components/education-section";
 import { ExperienceSection } from "@/components/experience-section";
 import { HealthStatus } from "@/components/health-status";
+import { ShareLinkButton } from "@/components/share-link-button";
 import { ProjectsClient } from "@/components/projects";
 import { SkillsSection } from "@/components/skills-section";
 import { profileImageUrl, BANNER_PATH } from "@/lib/avatar";
+
+export const metadata: Metadata = {
+  title: `${resume.profile.name} | Resume & Portfolio`,
+  description: `${resume.profile.headline}. ${resume.profile.introduction}`,
+};
 
 export default async function Home() {
   const apiResume = await getResumeCached();
@@ -22,7 +27,7 @@ export default async function Home() {
   const bannerSrc = profileImageUrl(
     profile.banner_url,
     profile.banner_updated_at,
-    BANNER_PATH,
+    BANNER_PATH
   );
 
   return (
@@ -35,9 +40,7 @@ export default async function Home() {
         <div className="content-width hero-grid">
           <div className="hero-copy">
             <p className="eyebrow">Hello, welcome to my portfolio</p>
-            <h1 id="intro-heading">
-              {profile.name}
-            </h1>
+            <h1 id="intro-heading">{profile.name}</h1>
             <p className="hero-headline">{profile.headline}</p>
             <p className="hero-description">{profile.introduction}</p>
             <div className="hero-actions">
@@ -50,6 +53,7 @@ export default async function Home() {
                   View Resume
                 </Link>
               </Button>
+              <ShareLinkButton path="/" />
             </div>
             {profile.location && (
               <p className="hero-location">

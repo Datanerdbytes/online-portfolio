@@ -74,16 +74,20 @@ export type ApiResume = {
 
 const RESUME_TIMEOUT_MS = 5000;
 
-export async function fetchResume(): Promise<ApiResume | null> {
+export async function fetchResume(token?: string): Promise<ApiResume | null> {
   let controller: AbortController | null = null;
   let timeout: ReturnType<typeof setTimeout> | null = null;
   try {
     controller = new AbortController();
     timeout = setTimeout(() => controller?.abort(), RESUME_TIMEOUT_MS);
-    const response = await fetch(`${API_BASE_URL}/api/v1/resume`, {
-      signal: controller.signal,
-      cache: "no-store",
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/${token ? "" : "public/"}resume`,
+      {
+        signal: controller.signal,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: "no-store",
+      }
+    );
     if (!response.ok) return null;
     return (await response.json()) as ApiResume;
   } catch {
@@ -190,17 +194,23 @@ export async function fetchProjectsSafe(): Promise<Project[]> {
   }
 }
 
-export async function fetchProjects(): Promise<ProjectsResponse> {
+export async function fetchProjects(token?: string): Promise<ProjectsResponse> {
   let controller: AbortController | null = null;
   let timeout: ReturnType<typeof setTimeout> | null = null;
   try {
     controller = new AbortController();
     timeout = setTimeout(() => controller?.abort(), PROJECTS_TIMEOUT_MS);
-    const response = await fetch(`${API_BASE_URL}/api/v1/projects`, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-store" },
-      signal: controller.signal,
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/${token ? "" : "public/"}projects`,
+      {
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        signal: controller.signal,
+      }
+    );
     if (!response.ok) {
       throw new Error(
         `Upstream projects request failed with HTTP ${response.status}`

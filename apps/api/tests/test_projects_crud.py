@@ -14,12 +14,13 @@ from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.api.v1.projects import get_current_owner
-from app.core.auth import TokenClaims, create_access_token
+from app.core.auth import TokenClaims
 from app.core.config import settings
 from app.core.storage import get_image_store
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.main import app
 from app.models.project import Project
+from tests.neon_support import configure_neon, create_access_token
 
 OWNER_CLAIMS = TokenClaims(
     sub="portfolio-owner",
@@ -107,7 +108,7 @@ class StubSession:
 
 @contextmanager
 def _client_with_overrides(session=None, override_owner=True, store=None):
-    if session is not None:
+    if session is not None or override_owner:
         app.dependency_overrides[get_db] = lambda: session
     if override_owner:
         app.dependency_overrides[get_current_owner] = lambda: OWNER_CLAIMS
@@ -122,7 +123,8 @@ def _client_with_overrides(session=None, override_owner=True, store=None):
 
 
 def _configure_auth(monkeypatch):
-    from app.core.auth import hash_password
+    configure_neon(monkeypatch)
+    from tests.neon_support import hash_password
 
     monkeypatch.setattr(settings, "API_ACCESS_SECRET", "test-secret-key-at-least-32-chars-long!")
     monkeypatch.setattr(settings, "OWNER_ID", "portfolio-owner")
@@ -131,6 +133,7 @@ def _configure_auth(monkeypatch):
 
 
 def _unconfigure_auth(monkeypatch):
+    monkeypatch.setattr(settings, "NEON_AUTH_BASE_URL", None)
     monkeypatch.setattr(settings, "API_ACCESS_SECRET", None)
     monkeypatch.setattr(settings, "OWNER_ID", None)
     monkeypatch.setattr(settings, "OWNER_USERNAME", None)
@@ -201,15 +204,14 @@ class TestAuthEnforcement:
 
     def test_mutation_with_non_owner_token_403(self, monkeypatch):
         _configure_auth(monkeypatch)
-        secret = settings.API_ACCESS_SECRET or ""
-        token = create_access_token("someone-else", secret)
+        token = create_access_token("someone-else", "foreign")
         with _client_with_overrides(override_owner=False) as client:
             response = client.post(
                 "/api/v1/projects",
                 json=_create_project_payload(),
                 headers={"Authorization": f"Bearer {token}"},
             )
-        assert response.status_code == 403
+        assert response.status_code == 401
 
     def test_mutation_unconfigured_503(self, monkeypatch):
         _unconfigure_auth(monkeypatch)
@@ -824,7 +826,7 @@ def test_response_refresh_failure_rolls_back_before_commit(method):
     ],
 )
 @pytest.mark.parametrize(
-    "auth_case,expected", [("missing", 401), ("non-owner", 403), ("unconfigured", 503)]
+    "auth_case,expected", [("missing", 401), ("non-owner", 401), ("unconfigured", 503)]
 )
 def test_every_mutation_enforces_owner_before_database(
     monkeypatch, method, path, payload, auth_case, expected
@@ -835,7 +837,7 @@ def test_every_mutation_enforces_owner_before_database(
         _configure_auth(monkeypatch)
     headers = {"X-Owner-ID": "portfolio-owner", "Cookie": "portfolio-admin=spoofed"}
     if auth_case == "non-owner":
-        token = create_access_token("other-owner", settings.API_ACCESS_SECRET)
+        token = create_access_token("other-owner", "foreign")
         headers["Authorization"] = f"Bearer {token}"
     session = StubSession(fail_query=True)
     with _client_with_overrides(session, override_owner=False) as client:

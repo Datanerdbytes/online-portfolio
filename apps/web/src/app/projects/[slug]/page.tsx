@@ -13,11 +13,11 @@ const REQUEST_TIMEOUT_MS = 5000;
 async function getProject(slug: string): Promise<Project | null> {
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/projects/${encodeURIComponent(slug)}`,
+      `${API_BASE_URL}/api/v1/public/projects/${encodeURIComponent(slug)}`,
       {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         next: { revalidate: 300 },
-      },
+      }
     );
     if (!response.ok) return null;
 
@@ -29,7 +29,7 @@ async function getProject(slug: string): Promise<Project | null> {
 }
 
 async function getReadmeFromBackend(
-  projectSlug: string,
+  projectSlug: string
 ): Promise<string | null> {
   try {
     const response = await fetch(
@@ -37,7 +37,7 @@ async function getReadmeFromBackend(
       {
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         next: { revalidate: 3600 },
-      },
+      }
     );
     if (!response.ok) return null;
 
@@ -104,7 +104,7 @@ async function ProjectReadme({
     readmePromise,
   ]);
   const fallbackProject = staticResumeProjects().find(
-    (item) => item.slug === projectSlug,
+    (item) => item.slug === projectSlug
   );
   const repositoryUrl =
     project?.repository_url ?? fallbackProject?.repository_url ?? null;
@@ -150,7 +150,7 @@ async function ProjectMetadata({
 }) {
   const project = await projectPromise;
   const fallbackProject = staticResumeProjects().find(
-    (item) => item.slug === projectSlug,
+    (item) => item.slug === projectSlug
   );
   const details = project ?? fallbackProject;
 
@@ -225,7 +225,7 @@ async function ProjectTitle({
 }) {
   const project = await projectPromise;
   const fallbackProject = staticResumeProjects().find(
-    (item) => item.slug === projectSlug,
+    (item) => item.slug === projectSlug
   );
 
   return (
@@ -237,7 +237,7 @@ async function ProjectTitle({
 
 function ProjectTitleSkeleton({ slug }: { slug: string }) {
   const fallbackProject = staticResumeProjects().find(
-    (item) => item.slug === slug,
+    (item) => item.slug === slug
   );
 
   return (

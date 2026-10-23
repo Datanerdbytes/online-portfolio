@@ -8,7 +8,7 @@ import httpx
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.main import app
 
 

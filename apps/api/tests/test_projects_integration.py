@@ -18,11 +18,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.v1.projects import get_current_owner
-from app.core.auth import TokenClaims, hash_password
-from app.core.config import settings
-from app.db.session import get_db
+from app.core.auth import TokenClaims
+from app.db.tenant import TenantSession
+from app.db.tenant import get_content_db as get_db
 from app.main import app
+from app.models.owner import LEGACY_OWNER_ID
 from app.models.project import Project
+from tests.neon_support import configure_neon
 
 OWNER_CLAIMS = TokenClaims(
     sub="portfolio-owner",
@@ -64,14 +66,14 @@ def crud_engine(integration_db):
 
 @pytest.fixture
 def db_session(crud_engine):
-    with Session(crud_engine) as session:
+    with TenantSession(crud_engine, user_id=LEGACY_OWNER_ID) as session:
         yield session
 
 
 @pytest.fixture
 def client(crud_engine):
     def request_session():
-        with Session(crud_engine) as session:
+        with TenantSession(crud_engine, user_id=LEGACY_OWNER_ID) as session:
             yield session
 
     app.dependency_overrides[get_db] = request_session
@@ -225,15 +227,10 @@ class TestReorderAtomic:
 
 def test_real_bearer_crud_and_sample_preservation(client, db_session, crud_engine, monkeypatch):
     app.dependency_overrides.pop(get_current_owner)
-    monkeypatch.setattr(settings, "API_ACCESS_SECRET", "test-integration-secret-at-least-32-bytes!")
-    monkeypatch.setattr(settings, "OWNER_ID", "test-owner")
-    monkeypatch.setattr(settings, "OWNER_USERNAME", "test-owner")
-    monkeypatch.setattr(settings, "OWNER_PASSWORD_HASH", hash_password("test-password"))
-    login = client.post(
-        "/api/v1/auth/login", json={"username": "test-owner", "password": "test-password"}
-    )
-    assert login.status_code == 200
-    headers = {"Authorization": "Bearer " + login.json()["access_token"]}
+    configure_neon(monkeypatch)
+    from tests.neon_support import create_access_token
+
+    headers = {"Authorization": "Bearer " + create_access_token("portfolio-owner")}
     assert (
         client.post("/api/v1/projects", json=_project_payload(), headers=headers).status_code == 201
     )

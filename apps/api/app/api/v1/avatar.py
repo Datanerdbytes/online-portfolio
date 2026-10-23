@@ -46,7 +46,7 @@ from app.core.storage import (
     ProfileImageStore,
     get_image_store,
 )
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.models.resume import Profile
 from app.schemas.resume import ProfileResponse
 
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 
 # A successful public read is cacheable for a short while. The ETag makes the
 # browser revalidate instead of guessing when the portrait changed.
-AVATAR_CACHE_CONTROL = "public, max-age=300, must-revalidate"
+AVATAR_CACHE_CONTROL = "private, no-store"
 
 # 400 responses may only use these messages. Anything else - a framework
 # internal body-parse error, for example - is replaced with the generic one so

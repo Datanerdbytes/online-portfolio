@@ -6,19 +6,32 @@ experience_highlights, education, contact + contact_links.
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKeyConstraint,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.avatar import AVATAR_URL
 from app.db.base import Base
+from app.models.owner import OwnedContent
 
 PROFILE_BANNER_URL = "/api/v1/resume/profile/banner"
 
 
-class Profile(Base):
+class Profile(OwnedContent, Base):
     """Single-row table for the owner's profile/hero content."""
 
     __tablename__ = "profile"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_profile_id_user"),
+        UniqueConstraint("user_id", name="uq_profile_user"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -54,10 +67,11 @@ class Profile(Base):
         return PROFILE_BANNER_URL if self.banner_filename else None
 
 
-class SkillGroup(Base):
+class SkillGroup(OwnedContent, Base):
     """A named group of skills, e.g. 'Data Engineering & Cloud Warehousing'."""
 
     __tablename__ = "skill_groups"
+    __table_args__ = (UniqueConstraint("id", "user_id", name="uq_skill_groups_id_user"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -73,31 +87,43 @@ class SkillGroup(Base):
     )
 
 
-class SkillItem(Base):
+class SkillItem(OwnedContent, Base):
     """A single skill within a SkillGroup."""
 
     __tablename__ = "skill_items"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_skill_items_id_user"),
+        ForeignKeyConstraint(
+            ["group_id", "user_id"],
+            ["skill_groups.id", "skill_groups.user_id"],
+            ondelete="CASCADE",
+            name="fk_skill_items_parent_user",
+        ),
+        UniqueConstraint("user_id", "idempotency_key", name="uq_skill_items_user_idempotency_key"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    group_id: Mapped[int] = mapped_column(
-        ForeignKey("skill_groups.id", ondelete="CASCADE"), nullable=False
-    )
+    group_id: Mapped[int] = mapped_column(Integer, nullable=False)
     item: Mapped[str] = mapped_column(String(200), nullable=False)
     display_order: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
     )
-    idempotency_key: Mapped[str | None] = mapped_column(String(36), unique=True, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     group: Mapped["SkillGroup"] = relationship("SkillGroup", back_populates="items")
 
 
-class Experience(Base):
+class Experience(OwnedContent, Base):
     """A work experience entry."""
 
     __tablename__ = "experience"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_experience_id_user"),
+        UniqueConstraint("user_id", "slug", name="uq_experience_user_slug"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     role: Mapped[str] = mapped_column(String(200), nullable=False)
     organization: Mapped[str] = mapped_column(String(200), nullable=False)
     started: Mapped[str] = mapped_column(String(20), nullable=False)  # YYYY-MM
@@ -118,15 +144,22 @@ class Experience(Base):
     )
 
 
-class ExperienceHighlight(Base):
+class ExperienceHighlight(OwnedContent, Base):
     """A bullet-point highlight for an Experience entry."""
 
     __tablename__ = "experience_highlights"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_experience_highlights_id_user"),
+        ForeignKeyConstraint(
+            ["experience_id", "user_id"],
+            ["experience.id", "experience.user_id"],
+            ondelete="CASCADE",
+            name="fk_experience_highlights_parent_user",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    experience_id: Mapped[int] = mapped_column(
-        ForeignKey("experience.id", ondelete="CASCADE"), nullable=False
-    )
+    experience_id: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     display_order: Mapped[int] = mapped_column(
         Integer, nullable=False, default=0, server_default="0"
@@ -135,13 +168,17 @@ class ExperienceHighlight(Base):
     experience: Mapped["Experience"] = relationship("Experience", back_populates="highlights")
 
 
-class Education(Base):
+class Education(OwnedContent, Base):
     """An education entry."""
 
     __tablename__ = "education"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_education_id_user"),
+        UniqueConstraint("user_id", "slug", name="uq_education_user_slug"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     qualification: Mapped[str] = mapped_column(String(300), nullable=False)
     institution: Mapped[str] = mapped_column(String(300), nullable=False)
     started: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -151,10 +188,14 @@ class Education(Base):
     )
 
 
-class Contact(Base):
+class Contact(OwnedContent, Base):
     """Single-row contact info."""
 
     __tablename__ = "contact"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_contact_id_user"),
+        UniqueConstraint("user_id", name="uq_contact_user"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -168,15 +209,22 @@ class Contact(Base):
     )
 
 
-class ContactLink(Base):
+class ContactLink(OwnedContent, Base):
     """A labelled URL in the contact section (GitHub, Tableau Public, etc.)."""
 
     __tablename__ = "contact_links"
+    __table_args__ = (
+        UniqueConstraint("id", "user_id", name="uq_contact_links_id_user"),
+        ForeignKeyConstraint(
+            ["contact_id", "user_id"],
+            ["contact.id", "contact.user_id"],
+            ondelete="CASCADE",
+            name="fk_contact_links_parent_user",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    contact_id: Mapped[int] = mapped_column(
-        ForeignKey("contact.id", ondelete="CASCADE"), nullable=False
-    )
+    contact_id: Mapped[int] = mapped_column(Integer, nullable=False)
     label: Mapped[str] = mapped_column(String(100), nullable=False)
     url: Mapped[str] = mapped_column(String(1024), nullable=False)
     display_order: Mapped[int] = mapped_column(

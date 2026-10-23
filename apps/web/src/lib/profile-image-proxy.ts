@@ -15,6 +15,8 @@ export function createProfileImageHandlers(
 
     try {
       const headers = new Headers();
+      const token = await readAdminToken();
+      if (token) headers.set("Authorization", `Bearer ${token}`);
       const ifNoneMatch = req.headers.get("if-none-match");
       if (ifNoneMatch) headers.set("if-none-match", ifNoneMatch);
 
