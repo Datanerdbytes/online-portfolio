@@ -1,12 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
-import type { ApiResume, ApiProfile, ApiSkillGroup, ApiSkillItem, ApiExperience, ApiEducation, ApiContact, Project, ProjectsResponse } from "@/lib/api";
-import { isProject, isProjectsResponse, failure } from "@/lib/project-management";
+import type {
+  ApiResume,
+  ApiProfile,
+  ApiSkillGroup,
+  ApiSkillItem,
+  ApiExperience,
+  ApiEducation,
+  ApiContact,
+  Project,
+  ProjectsResponse,
+} from "@/lib/api";
+import {
+  isProject,
+  isProjectsResponse,
+  failure,
+} from "@/lib/project-management";
 import {
   AVATAR_PATH,
-  AVATAR_UPLOAD_MAX_BYTES,
+  AVATAR_MAX_BYTES,
   BANNER_PATH,
   type ProfileImageKind,
+  validateAvatarFile,
 } from "@/lib/avatar";
 
 export const PROJECTS_QUERY_KEY = ["projects"];
@@ -14,19 +29,29 @@ export const RESUME_QUERY_KEY = ["resume"];
 
 export function resumeFailure(status: number): string {
   switch (status) {
-    case 400: return "The resume values were rejected. Check the fields and try again.";
-    case 401: case 403: return "Your session could not be verified. Sign in again, then retry.";
-    case 404: return "The resume record was not found. It may have been removed.";
-    case 429: return "Too many requests. Please try again later.";
-    default: return "The resume service is unavailable. Please try again.";
+    case 400:
+      return "The resume values were rejected. Check the fields and try again.";
+    case 401:
+    case 403:
+      return "Your session could not be verified. Sign in again, then retry.";
+    case 404:
+      return "The resume record was not found. It may have been removed.";
+    case 429:
+      return "Too many requests. Please try again later.";
+    default:
+      return "The resume service is unavailable. Please try again.";
   }
 }
 
-export async function fetchProjectsData(signal?: AbortSignal): Promise<ProjectsResponse> {
+export async function fetchProjectsData(
+  signal?: AbortSignal
+): Promise<ProjectsResponse> {
   const response = await request("/projects", { method: "GET", signal });
-  if (!response.ok) throw new ApiError(response.status, failure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, failure(response.status));
   const data: unknown = await response.json();
-  if (!isProjectsResponse(data)) throw new ApiError(502, "Invalid project list");
+  if (!isProjectsResponse(data))
+    throw new ApiError(502, "Invalid project list");
   return data;
 }
 
@@ -41,30 +66,43 @@ export function useProjects(options?: { initialData?: ProjectsResponse }) {
 
 export async function fetchResumeData(): Promise<ApiResume> {
   const response = await request("/resume", { method: "GET" });
-  if (!response.ok) throw new ApiError(response.status, resumeFailure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, resumeFailure(response.status));
   return (await response.json()) as ApiResume;
 }
 
 type PatchBody = Record<string, unknown>;
 
 async function resumePatch(path: string, body: PatchBody): Promise<unknown> {
-  const response = await request(path, { method: "PATCH", body: JSON.stringify(body) });
-  if (!response.ok) throw new ApiError(response.status, resumeFailure(response.status));
+  const response = await request(path, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok)
+    throw new ApiError(response.status, resumeFailure(response.status));
   return response.json();
 }
 
 async function resumeDelete(path: string): Promise<void> {
   const response = await request(path, { method: "DELETE" });
-  if (!response.ok) throw new ApiError(response.status, resumeFailure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, resumeFailure(response.status));
 }
 
-async function resumePost(path: string, body: PatchBody, idempotencyKey?: string): Promise<unknown> {
+async function resumePost(
+  path: string,
+  body: PatchBody,
+  idempotencyKey?: string
+): Promise<unknown> {
   const response = await request(path, {
     method: "POST",
     body: JSON.stringify(body),
-    ...(idempotencyKey ? { headers: { "idempotency-key": idempotencyKey } } : {}),
+    ...(idempotencyKey
+      ? { headers: { "idempotency-key": idempotencyKey } }
+      : {}),
   });
-  if (!response.ok) throw new ApiError(response.status, resumeFailure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, resumeFailure(response.status));
   return response.json();
 }
 
@@ -73,12 +111,18 @@ export async function updateProfile(body: PatchBody): Promise<ApiProfile> {
   return result as ApiProfile;
 }
 
-export async function updateSkillGroup(id: number, body: { label: string }): Promise<ApiSkillGroup> {
+export async function updateSkillGroup(
+  id: number,
+  body: { label: string }
+): Promise<ApiSkillGroup> {
   const result = await resumePatch(`/resume/skills/${id}`, body);
   return result as ApiSkillGroup;
 }
 
-export async function updateSkillItem(id: number, body: { item: string }): Promise<ApiSkillItem> {
+export async function updateSkillItem(
+  id: number,
+  body: { item: string }
+): Promise<ApiSkillItem> {
   const result = await resumePatch(`/resume/skills/items/${id}`, body);
   return result as ApiSkillItem;
 }
@@ -91,12 +135,23 @@ export async function deleteSkillItem(id: number): Promise<void> {
   await resumeDelete(`/resume/skills/items/${id}`);
 }
 
-export async function addSkillItem(groupId: number, body: { item: string; display_order?: number }, idempotencyKey: string): Promise<ApiSkillItem> {
-  const result = await resumePost(`/resume/skills/${groupId}/items`, body, idempotencyKey);
+export async function addSkillItem(
+  groupId: number,
+  body: { item: string; display_order?: number },
+  idempotencyKey: string
+): Promise<ApiSkillItem> {
+  const result = await resumePost(
+    `/resume/skills/${groupId}/items`,
+    body,
+    idempotencyKey
+  );
   return result as ApiSkillItem;
 }
 
-export async function updateExperience(id: number, body: PatchBody): Promise<ApiExperience> {
+export async function updateExperience(
+  id: number,
+  body: PatchBody
+): Promise<ApiExperience> {
   const result = await resumePatch(`/resume/experience/${id}`, body);
   return result as ApiExperience;
 }
@@ -110,7 +165,10 @@ export async function addExperience(body: PatchBody): Promise<ApiExperience> {
   return result as ApiExperience;
 }
 
-export async function updateEducation(id: number, body: PatchBody): Promise<ApiEducation> {
+export async function updateEducation(
+  id: number,
+  body: PatchBody
+): Promise<ApiEducation> {
   const result = await resumePatch(`/resume/education/${id}`, body);
   return result as ApiEducation;
 }
@@ -142,7 +200,10 @@ export function useUpdateProfile() {
   return useMutation({
     mutationFn: (body: PatchBody) => updateProfile(body),
     onSuccess: (data) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => ({ ...old, profile: data }));
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({ ...old, profile: data })
+      );
     },
   });
 }
@@ -150,12 +211,18 @@ export function useUpdateProfile() {
 export function useUpdateSkillGroup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: { label: string } }) => updateSkillGroup(id, body),
+    mutationFn: ({ id, body }: { id: number; body: { label: string } }) =>
+      updateSkillGroup(id, body),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const skills = (old?.skills ?? []).map((s) => s.id === variables.id ? data : s);
-        return { ...old, skills };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const skills = (old?.skills ?? []).map((s) =>
+            s.id === variables.id ? data : s
+          );
+          return { ...old, skills };
+        }
+      );
     },
   });
 }
@@ -163,15 +230,19 @@ export function useUpdateSkillGroup() {
 export function useUpdateSkillItem() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: { item: string } }) => updateSkillItem(id, body),
+    mutationFn: ({ id, body }: { id: number; body: { item: string } }) =>
+      updateSkillItem(id, body),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const skills = (old?.skills ?? []).map((g) => ({
-          ...g,
-          items: g.items.map((i) => i.id === variables.id ? data : i),
-        }));
-        return { ...old, skills };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const skills = (old?.skills ?? []).map((g) => ({
+            ...g,
+            items: g.items.map((i) => (i.id === variables.id ? data : i)),
+          }));
+          return { ...old, skills };
+        }
+      );
     },
   });
 }
@@ -181,10 +252,13 @@ export function useDeleteSkillGroup() {
   return useMutation({
     mutationFn: (id: number) => deleteSkillGroup(id),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const skills = (old?.skills ?? []).filter((s) => s.id !== variables);
-        return { ...old, skills };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const skills = (old?.skills ?? []).filter((s) => s.id !== variables);
+          return { ...old, skills };
+        }
+      );
     },
   });
 }
@@ -194,13 +268,16 @@ export function useDeleteSkillItem() {
   return useMutation({
     mutationFn: (id: number) => deleteSkillItem(id),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const skills = (old?.skills ?? []).map((g) => ({
-          ...g,
-          items: g.items.filter((i) => i.id !== variables),
-        }));
-        return { ...old, skills };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const skills = (old?.skills ?? []).map((g) => ({
+            ...g,
+            items: g.items.filter((i) => i.id !== variables),
+          }));
+          return { ...old, skills };
+        }
+      );
     },
   });
 }
@@ -224,13 +301,15 @@ export function useAddSkillItem() {
     },
     onSuccess: (data, variables) => {
       retryKey.current = null;
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const skills = (old?.skills ?? []).map((g) =>
-          g.id === variables.groupId
-            ? { ...g, items: [...g.items, data] }
-            : g);
-        return { ...old, skills };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const skills = (old?.skills ?? []).map((g) =>
+            g.id === variables.groupId ? { ...g, items: [...g.items, data] } : g
+          );
+          return { ...old, skills };
+        }
+      );
     },
   });
 }
@@ -238,12 +317,18 @@ export function useAddSkillItem() {
 export function useUpdateExperience() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: PatchBody }) => updateExperience(id, body),
+    mutationFn: ({ id, body }: { id: number; body: PatchBody }) =>
+      updateExperience(id, body),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const experience = (old?.experience ?? []).map((e) => e.id === variables.id ? data : e);
-        return { ...old, experience };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const experience = (old?.experience ?? []).map((e) =>
+            e.id === variables.id ? data : e
+          );
+          return { ...old, experience };
+        }
+      );
     },
   });
 }
@@ -253,10 +338,15 @@ export function useDeleteExperience() {
   return useMutation({
     mutationFn: (id: number) => deleteExperience(id),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const experience = (old?.experience ?? []).filter((e) => e.id !== variables);
-        return { ...old, experience };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const experience = (old?.experience ?? []).filter(
+            (e) => e.id !== variables
+          );
+          return { ...old, experience };
+        }
+      );
     },
   });
 }
@@ -266,10 +356,13 @@ export function useAddExperience() {
   return useMutation({
     mutationFn: (body: PatchBody) => addExperience(body),
     onSuccess: (data) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => ({
-        ...old,
-        experience: [...(old?.experience ?? []), data],
-      }));
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({
+          ...old,
+          experience: [...(old?.experience ?? []), data],
+        })
+      );
     },
   });
 }
@@ -277,12 +370,18 @@ export function useAddExperience() {
 export function useUpdateEducation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: PatchBody }) => updateEducation(id, body),
+    mutationFn: ({ id, body }: { id: number; body: PatchBody }) =>
+      updateEducation(id, body),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const education = (old?.education ?? []).map((e) => e.id === variables.id ? data : e);
-        return { ...old, education };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const education = (old?.education ?? []).map((e) =>
+            e.id === variables.id ? data : e
+          );
+          return { ...old, education };
+        }
+      );
     },
   });
 }
@@ -292,10 +391,15 @@ export function useDeleteEducation() {
   return useMutation({
     mutationFn: (id: number) => deleteEducation(id),
     onSuccess: (data, variables) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => {
-        const education = (old?.education ?? []).filter((e) => e.id !== variables);
-        return { ...old, education };
-      });
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => {
+          const education = (old?.education ?? []).filter(
+            (e) => e.id !== variables
+          );
+          return { ...old, education };
+        }
+      );
     },
   });
 }
@@ -305,10 +409,13 @@ export function useAddEducation() {
   return useMutation({
     mutationFn: (body: PatchBody) => addEducation(body),
     onSuccess: (data) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => ({
-        ...old,
-        education: [...(old?.education ?? []), data],
-      }));
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({
+          ...old,
+          education: [...(old?.education ?? []), data],
+        })
+      );
     },
   });
 }
@@ -323,7 +430,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path: string, init: RequestInit = {}): Promise<Response> {
+async function request(
+  path: string,
+  init: RequestInit = {}
+): Promise<Response> {
   const controller = new AbortController();
   const externalSignal = init.signal;
   const abortWithExternalSignal = () => controller.abort();
@@ -363,21 +473,29 @@ type UpdateProjectBody = {
   display_order?: number;
 };
 
-export async function updateProject(slug: string, body: UpdateProjectBody): Promise<Project> {
+export async function updateProject(
+  slug: string,
+  body: UpdateProjectBody
+): Promise<Project> {
   const response = await request(`/projects/${encodeURIComponent(slug)}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new ApiError(response.status, failure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, failure(response.status));
   const result: unknown = await response.json();
   if (!isProject(result)) throw new ApiError(502, "Invalid project response");
   return result;
 }
 
 export async function deleteProject(slug: string): Promise<void> {
-  const response = await request(`/projects/${encodeURIComponent(slug)}`, { method: "DELETE" });
-  if (!response.ok) throw new ApiError(response.status, failure(response.status));
-  if (response.status !== 204) throw new ApiError(502, "Unexpected deletion response");
+  const response = await request(`/projects/${encodeURIComponent(slug)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok)
+    throw new ApiError(response.status, failure(response.status));
+  if (response.status !== 204)
+    throw new ApiError(502, "Unexpected deletion response");
 }
 
 export function useUpdateProject() {
@@ -394,13 +512,137 @@ export function useUpdateProject() {
         (old: ProjectsResponse | undefined) =>
           old && {
             ...old,
+            items: old.items
+              .map((project) =>
+                project.slug === variables.slug ? data : project
+              )
+              .sort(
+                (left, right) =>
+                  left.display_order - right.display_order || left.id - right.id
+              ),
+          }
+      );
+    },
+  });
+}
+
+export async function uploadProjectScreenshot(
+  slug: string,
+  file: File
+): Promise<Project> {
+  const validationError = validateAvatarFile(file);
+  if (validationError) throw new ApiError(400, validationError);
+
+  const formData = new FormData();
+  formData.set("file", file);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `/api/projects/${encodeURIComponent(slug)}/screenshot`,
+      {
+        method: "PUT",
+        headers: { "X-Requested-With": "online-resume-admin" },
+        body: formData,
+        signal: controller.signal,
+        cache: "no-store",
+      }
+    );
+    if (!response.ok) {
+      throw new ApiError(response.status, screenshotFailure(response.status));
+    }
+    const result: unknown = await response.json();
+    if (!isProject(result)) throw new ApiError(502, "Invalid project response");
+    return result;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(502, failure(502));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function screenshotFailure(status: number): string {
+  if (status === 400) return "Upload a JPEG, PNG, or WebP image.";
+  if (status === 413) return "Image must be 2 MB or smaller.";
+  return failure(status);
+}
+
+export async function removeProjectScreenshot(slug: string): Promise<void> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `/api/projects/${encodeURIComponent(slug)}/screenshot`,
+      {
+        method: "DELETE",
+        headers: { "X-Requested-With": "online-resume-admin" },
+        signal: controller.signal,
+        cache: "no-store",
+      }
+    );
+    if (!response.ok)
+      throw new ApiError(response.status, failure(response.status));
+    if (response.status !== 204) {
+      throw new ApiError(502, "Unexpected screenshot removal response");
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    throw new ApiError(502, failure(502));
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function useUpdateProjectScreenshot(
+  mutationFn: (slug: string, file?: File) => Promise<Project>
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ slug, file }: { slug: string; file?: File }) =>
+      mutationFn(slug, file),
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(
+        PROJECTS_QUERY_KEY,
+        (old: ProjectsResponse | undefined) =>
+          old && {
+            ...old,
             items: old.items.map((project) =>
-              project.slug === variables.slug ? data : project,
-            ).sort(
-              (left, right) =>
-                left.display_order - right.display_order || left.id - right.id,
+              project.slug === variables.slug ? data : project
             ),
-          },
+          }
+      );
+    },
+  });
+}
+
+export function useUploadProjectScreenshot() {
+  return useUpdateProjectScreenshot((slug, file) => {
+    if (!file) throw new ApiError(400, "Choose an image file.");
+    return uploadProjectScreenshot(slug, file);
+  });
+}
+
+export function useRemoveProjectScreenshot() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removeProjectScreenshot,
+    onSuccess: (_data, slug) => {
+      queryClient.setQueryData(
+        PROJECTS_QUERY_KEY,
+        (old: ProjectsResponse | undefined) =>
+          old && {
+            ...old,
+            items: old.items.map((project) =>
+              project.slug === slug
+                ? {
+                    ...project,
+                    screenshot_url: null,
+                    screenshot_updated_at: null,
+                  }
+                : project
+            ),
+          }
       );
     },
   });
@@ -420,7 +662,7 @@ export function useDeleteProject() {
           old && {
             ...old,
             items: old.items.filter((project) => project.slug !== variables),
-          },
+          }
       );
     },
   });
@@ -441,7 +683,8 @@ export async function createProject(body: CreateProjectBody): Promise<Project> {
     method: "POST",
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new ApiError(response.status, failure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, failure(response.status));
   const result: unknown = await response.json();
   if (!isProject(result)) throw new ApiError(502, "Invalid project response");
   return result;
@@ -463,10 +706,10 @@ export function useCreateProject() {
             ...old,
             items: [...old.items, project].sort(
               (left, right) =>
-                left.display_order - right.display_order || left.id - right.id,
+                left.display_order - right.display_order || left.id - right.id
             ),
           };
-        },
+        }
       );
       if (!queryClient.getQueryData(PROJECTS_QUERY_KEY)) {
         await queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
@@ -476,13 +719,14 @@ export function useCreateProject() {
 }
 
 export async function reorderProjects(
-  orders: { slug: string; display_order: number }[],
+  orders: { slug: string; display_order: number }[]
 ): Promise<void> {
   const response = await request("/projects/reorder", {
     method: "POST",
     body: JSON.stringify({ orders }),
   });
-  if (!response.ok) throw new ApiError(response.status, failure(response.status));
+  if (!response.ok)
+    throw new ApiError(response.status, failure(response.status));
   const result: unknown = await response.json();
   if (
     !result ||
@@ -507,7 +751,7 @@ export function useReorderProjects() {
         (old: ProjectsResponse | undefined) => {
           if (!old) return old;
           const orderBySlug = new Map(
-            orders.map((item) => [item.slug, item.display_order]),
+            orders.map((item) => [item.slug, item.display_order])
           );
           return {
             ...old,
@@ -519,10 +763,10 @@ export function useReorderProjects() {
               }))
               .sort(
                 (left, right) =>
-                  left.display_order - right.display_order || left.id - right.id,
+                  left.display_order - right.display_order || left.id - right.id
               ),
           };
-        },
+        }
       );
     },
   });
@@ -531,7 +775,7 @@ export function useReorderProjects() {
 async function profileImageRequest(
   kind: ProfileImageKind,
   method: "PUT" | "DELETE",
-  body?: FormData,
+  body?: FormData
 ): Promise<ApiProfile> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -577,7 +821,7 @@ export function useUploadProfileImage(kind: ProfileImageKind) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (file: File) => {
-      if (file.size > AVATAR_UPLOAD_MAX_BYTES) {
+      if (file.size > AVATAR_MAX_BYTES) {
         throw new ApiError(413, "Image must be 2 MB or smaller.");
       }
       const formData = new FormData();
@@ -585,10 +829,13 @@ export function useUploadProfileImage(kind: ProfileImageKind) {
       return profileImageRequest(kind, "PUT", formData);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => ({
-        ...(old ?? ({} as ApiResume)),
-        profile: data,
-      }));
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({
+          ...(old ?? ({} as ApiResume)),
+          profile: data,
+        })
+      );
       queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
     },
   });
@@ -599,10 +846,13 @@ export function useRemoveProfileImage(kind: ProfileImageKind) {
   return useMutation({
     mutationFn: () => profileImageRequest(kind, "DELETE"),
     onSuccess: (data) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => ({
-        ...(old ?? ({} as ApiResume)),
-        profile: data,
-      }));
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({
+          ...(old ?? ({} as ApiResume)),
+          profile: data,
+        })
+      );
       queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
     },
   });
@@ -613,10 +863,13 @@ export function useUpdateContact() {
   return useMutation({
     mutationFn: (body: PatchBody) => updateContact(body),
     onSuccess: (data) => {
-      queryClient.setQueryData(RESUME_QUERY_KEY, (old: ApiResume | undefined) => ({
-        ...(old ?? {}),
-        contact: data,
-      }));
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({
+          ...(old ?? {}),
+          contact: data,
+        })
+      );
     },
   });
 }

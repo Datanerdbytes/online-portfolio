@@ -1,6 +1,8 @@
+import re
+
 from fastapi import FastAPI
 
-from app.api.v1 import auth, avatar, github, health, projects, resume
+from app.api.v1 import auth, avatar, github, health, project_screenshot, projects, resume
 from app.core.config import settings
 from app.core.middleware import MULTIPART_OVERHEAD_BYTES, RequestBodyLimitMiddleware
 from app.schemas.root import RootResponse
@@ -11,6 +13,7 @@ app.include_router(auth.router, prefix="/api/v1")
 app.include_router(avatar.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
+app.include_router(project_screenshot.router, prefix="/api/v1")
 app.include_router(resume.router, prefix="/api/v1")
 app.include_router(github.router, prefix="/api/v1")
 
@@ -21,6 +24,13 @@ app.add_middleware(
     max_bytes=settings.MAX_AVATAR_BYTES + MULTIPART_OVERHEAD_BYTES,
     method="PUT",
     path="/api/v1/resume/profile/avatar",
+)
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_bytes=settings.MAX_AVATAR_BYTES + MULTIPART_OVERHEAD_BYTES,
+    method="PUT",
+    path_pattern=re.compile(r"/api/v1/projects/[^/]+/screenshot"),
+    too_large_detail="Screenshot too large",
 )
 app.add_middleware(
     RequestBodyLimitMiddleware,

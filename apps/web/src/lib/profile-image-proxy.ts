@@ -5,7 +5,10 @@ import { AVATAR_UPLOAD_MAX_BYTES } from "@/lib/avatar";
 
 const UPSTREAM_TIMEOUT_MS = 10000;
 
-export function createProfileImageHandlers(apiPath: string, imageLabel: string) {
+export function createProfileImageHandlers(
+  apiPath: string,
+  imageLabel: string
+) {
   async function GET(req: NextRequest) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
@@ -28,12 +31,17 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
         const cacheControl = upstream.headers.get("cache-control");
         if (etag) responseHeaders.set("etag", etag);
         if (cacheControl) responseHeaders.set("cache-control", cacheControl);
-        return new NextResponse(null, { status: 304, headers: responseHeaders });
+        return new NextResponse(null, {
+          status: 304,
+          headers: responseHeaders,
+        });
       }
 
       if (upstream.status === 404 || upstream.status === 503) {
         const fallback =
-          upstream.status === 404 ? `${imageLabel} not found` : "Image storage unavailable";
+          upstream.status === 404
+            ? `${imageLabel} not found`
+            : "Image storage unavailable";
         const body = await upstream.text();
         try {
           return NextResponse.json(JSON.parse(body), {
@@ -43,13 +51,21 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
         } catch {
           return NextResponse.json(
             { detail: fallback },
-            { status: upstream.status, headers: { "Cache-Control": "no-store" } },
+            {
+              status: upstream.status,
+              headers: { "Cache-Control": "no-store" },
+            }
           );
         }
       }
 
       const responseHeaders = new Headers();
-      for (const name of ["content-type", "content-length", "etag", "cache-control"]) {
+      for (const name of [
+        "content-type",
+        "content-length",
+        "etag",
+        "cache-control",
+      ]) {
         const value = upstream.headers.get(name);
         if (value) responseHeaders.set(name, value);
       }
@@ -60,7 +76,7 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
     } catch {
       return NextResponse.json(
         { detail: `${imageLabel} service unavailable` },
-        { status: 503, headers: { "Cache-Control": "no-store" } },
+        { status: 503, headers: { "Cache-Control": "no-store" } }
       );
     } finally {
       clearTimeout(timeout);
@@ -72,7 +88,10 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
     if (mutationError) {
       return NextResponse.json(
         { detail: mutationError.detail },
-        { status: mutationError.status, headers: { "Cache-Control": "no-store" } },
+        {
+          status: mutationError.status,
+          headers: { "Cache-Control": "no-store" },
+        }
       );
     }
 
@@ -80,7 +99,7 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
     if (!token) {
       return NextResponse.json(
         { detail: "Not authenticated" },
-        { status: 401, headers: { "Cache-Control": "no-store" } },
+        { status: 401, headers: { "Cache-Control": "no-store" } }
       );
     }
 
@@ -103,11 +122,13 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
         if (contentLength) {
           const length = Number(contentLength);
           if (!Number.isNaN(length) && length > AVATAR_UPLOAD_MAX_BYTES) {
-            return tooLargeResponse();
+            return tooLargeResponse(imageLabel);
           }
         }
         const arrayBuffer = await req.arrayBuffer();
-        if (arrayBuffer.byteLength > AVATAR_UPLOAD_MAX_BYTES) return tooLargeResponse();
+        if (arrayBuffer.byteLength > AVATAR_UPLOAD_MAX_BYTES) {
+          return tooLargeResponse(imageLabel);
+        }
         body = arrayBuffer;
       }
 
@@ -133,7 +154,7 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
     } catch {
       return NextResponse.json(
         { detail: `${imageLabel} service unavailable` },
-        { status: 503, headers: { "Cache-Control": "no-store" } },
+        { status: 503, headers: { "Cache-Control": "no-store" } }
       );
     } finally {
       clearTimeout(timeout);
@@ -143,10 +164,10 @@ export function createProfileImageHandlers(apiPath: string, imageLabel: string) 
   return { GET, PUT: mutate, DELETE: mutate };
 }
 
-function tooLargeResponse() {
+function tooLargeResponse(imageLabel: string) {
   return NextResponse.json(
-    { detail: "Avatar too large" },
-    { status: 413, headers: { "Cache-Control": "no-store" } },
+    { detail: `${imageLabel} too large` },
+    { status: 413, headers: { "Cache-Control": "no-store" } }
   );
 }
 
@@ -158,9 +179,15 @@ async function jsonOrFallback(upstream: Response, fallback: string) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch {
-    return new NextResponse(responseBody || JSON.stringify({ detail: fallback }), {
-      status: upstream.status,
-      headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
-    });
+    return new NextResponse(
+      responseBody || JSON.stringify({ detail: fallback }),
+      {
+        status: upstream.status,
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }

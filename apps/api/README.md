@@ -4,30 +4,30 @@ FastAPI backend for the online resume portfolio. Runs on http://localhost:8000.
 
 ## Commands (run from `apps/api`)
 
-| Command | Description |
-| --- | --- |
-| `uv run uvicorn app.main:app --reload` | Start dev server (http://localhost:8000) |
-| `uv run pytest` | Run database-free tests (no PostgreSQL) |
-| `uv run pytest --run-integration` | Run integration tests against a disposable PostgreSQL database |
-| `TEST_DATABASE_ADMIN_URL=postgresql+psycopg://resume:resume@localhost:5432/postgres uv run pytest --run-integration` | Run integration tests with explicit admin URL |
-| `uv run alembic upgrade head` | Apply migrations |
-| `uv run alembic downgrade base` | Reverse all migrations |
-| `uv run alembic revision --autogenerate -m "message"` | Create a migration |
-| `uv run ruff check .` | Lint |
-| `uv run ruff format .` | Format |
-| `uv run python -m app.scripts.seed_projects --allow-sample-data` | Seed illustrative sample projects (dev only) |
+| Command                                                                                                              | Description                                                    |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `uv run uvicorn app.main:app --reload`                                                                               | Start dev server (http://localhost:8000)                       |
+| `uv run pytest`                                                                                                      | Run database-free tests (no PostgreSQL)                        |
+| `uv run pytest --run-integration`                                                                                    | Run integration tests against a disposable PostgreSQL database |
+| `TEST_DATABASE_ADMIN_URL=postgresql+psycopg://resume:resume@localhost:5432/postgres uv run pytest --run-integration` | Run integration tests with explicit admin URL                  |
+| `uv run alembic upgrade head`                                                                                        | Apply migrations                                               |
+| `uv run alembic downgrade base`                                                                                      | Reverse all migrations                                         |
+| `uv run alembic revision --autogenerate -m "message"`                                                                | Create a migration                                             |
+| `uv run ruff check .`                                                                                                | Lint                                                           |
+| `uv run ruff format .`                                                                                               | Format                                                         |
+| `uv run python -m app.scripts.seed_projects --allow-sample-data`                                                     | Seed illustrative sample projects (dev only)                   |
 
 ## Environment
 
 `apps/api/.env` (copied from `apps/api/.env.example`, never committed) is loaded from the `apps/api/` working directory by `pydantic-settings`.
 
-| Variable | Description | Default |
-| --- | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string (`postgresql+psycopg` driver, used by SQLAlchemy and Alembic) | `postgresql+psycopg://resume:resume@localhost:5432/resume` |
-| `API_HOST` | Host to bind | `0.0.0.0` |
-| `API_PORT` | Port to bind | `8000` |
-| `GITHUB_USERNAME` | GitHub account that owns repositories linked by published projects | unset |
-| `GITHUB_PAT` | Server-side token used for GitHub API requests; no public-repository scope is needed | unset |
+| Variable          | Description                                                                                | Default                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| `DATABASE_URL`    | PostgreSQL connection string (`postgresql+psycopg` driver, used by SQLAlchemy and Alembic) | `postgresql+psycopg://resume:resume@localhost:5432/resume` |
+| `API_HOST`        | Host to bind                                                                               | `0.0.0.0`                                                  |
+| `API_PORT`        | Port to bind                                                                               | `8000`                                                     |
+| `GITHUB_USERNAME` | GitHub account that owns repositories linked by published projects                         | unset                                                      |
+| `GITHUB_PAT`      | Server-side token used for GitHub API requests; no public-repository scope is needed       | unset                                                      |
 
 ## API endpoints
 
@@ -39,6 +39,8 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 - `GET /api/v1/github/projects/{slug}/readme` — Returns GitHub-rendered README HTML for a published project whose repository URL belongs to `GITHUB_USERNAME`. The repository must also be public according to GitHub; private repositories and projects without an eligible GitHub URL return 404. Requires `GITHUB_USERNAME` and `GITHUB_PAT`; the token is never sent to the browser.
 - `GET /api/v1/resume/profile/avatar` and `GET /api/v1/resume/profile/banner` — Public image reads for the independent sidebar profile photo and square hero banner. Both return the image bytes with an ETag; absent images return 404.
 - `PUT` and `DELETE` on those image paths — Owner-only uploads and removals. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default). Image files are stored beneath `MEDIA_ROOT`; the database stores only generated filenames and image metadata.
+- `GET /api/v1/projects/{slug}/screenshot` — Public read of the project's optional screenshot, returned with an ETag. Missing projects or screenshots return 404.
+- `PUT` and `DELETE /api/v1/projects/{slug}/screenshot` — Owner-only upload, replacement, or removal. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default), reuse the validated profile-image storage, and persist only generated filenames and image metadata. Uploaded screenshots are shown as small thumbnails beside project technology tags.
 
 ## Protected project management (owner only)
 
@@ -65,10 +67,11 @@ Validation: `slug` must match `^[a-z0-9]+(?:-[a-z0-9]+)*$` (1–100 chars, not t
 - `demo_url` — optional (`String(1024)`, nullable).
 - `display_order` — required integer, default 0.
 - `is_sample` — required boolean, default false. Flags clearly labeled illustrative placeholder entries.
+- `screenshot_filename`, `screenshot_content_type`, `screenshot_updated_at` — nullable screenshot storage metadata. Files live beneath `MEDIA_ROOT`; `ProjectResponse.screenshot_url` is non-null only when a screenshot has been uploaded.
 
 Migrations are managed with Alembic; `create_all()` is not used on application startup. Model metadata is registered in `migrations/env.py` for autogeneration.
 
-Current migration: `6151be1aade3` (`create_projects_table`).
+Current migration adds the optional screenshot metadata after the project-table migration.
 
 ## Development-only seed
 
@@ -77,6 +80,7 @@ Current migration: `6151be1aade3` (`create_projects_table`).
 Creates three clearly labeled illustrative project entries (every title starts with `Sample:`, each has an explicit sample description, and `is_sample=true`). Repository and demo URLs are null. Technology lists describe the illustrative projects, not the owner's verified expertise. No people, employers, achievements, metrics, or completed work are invented.
 
 Safety behavior:
+
 - Requires the explicit `--allow-sample-data` flag; refuses otherwise (exit code 2).
 - Never runs during application startup or migrations.
 - Repeatable: stable slugs mean re-seeding inserts nothing new.
@@ -120,13 +124,12 @@ TEST_DATABASE_ADMIN_URL=postgresql+psycopg://resume:resume@localhost:5432/postgr
   uv run pytest --run-integration
 ```
 
-- ``TEST_DATABASE_ADMIN_URL`` is required; ``DATABASE_URL`` is never used as a fallback.
+- `TEST_DATABASE_ADMIN_URL` is required; `DATABASE_URL` is never used as a fallback.
 - A unique database name is generated per run; pre-existing databases are never reused or dropped.
 - Only the database created by the current run is dropped at teardown.
 - If the account cannot create databases or the configuration is missing/invalid, the run fails with an actionable message.
 
 Do not run integration tests against a developer's existing database without separate authorization.
-
 
 ## Owner authentication (A0)
 

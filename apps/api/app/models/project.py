@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Integer, String, text
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Integer, String, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,6 +30,9 @@ class Project(Base):
     - ``is_sample``: ``Boolean``, required, default false. Flags clearly
       labeled illustrative placeholder entries that are not real portfolio
       work.
+    - ``screenshot_filename`` / ``screenshot_content_type`` /
+      ``screenshot_updated_at``: optional metadata for one replaceable
+      project screenshot stored beneath ``MEDIA_ROOT``.
     """
 
     __tablename__ = "projects"
@@ -50,3 +55,14 @@ class Project(Base):
     is_sample: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    screenshot_filename: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    screenshot_content_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    screenshot_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    @property
+    def screenshot_url(self) -> str | None:
+        if not self.screenshot_filename:
+            return None
+        return f"/api/v1/projects/{self.slug}/screenshot"

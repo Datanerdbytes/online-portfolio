@@ -10,7 +10,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.v1.auth import AuthRoute
+from app.api.v1.project_screenshot import remove_screenshot_quietly
 from app.core.auth import TokenClaims, verify_owner_token
+from app.core.storage import ProfileImageStore, get_image_store
 from app.db.session import get_db
 from app.models.project import Project
 from app.schemas.project import (
@@ -254,12 +256,14 @@ def delete_project(
     slug: str,
     current_owner: TokenClaims = Depends(get_current_owner),  # noqa: B008  # FastAPI idiom
     db: Session = Depends(get_db),  # noqa: B008  # FastAPI idiom
+    store: ProfileImageStore = Depends(get_image_store),  # noqa: B008
 ):
     try:
         project = db.query(Project).filter(Project.slug == slug).with_for_update().first()
         if project is None:
             raise HTTPException(status_code=404, detail="Project not found")
 
+        screenshot_filename = getattr(project, "screenshot_filename", None)
         db.delete(project)
         db.commit()
     except HTTPException:
@@ -270,4 +274,5 @@ def delete_project(
         raise HTTPException(
             status_code=503, detail="Projects service temporarily unavailable."
         ) from None
+    remove_screenshot_quietly(store, screenshot_filename)
     return None
