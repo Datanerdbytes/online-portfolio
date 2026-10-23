@@ -1,0 +1,7 @@
+npx lint-staged
+node scripts/check-staged-files.mjs
+node scripts/check-secrets.mjs
+npm run lint:web
+npm run typecheck:web
+npm run test:web
+(cd apps/api && uv run ruff check . && uv run mypy --explicit-package-bases app && uv run pytest)

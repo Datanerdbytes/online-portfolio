@@ -1,331 +1,199 @@
-# Online Resume / Portfolio
+# Online Resume & Portfolio
 
-A production-style full-stack online resume and portfolio demonstrating frontend and backend engineering.
+A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI, and PostgreSQL. The project combines a public portfolio with an optional owner-only interface for managing its content.
 
-## Stack
+## What it includes
 
-| Area             | Technology                                                 |
-| ---------------- | ---------------------------------------------------------- |
-| Frontend         | Next.js 16 App Router, TypeScript, Tailwind CSS, shadcn/ui |
-| Backend          | FastAPI, Python 3.12+, SQLAlchemy 2, Alembic               |
-| Database         | PostgreSQL 16 (Docker Compose)                             |
-| Package Managers | npm (frontend), uv (backend)                               |
+- Responsive portfolio homepage with profile, skills, experience, education, contact details, and featured projects.
+- A print-friendly resume page.
+- Project detail pages with GitHub-rendered README content and Mermaid diagrams when configured.
+- FastAPI endpoints for resume and project content, backed by PostgreSQL and managed with Alembic.
+- Optional owner administration for projects, resume content, and profile images.
+- Generated resume fallback content so the portfolio can still show resume details when the API is unavailable.
+- Same-origin frontend API routes, including backend health status and protected administration requests.
 
-## Repository Structure
+Resume and portfolio entries are application content; update them with accurate information before publishing. The optional project seeder creates explicitly labeled development samples, not claims about completed work.
 
+## Technology
+
+| Area             | Technology                                                     |
+| ---------------- | -------------------------------------------------------------- |
+| Frontend         | Next.js App Router, React, TypeScript, Tailwind CSS, shadcn/ui |
+| Backend          | FastAPI, Python 3.12+, SQLAlchemy 2, Alembic                   |
+| Database         | PostgreSQL 16                                                  |
+| Package managers | npm workspaces and uv                                          |
+
+## Repository layout
+
+```text
+apps/
+  web/    Next.js frontend, UI, API proxy routes, and frontend tests
+  api/    FastAPI application, database models, migrations, and backend tests
+compose.yaml
+package.json
 ```
-online-resume/
-├── apps/
-│   ├── web/          # Next.js frontend
-│   └── api/          # FastAPI backend
-├── compose.yaml      # Docker Compose for PostgreSQL
-├── package.json      # Root workspace configuration
-└── README.md
-```
 
-## Prerequisites
+## Run locally
 
-- Node.js >= 20
-- Python >= 3.12
-- uv (Python package manager): `pip install uv`
-- Docker & Docker Compose (for PostgreSQL)
+### Prerequisites
 
-## Quick Start
+- Node.js 20 or newer and npm
+- Python 3.12 or newer and [uv](https://docs.astral.sh/uv/)
+- Docker Compose, for the local PostgreSQL database
 
-All command groups below start from the repository root (`online-resume/`). Commands that must run inside `apps/api` use a subshell `(cd apps/api && ...)` so your shell returns to the root afterward; terminal-specific instructions state the directory explicitly.
+### Install dependencies and configure the environment
 
-### 1. Install dependencies
-
-**Starting directory:** repository root
+Run from the repository root:
 
 ```bash
-# Frontend (root workspace)
 npm install
-
-# Backend (subshell; shell returns to root when done)
 (cd apps/api && uv sync)
-```
-
-### 2. Start PostgreSQL
-
-**Starting directory:** repository root (`compose.yaml` lives here)
-
-```bash
-docker compose up -d
-```
-
-Verify it is healthy:
-
-```bash
-docker compose ps
-```
-
-### 3. Configure environment
-
-**Starting directory:** repository root
-
-Copy the example files and adjust as needed. Do not commit `.env` or `.env.local`.
-
-```bash
-# Backend (settings load .env from the apps/api/ working directory)
 cp apps/api/.env.example apps/api/.env
-
-# Frontend (Next.js loads .env.local in development; server-side only)
 cp apps/web/.env.example apps/web/.env.local
 ```
 
-The defaults run a public-only site. To enable the project administration interface, provision the four owner values in `apps/api/.env` and set `ADMIN_WEB_ORIGIN` in `apps/web/.env.local` — see [Administration](#administration).
+The examples use local development settings. The API loads `apps/api/.env` when commands run from `apps/api`; Next.js loads `apps/web/.env.local` from `apps/web`. Do not commit real `.env` files or credentials.
 
-### 4. Run database migrations
+### Start PostgreSQL and prepare the database
 
-**Starting directory:** repository root (the subshell runs Alembic from `apps/api`, then returns to root)
+Run from the repository root:
 
 ```bash
+docker compose up -d
 (cd apps/api && uv run alembic upgrade head)
+(cd apps/api && uv run python -m app.scripts.seed_resume)
 ```
 
-Migrations require PostgreSQL to be running (step 2). Alembic connects using `DATABASE_URL` from `apps/api/.env`.
+The resume seed is repeatable and synchronizes missing canonical resume content while preserving entries managed through the administration interface. To add clearly labeled sample projects for local development only, run:
 
-### 5. Start development servers
+```bash
+(cd apps/api && uv run python -m app.scripts.seed_projects --allow-sample-data)
+```
 
-Use two terminals. Each command group states its starting directory.
+Sample projects are never added automatically. The `--allow-sample-data` flag is required, and existing entries are not overwritten.
 
-**Terminal 1 — Backend** (runs on http://localhost:8000)
+### Start the application
 
-**Starting directory:** repository root
+Open two terminals from the repository root.
+
+**Terminal 1 — API**
 
 ```bash
 cd apps/api
 uv run uvicorn app.main:app --reload
 ```
 
-**Terminal 2 — Frontend** (runs on http://localhost:3000)
+The API runs at <http://localhost:8000>. Its interactive OpenAPI docs are at <http://localhost:8000/docs>.
 
-**Starting directory:** repository root
+**Terminal 2 — web**
 
 ```bash
 npm run dev:web
 ```
 
-### 6. Verify the health endpoint
+The site runs at <http://localhost:3000>. The frontend's server-side API routes use `API_BASE_URL` (default `http://localhost:8000`).
 
-Backend liveness:
+### Verify the services
 
 ```bash
 curl http://localhost:8000/api/v1/health
-# {"status":"ok"}
-```
-
-Frontend health proxy (honestly reports unavailable when the backend is stopped):
-
-```bash
 curl http://localhost:3000/api/health
 ```
 
-`GET /api/v1/health` is a process-liveness check only. It never claims that PostgreSQL is connected. Database connectivity is established separately by running PostgreSQL via Compose (step 2) and applying migrations (step 4). If database readiness is ever added, it belongs on a separate endpoint such as `GET /api/v1/ready`, never on `/api/v1/health`.
+The API health endpoint returns `{"status":"ok"}` as a process-liveness check; it does not assert that PostgreSQL is available. The frontend health route reports the upstream API status separately.
 
-### 7. Seed the resume content
+## Configuration
 
-**Starting directory:** repository root (the subshell runs the script from `apps/api`)
+| Variable                                                                 | App | Purpose                                                                                        |
+| ------------------------------------------------------------------------ | --- | ---------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                           | API | PostgreSQL URL using the `postgresql+psycopg` SQLAlchemy driver                                |
+| `API_HOST`, `API_PORT`                                                   | API | API bind address and port                                                                      |
+| `WEB_APP_URL`                                                            | API | Public frontend URL returned by the API root endpoint                                          |
+| `API_BASE_URL`                                                           | Web | Server-only URL for the FastAPI service                                                        |
+| `GITHUB_USERNAME`, `GITHUB_PAT`                                          | API | Optional server-side GitHub configuration for README rendering of eligible public repositories |
+| `API_ACCESS_SECRET`, `OWNER_ID`, `OWNER_USERNAME`, `OWNER_PASSWORD_HASH` | API | Optional owner authentication; configure all four together                                     |
+| `ADMIN_WEB_ORIGIN`                                                       | Web | Exact site origin required for owner administration                                            |
+| `MEDIA_ROOT`, `MAX_AVATAR_BYTES`                                         | API | Profile image storage location and upload size limit                                           |
 
-```bash
-(cd apps/api && uv run python -m app.scripts.seed_resume)
-```
+See [`apps/api/.env.example`](./apps/api/.env.example) and [`apps/web/.env.example`](./apps/web/.env.example) for the full examples. Owner settings are optional; without valid configuration, public browsing remains available and administration is disabled. `ADMIN_WEB_ORIGIN` must match the site's exact origin and use HTTPS in production.
 
-The script inserts the resume content that is missing and is safe to run repeatedly. It also synchronizes the skill list: canonical skills from the resume PDF are created or restored, renamed entries are normalized, and duplicate skills inside a group are removed. Rows added through the administration interface are preserved.
+## Content and fallback behavior
 
-Refresh the frontend fallback copy after seeding (the API must be running):
+Resume data is served from PostgreSQL through the API. If the API is unavailable, the homepage and resume page use the generated fallback at `apps/web/src/content/resume.ts` and indicate that fallback is in use. Do not edit that generated file by hand.
 
-```bash
-(cd apps/web && API_BASE_URL=http://127.0.0.1:8000 npm run sync:resume-content)
-```
-
-## Available Commands
-
-### Frontend (apps/web)
-
-Root workspace scripts run from the repository root; equivalently run `npm run <command>` from `apps/web`.
-
-| Command                             | Description                                      | Directory  |
-| ----------------------------------- | ------------------------------------------------ | ---------- |
-| `npm run dev:web`                   | Start development server (http://localhost:3000) | Root       |
-| `npm run build:web`                 | Production build                                 | Root       |
-| `npm run start`                     | Start production server                          | `apps/web` |
-| `npm run lint:web`                  | Run ESLint                                       | Root       |
-| `npm run typecheck:web`             | Run TypeScript compiler check                    | Root       |
-| `npm run test`                      | Run the frontend test suite                      | `apps/web` |
-| `npm run sync:resume-content`       | Regenerate the fallback copy from the API        | `apps/web` |
-| `npm run sync:resume-content:check` | Fail when the fallback copy is stale             | `apps/web` |
-
-### Backend (apps/api)
-
-All backend commands run from `apps/api` so that `app.core.config` loads `apps/api/.env`.
-
-| Command                                               | Description                                      |
-| ----------------------------------------------------- | ------------------------------------------------ |
-| `uv run uvicorn app.main:app --reload`                | Start development server (http://localhost:8000) |
-| `uv run pytest`                                       | Run tests                                        |
-| `uv run alembic upgrade head`                         | Apply migrations                                 |
-| `uv run alembic revision --autogenerate -m "message"` | Create migration                                 |
-| `uv run ruff check .`                                 | Lint                                             |
-| `uv run ruff format .`                                | Format                                           |
-| `uv run python -m app.scripts.seed_resume`            | Seed or synchronize resume content               |
-
-### Root
-
-| Command                 | Description                    |
-| ----------------------- | ------------------------------ |
-| `npm install`           | Install frontend dependencies  |
-| `npm run dev:web`       | Start frontend dev server      |
-| `npm run build:web`     | Build frontend                 |
-| `npm run lint:web`      | Lint frontend                  |
-| `npm run typecheck:web` | Type-check frontend            |
-| `npm run format`        | Format all files with Prettier |
-| `npm run format:check`  | Check formatting with Prettier |
-
-## Resume Content and Fallback
-
-The `/resume` page and the homepage read their content from the API, which serves the rows stored in PostgreSQL.
-
-```
-PostgreSQL → GET /api/v1/resume, GET /api/v1/projects → frontend
-```
-
-When the API is unavailable the frontend falls back to `apps/web/src/content/resume.ts`, a repository copy of the same content, and says so on the page. The fallback file is generated, not edited by hand:
-
-| File                                       | Role                                                      |
-| ------------------------------------------ | --------------------------------------------------------- |
-| `apps/web/src/content/resume-types.ts`     | Hand-written types shared by the API and fallback shapes  |
-| `apps/web/src/content/resume.ts`           | Generated fallback content (skills, experience, projects) |
-| `apps/web/scripts/sync-resume-content.mjs` | Reads the API and rewrites the fallback file              |
-
-Regenerate it after seeding or editing content, and use the check mode in CI to catch drift:
+After changing resume data, refresh the fallback while the API is running:
 
 ```bash
 (cd apps/web && API_BASE_URL=http://127.0.0.1:8000 npm run sync:resume-content)
+```
+
+Check whether the checked-in fallback matches the API:
+
+```bash
 (cd apps/web && API_BASE_URL=http://127.0.0.1:8000 npm run sync:resume-content:check)
 ```
 
-## Administration
+Project listings come from the API. Empty results and unavailable-service states are handled explicitly; the UI does not present seeded sample projects as real work.
 
-Project administration is optional. Without owner configuration the site stays public-only and the administration routes are disabled.
+## Checks and tests
 
-### Backend owner configuration (apps/api/.env)
+Run frontend checks from the repository root:
 
-All four values must be provisioned together. A partial configuration fails closed: administration is disabled while public browsing keeps working.
+```bash
+npm run lint:web
+npm run typecheck:web
+npm run build:web
+```
 
-| Variable              | Purpose                                                                       |
-| --------------------- | ----------------------------------------------------------------------------- |
-| `API_ACCESS_SECRET`   | HMAC signing secret for owner access tokens; at least 32 bytes of random data |
-| `OWNER_ID`            | Stable identifier shown in the administration interface                       |
-| `OWNER_USERNAME`      | Login name for the owner account                                              |
-| `OWNER_PASSWORD_HASH` | Argon2id hash of the owner password; the plaintext password is never stored   |
+Run the frontend test suite from `apps/web`:
 
-Generate the password hash out of band and keep the plaintext out of every environment file:
+```bash
+cd apps/web
+npm test
+```
+
+Run backend checks from `apps/api`:
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run mypy --explicit-package-bases app
+```
+
+The default backend tests do not require PostgreSQL. PostgreSQL integration tests are opt-in and require an explicit admin connection URL for a disposable test server:
 
 ```bash
 cd apps/api
-uv run python -c "from argon2 import PasswordHasher; print(PasswordHasher().hash('change-me'))"
+TEST_DATABASE_ADMIN_URL='postgresql+psycopg://resume:resume@localhost:5432/postgres' uv run pytest --run-integration
 ```
 
-### Frontend configuration (apps/web/.env.local)
+This example uses the local Compose defaults; adjust it if you changed the database credentials or port. The integration suite creates and removes only the isolated database it creates. Do not point it at a database containing data you need to keep. See the [API README](./apps/api/README.md) and [web README](./apps/web/README.md) for additional test and verification details.
 
-`ADMIN_WEB_ORIGIN` must match the scheme, host, and port of the public site exactly — no trailing slash and no path. It is read on the server only and is never exposed through a `NEXT_PUBLIC_` variable.
+## Pull request and commit checks
 
-- Development: a plain-HTTP origin such as `http://localhost:3000` is accepted.
-- Production: the origin must use HTTPS. A plain-HTTP origin is rejected, because the session cookie is issued as `__Host-portfolio-admin` with the `Secure` attribute and could not be set over HTTP.
+Installing the npm workspace also installs its Husky Git hooks. Before each commit, the pre-commit hook formats staged JavaScript/TypeScript and Python files, checks staged file sizes and TOML syntax, scans tracked files for newly introduced secrets, and runs the frontend lint/typecheck/tests plus backend Ruff, Mypy, and pytest checks. Prettier also parses and formats staged JSON and YAML. Install frontend dependencies with `npm install` and backend development dependencies with `(cd apps/api && uv sync)` before committing.
 
-A missing or invalid origin disables the administration routes (`Administration unavailable`) while public browsing keeps working.
+The GitHub Actions workflow runs the frontend checks and production build, backend checks, tracked-file secret scanning, changed-file formatting, and repository file validation on pull requests targeting `main` (and on pushes to `main`). To require these checks before merging, enable branch protection or a ruleset for `main` in the GitHub repository settings and require the **Web checks**, **API checks**, and **Repository file checks** statuses.
 
-### Signing in
+## Optional owner administration
 
-1. Open `/auth/signin` and enter the owner username and password.
-2. The Next.js server route forwards the credentials to `POST /api/v1/auth/login`, the backend verifies them against `OWNER_PASSWORD_HASH`, and the returned token is stored in an HttpOnly, `SameSite=Lax` cookie. The browser never receives the token.
-3. Every mutation is re-authorized by the backend against that token, and the frontend proxies reject requests that do not come from the exact configured origin.
-4. Sessions last 15 minutes and are not extended by activity, so sign in again after expiry.
+Administration is disabled unless all four API owner settings are configured: `API_ACCESS_SECRET`, `OWNER_ID`, `OWNER_USERNAME`, and `OWNER_PASSWORD_HASH`. Store only an Argon2id password hash, never the plaintext password. The frontend keeps the short-lived owner token in a server-managed HttpOnly cookie and requires same-origin checks for mutations.
 
-The login limiter is process-local: 5 attempts per 300 seconds per process, counting successful and failed attempts. Run a single backend worker or replica, otherwise the effective limit scales with the number of workers.
+The login limiter is process-local. Run a single API worker/replica unless a shared limiter is added. For setup instructions and the complete route behavior, see the [API README](./apps/api/README.md) and [web README](./apps/web/README.md).
 
-## API Endpoints
+## PostgreSQL lifecycle
 
-### Backend (apps/api)
-
-| Method   | Path                       | Access       | Description                                                                    |
-| -------- | -------------------------- | ------------ | ------------------------------------------------------------------------------ |
-| `GET`    | `/api/v1/health`           | Public       | Health check (`{"status": "ok"}`); process liveness only, not a database check |
-| `GET`    | `/api/v1/projects`         | Public       | Project list for the landing page                                              |
-| `POST`   | `/api/v1/auth/login`       | Public       | Verify owner credentials and issue a short-lived access token                  |
-| `GET`    | `/api/v1/auth/me`          | Bearer token | Return the verified owner identity and token expiry                            |
-| `POST`   | `/api/v1/projects`         | Bearer token | Create a project (`is_sample` is always `false`)                               |
-| `PUT`    | `/api/v1/projects/{slug}`  | Bearer token | Replace the mutable fields of a project                                        |
-| `PATCH`  | `/api/v1/projects/{slug}`  | Bearer token | Partially update a project; `is_sample` is preserved                           |
-| `DELETE` | `/api/v1/projects/{slug}`  | Bearer token | Delete a project                                                               |
-| `POST`   | `/api/v1/projects/reorder` | Bearer token | Atomically update `display_order` for a batch of slugs; no partial writes      |
-
-OpenAPI documentation is served at `/docs`, with the raw schema at `/openapi.json`.
-
-### Frontend (apps/web)
-
-| Method   | Path                    | Description                                         |
-| -------- | ----------------------- | --------------------------------------------------- |
-| `GET`    | `/api/health`           | Backend liveness proxy                              |
-| `GET`    | `/api/projects`         | Public project list                                 |
-| `POST`   | `/api/projects`         | Authenticated create proxy                          |
-| `PUT`    | `/api/projects/[slug]`  | Authenticated replace proxy                         |
-| `PATCH`  | `/api/projects/[slug]`  | Authenticated partial-update proxy                  |
-| `DELETE` | `/api/projects/[slug]`  | Authenticated delete proxy                          |
-| `POST`   | `/api/projects/reorder` | Authenticated reorder proxy                         |
-| `POST`   | `/api/auth/login`       | Credential proxy that sets the session cookie       |
-| `POST`   | `/api/auth/logout`      | Clears the session cookie                           |
-| `GET`    | `/api/auth/me`          | Identity check used by the administration interface |
-| `POST`   | `/api/auth/check`       | Session status check                                |
-
-Mutation proxies require the exact `ADMIN_WEB_ORIGIN` `Origin`, a custom request header, and a same-origin `Sec-Fetch-Site` value. They never accept a bearer token from the browser.
-
-## Environment Variables
-
-### Backend (apps/api/.env)
-
-Loaded from the `apps/api/` working directory by `pydantic-settings`.
-
-| Variable              | Description                                                                                | Default                                                    |
-| --------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| `DATABASE_URL`        | PostgreSQL connection string (`postgresql+psycopg` driver, used by SQLAlchemy and Alembic) | `postgresql+psycopg://resume:resume@localhost:5432/resume` |
-| `API_HOST`            | Host to bind                                                                               | `0.0.0.0`                                                  |
-| `API_PORT`            | Port to bind                                                                               | `8000`                                                     |
-| `API_ACCESS_SECRET`   | Optional. HMAC signing secret for owner access tokens; at least 32 bytes of random data    | unset (administration disabled)                            |
-| `OWNER_ID`            | Optional. Stable identifier for the owner account                                          | unset (administration disabled)                            |
-| `OWNER_USERNAME`      | Optional. Owner login name                                                                 | unset (administration disabled)                            |
-| `OWNER_PASSWORD_HASH` | Optional. Argon2id hash of the owner password; provision out of band                       | unset (administration disabled)                            |
-
-The four administration variables must be provided together. A partial configuration fails closed: the administration routes report `Administration unavailable` and the public site keeps working.
-
-### Frontend (apps/web/.env.local)
-
-Loaded by Next.js in development from `apps/web/`. Copied from `apps/web/.env.example` (which documents `.env.local`, not `.env`).
-
-| Variable           | Description                                                                               | Default                         |
-| ------------------ | ----------------------------------------------------------------------------------------- | ------------------------------- |
-| `API_BASE_URL`     | Backend base URL; server-side only, never exposed via `NEXT_PUBLIC_`                      | `http://localhost:8000`         |
-| `ADMIN_WEB_ORIGIN` | Exact public origin of the site (scheme, host, port; no trailing slash); server-side only | unset (administration disabled) |
-
-`ADMIN_WEB_ORIGIN` must use HTTPS in production; a plain-HTTP origin is rejected because the session cookie is issued as `__Host-portfolio-admin` with the `Secure` attribute. A missing or invalid origin disables the administration routes while public browsing keeps working.
-
-## Docker Compose
-
-**Starting directory:** repository root
+Run these commands from the repository root:
 
 ```bash
-# Start PostgreSQL (binds 127.0.0.1:${POSTGRES_PORT:-5432})
-docker compose up -d
-
-# Stop PostgreSQL (data preserved in the postgres_data volume)
-docker compose down
-
-# Stop and remove volumes (destroys local data)
-docker compose down -v
+docker compose up -d     # Start PostgreSQL
+docker compose down      # Stop it; preserve the named data volume
 ```
 
-## License
+`docker compose down -v` also deletes the local PostgreSQL volume and its data. Use it only when you intend to discard that development database.
 
-MIT
+## Further documentation
+
+- [Backend API and database guide](./apps/api/README.md)
+- [Frontend guide and browser verification](./apps/web/README.md)
+- [Project design plan](./docs/plans/design-plan.md)

@@ -60,6 +60,7 @@ def get_current_owner(authorization: str | None = Header(None)) -> TokenClaims: 
 # Full resume (read-only)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/resume", response_model=ResumeResponse)
 def get_resume(db: Session = Depends(get_db)):  # noqa: B008
     profile = db.query(Profile).first()
@@ -78,18 +79,21 @@ def get_resume(db: Session = Depends(get_db)):  # noqa: B008
     education = db.query(Education).order_by(Education.display_order).all()
     contact = db.query(Contact).options(selectinload(Contact.links)).first()
 
-    return ResumeResponse(
-        profile=profile,
-        skills=skills,
-        experience=experience,
-        education=education,
-        contact=contact,
+    return ResumeResponse.model_validate(
+        {
+            "profile": profile,
+            "skills": skills,
+            "experience": experience,
+            "education": education,
+            "contact": contact,
+        }
     )
 
 
 # ---------------------------------------------------------------------------
 # Profile
 # ---------------------------------------------------------------------------
+
 
 @router.get("/resume/profile", response_model=ProfileResponse)
 def get_profile(db: Session = Depends(get_db)):  # noqa: B008
@@ -118,6 +122,7 @@ def patch_profile(
 # ---------------------------------------------------------------------------
 # Skills
 # ---------------------------------------------------------------------------
+
 
 @router.get("/resume/skills", response_model=list[SkillGroupResponse])
 def get_skills(db: Session = Depends(get_db)):  # noqa: B008
@@ -191,9 +196,7 @@ def add_skill_item(
         ):
             raise HTTPException(status_code=400, detail="Invalid idempotency key")
         existing = (
-            db.query(SkillItem)
-            .filter(SkillItem.idempotency_key == idempotency_key)
-            .one_or_none()
+            db.query(SkillItem).filter(SkillItem.idempotency_key == idempotency_key).one_or_none()
         )
         if existing:
             if (
@@ -274,6 +277,7 @@ def delete_skill_item(
 # Experience
 # ---------------------------------------------------------------------------
 
+
 @router.get("/resume/experience", response_model=list[ExperienceResponse])
 def get_experience(db: Session = Depends(get_db)):  # noqa: B008
     return (
@@ -332,7 +336,9 @@ def delete_experience(
     db.commit()
 
 
-@router.post("/resume/experience/{exp_id}/highlights", response_model=HighlightResponse, status_code=201)
+@router.post(
+    "/resume/experience/{exp_id}/highlights", response_model=HighlightResponse, status_code=201
+)
 def add_highlight(
     exp_id: int,
     body: HighlightCreate,
@@ -382,6 +388,7 @@ def delete_highlight(
 # ---------------------------------------------------------------------------
 # Education
 # ---------------------------------------------------------------------------
+
 
 @router.get("/resume/education", response_model=list[EducationResponse])
 def get_education(db: Session = Depends(get_db)):  # noqa: B008
@@ -434,6 +441,7 @@ def delete_education(
 # ---------------------------------------------------------------------------
 # Contact
 # ---------------------------------------------------------------------------
+
 
 @router.get("/resume/contact", response_model=ContactResponse)
 def get_contact(db: Session = Depends(get_db)):  # noqa: B008

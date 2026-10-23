@@ -10,16 +10,15 @@ display order is reset so the canonical entries lead each group. Entries added
 through the admin UI are preserved and kept after the canonical ones.
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-from app.core.config import settings
-from app.db.base import Base
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.resume import (
     Contact,
     ContactLink,
@@ -36,25 +35,51 @@ engine = create_engine(settings.DATABASE_URL)
 # Canonical skill groups, in resume order. This is the single source of truth
 # for the skills section and is mirrored by the web fallback generator.
 CANONICAL_SKILL_GROUPS: list[tuple[str, list[str]]] = [
-    ("Data Engineering & Cloud Warehousing", [
-        "Medallion Architecture (Bronze/Silver/Gold)",
-        "Google BigQuery", "Snowflake", "dbt Core",
-        "Microsoft SQL Server", "PostgreSQL", "Star Schema Design",
-        "ETL/ELT Pipelines", "Watermarking", "Cryptographic Hashing (SHA-256)",
-    ]),
-    ("Programming & Tools", [
-        "Python (Pandas, SQLAlchemy)", "T-SQL", "Docker",
-        "Google Cloud Run", "GitHub Actions (CI/CD)", "uv", "Git/GitHub",
-    ]),
-    ("Data Visualization & Analytics", [
-        "Tableau (Desktop & Public)", "Plotly Dash",
-        "Executive Dashboard Design", "Data Storytelling",
-        "Advanced Excel (Power Query, Pivot Tables)",
-    ]),
-    ("Core Strengths", [
-        "Analytical Troubleshooting", "Pipeline Observability",
-        "Cross-Functional Communication",
-    ]),
+    (
+        "Data Engineering & Cloud Warehousing",
+        [
+            "Medallion Architecture (Bronze/Silver/Gold)",
+            "Google BigQuery",
+            "Snowflake",
+            "dbt Core",
+            "Microsoft SQL Server",
+            "PostgreSQL",
+            "Star Schema Design",
+            "ETL/ELT Pipelines",
+            "Watermarking",
+            "Cryptographic Hashing (SHA-256)",
+        ],
+    ),
+    (
+        "Programming & Tools",
+        [
+            "Python (Pandas, SQLAlchemy)",
+            "T-SQL",
+            "Docker",
+            "Google Cloud Run",
+            "GitHub Actions (CI/CD)",
+            "uv",
+            "Git/GitHub",
+        ],
+    ),
+    (
+        "Data Visualization & Analytics",
+        [
+            "Tableau (Desktop & Public)",
+            "Plotly Dash",
+            "Executive Dashboard Design",
+            "Data Storytelling",
+            "Advanced Excel (Power Query, Pivot Tables)",
+        ],
+    ),
+    (
+        "Core Strengths",
+        [
+            "Analytical Troubleshooting",
+            "Pipeline Observability",
+            "Cross-Functional Communication",
+        ],
+    ),
 ]
 
 # Names written before the canonical list existed. Each maps to the canonical
@@ -86,10 +111,7 @@ def sync_skills(session: Session) -> None:
     canonical entries lead each group. Entries that are not part of the
     canonical list are preserved and keep their relative order after it.
     """
-    groups = {
-        group.label: group
-        for group in session.execute(select(SkillGroup)).scalars().all()
-    }
+    groups = {group.label: group for group in session.execute(select(SkillGroup)).scalars().all()}
 
     for order, (label, canonical_items) in enumerate(CANONICAL_SKILL_GROUPS):
         group = groups.get(label)
@@ -110,11 +132,7 @@ def sync_skills(session: Session) -> None:
             if canonical is None:
                 continue
             duplicate = next(
-                (
-                    other
-                    for other in items
-                    if other.id != item.id and other.item == canonical
-                ),
+                (other for other in items if other.id != item.id and other.item == canonical),
                 None,
             )
             if duplicate is not None:
@@ -166,22 +184,24 @@ def seed():
         # --- Profile ---
         existing = session.execute(select(Profile)).scalar_one_or_none()
         if not existing:
-            session.add(Profile(
-                name="Roel Somido",
-                headline="Data Analytics & Data Engineering Candidate",
-                introduction=(
-                    "B.S. Information Technology graduate specializing in end-to-end "
-                    "data architecture, automated pipeline engineering, cloud data "
-                    "warehousing, and executive business intelligence."
-                ),
-                about=(
-                    "Transitioning from technical support to Data Engineering and Analytics "
-                    "with hands-on experience building multi-tier Medallion pipelines, "
-                    "implementing dbt test suites, deploying serverless web apps, and "
-                    "delivering interactive Tableau dashboards."
-                ),
-                location="Claveria, Misamis Oriental",
-            ))
+            session.add(
+                Profile(
+                    name="Roel Somido",
+                    headline="Data Analytics & Data Engineering Candidate",
+                    introduction=(
+                        "B.S. Information Technology graduate specializing in end-to-end "
+                        "data architecture, automated pipeline engineering, cloud data "
+                        "warehousing, and executive business intelligence."
+                    ),
+                    about=(
+                        "Transitioning from technical support to Data Engineering and Analytics "
+                        "with hands-on experience building multi-tier Medallion pipelines, "
+                        "implementing dbt test suites, deploying serverless web apps, and "
+                        "delivering interactive Tableau dashboards."
+                    ),
+                    location="Claveria, Misamis Oriental",
+                )
+            )
             print("  ✓ Profile seeded")
         else:
             print("  - Profile already exists, skipping")
@@ -201,8 +221,14 @@ def seed():
                 "description": "",
                 "display_order": 0,
                 "highlights": [
-                    "Managed insurance claim data and financial reimbursements with strict attention to data accuracy.",
-                    "Resolved complex data discrepancies in customer accounts to ensure precise billing.",
+                    (
+                        "Managed insurance claim data and financial reimbursements with "
+                        "strict attention to data accuracy."
+                    ),
+                    (
+                        "Resolved complex data discrepancies in customer accounts to "
+                        "ensure precise billing."
+                    ),
                 ],
             },
             {
@@ -215,7 +241,10 @@ def seed():
                 "description": "",
                 "display_order": 1,
                 "highlights": [
-                    "Processed airline booking and transaction data, ensuring compliance with global distribution system standards.",
+                    (
+                        "Processed airline booking and transaction data, ensuring "
+                        "compliance with global distribution system standards."
+                    ),
                 ],
             },
             {
@@ -228,7 +257,10 @@ def seed():
                 "description": "",
                 "display_order": 2,
                 "highlights": [
-                    "Analyzed network connectivity data to troubleshoot and resolve infrastructure issues for ISP clients.",
+                    (
+                        "Analyzed network connectivity data to troubleshoot and resolve "
+                        "infrastructure issues for ISP clients."
+                    ),
                 ],
             },
         ]
@@ -242,7 +274,9 @@ def seed():
                 session.add(exp)
                 session.flush()
                 for i, text in enumerate(highlights):
-                    session.add(ExperienceHighlight(experience_id=exp.id, text=text, display_order=i))
+                    session.add(
+                        ExperienceHighlight(experience_id=exp.id, text=text, display_order=i)
+                    )
                 print(f"  ✓ Experience '{exp_data['slug']}' seeded")
             else:
                 print(f"  - Experience '{exp_data['slug']}' already exists, skipping")
@@ -252,14 +286,16 @@ def seed():
             select(Education).where(Education.slug == "asian-college-information-technology")
         ).scalar_one_or_none()
         if not existing_edu:
-            session.add(Education(
-                slug="asian-college-information-technology",
-                qualification="B.S. in Information Technology",
-                institution="Asian College",
-                started="2001-06",
-                ended="2005-05",
-                display_order=0,
-            ))
+            session.add(
+                Education(
+                    slug="asian-college-information-technology",
+                    qualification="B.S. in Information Technology",
+                    institution="Asian College",
+                    started="2001-06",
+                    ended="2005-05",
+                    display_order=0,
+                )
+            )
             print("  ✓ Education seeded")
         else:
             print("  - Education already exists, skipping")
@@ -270,14 +306,22 @@ def seed():
             contact = Contact(phone="+63 923-456-8257", email="roel.somido@icloud.com")
             session.add(contact)
             session.flush()
-            session.add(ContactLink(
-                contact_id=contact.id, label="GitHub",
-                url="https://github.com/Datanerdbytes", display_order=0,
-            ))
-            session.add(ContactLink(
-                contact_id=contact.id, label="Tableau Public",
-                url="https://public.tableau.com/app/profile/roel.somido/vizzes", display_order=1,
-            ))
+            session.add(
+                ContactLink(
+                    contact_id=contact.id,
+                    label="GitHub",
+                    url="https://github.com/Datanerdbytes",
+                    display_order=0,
+                )
+            )
+            session.add(
+                ContactLink(
+                    contact_id=contact.id,
+                    label="Tableau Public",
+                    url="https://public.tableau.com/app/profile/roel.somido/vizzes",
+                    display_order=1,
+                )
+            )
             print("  ✓ Contact seeded")
         else:
             print("  - Contact already exists, skipping")

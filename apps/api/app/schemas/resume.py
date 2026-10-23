@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
-
+from pydantic import BaseModel, ConfigDict
 
 # ---------------------------------------------------------------------------
 # Profile
 # ---------------------------------------------------------------------------
+
 
 class ProfileBase(BaseModel):
     name: str
@@ -43,6 +43,7 @@ class ProfilePatch(BaseModel):
 # ---------------------------------------------------------------------------
 # Skills
 # ---------------------------------------------------------------------------
+
 
 class SkillItemResponse(BaseModel):
     id: int
@@ -83,6 +84,7 @@ class SkillItemPatch(BaseModel):
 # ---------------------------------------------------------------------------
 # Experience
 # ---------------------------------------------------------------------------
+
 
 class HighlightResponse(BaseModel):
     id: int
@@ -141,6 +143,7 @@ class HighlightPatch(BaseModel):
 # Education
 # ---------------------------------------------------------------------------
 
+
 class EducationResponse(BaseModel):
     id: int
     slug: str
@@ -172,6 +175,7 @@ class EducationPatch(BaseModel):
 # ---------------------------------------------------------------------------
 # Contact
 # ---------------------------------------------------------------------------
+
 
 class ContactLinkResponse(BaseModel):
     id: int
@@ -209,6 +213,7 @@ class ContactLinkPatch(BaseModel):
 # ---------------------------------------------------------------------------
 # Full resume (read-only composite)
 # ---------------------------------------------------------------------------
+
 
 class ResumeResponse(BaseModel):
     profile: ProfileResponse | None = None
