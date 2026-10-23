@@ -61,6 +61,8 @@ The backend's `vercel.json` excludes local environment files, media, tests, and
 caches from the Python function bundle itself. This complements `.vercelignore`:
 prebuilt function source maps must not reference files that upload rules omit.
 The deployment job checks the generated source map before uploading the backend.
+The frontend build uses `--standalone` to inline traced dependencies into the
+build output instead of referring to ignored source `node_modules` files.
 
 Both Vercel projects were configured without Git integration when this workflow
 was introduced. Keep automatic Git production deployments disabled so they do

@@ -163,7 +163,7 @@ jobs:
           VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Build frontend
-        run: vercel build --prod
+        run: vercel build --prod --standalone
         env:
           VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
       - name: Stage frontend without changing live domains
