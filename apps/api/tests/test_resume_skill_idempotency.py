@@ -8,7 +8,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.resume import get_current_owner
 from app.core.auth import TokenClaims
-from app.db.session import get_db
+from app.db.tenant import TenantSession
+from app.db.tenant import get_content_db as get_db
 from app.main import app
 from app.models.resume import SkillGroup, SkillItem
 
@@ -32,7 +33,7 @@ def db_session() -> Generator[Session, None, None]:
     tables = [SkillGroup.__table__, SkillItem.__table__]
     SkillGroup.metadata.create_all(engine, tables=tables)
     try:
-        with Session(engine) as session:
+        with TenantSession(engine, user_id="test-owner") as session:
             yield session
     finally:
         SkillGroup.metadata.drop_all(engine, tables=tables)
@@ -68,9 +69,7 @@ def test_repeated_skill_item_create_replays_existing_result(client, db_session):
     assert len(db_session.scalars(select(SkillItem)).all()) == 1
 
 
-def test_skill_item_create_rejects_key_reuse_with_different_payload(
-    client, db_session
-):
+def test_skill_item_create_rejects_key_reuse_with_different_payload(client, db_session):
     group = SkillGroup(label="Languages", display_order=0)
     db_session.add(group)
     db_session.commit()

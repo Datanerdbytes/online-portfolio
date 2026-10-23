@@ -1,6 +1,6 @@
 # Online Resume & Portfolio
 
-A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI, and PostgreSQL. The project combines a public portfolio with an optional owner-only interface for managing its content.
+A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI, and PostgreSQL. The project combines a public portfolio with multi-user editing through Neon Managed Better Auth. Resumes and projects remain public.
 
 ## What it includes
 
@@ -8,7 +8,7 @@ A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI
 - A print-friendly resume page.
 - Project detail pages with GitHub-rendered README content and Mermaid diagrams when configured.
 - FastAPI endpoints for resume and project content, backed by PostgreSQL and managed with Alembic.
-- Optional owner administration for projects, resume content, and profile images.
+- Neon-managed accounts and owner-authorized editing of projects, resume content, and images.
 - Generated resume fallback content so the portfolio can still show resume details when the API is unavailable.
 - Same-origin frontend API routes, including backend health status and protected administration requests.
 
@@ -104,16 +104,16 @@ The API health endpoint returns `{"status":"ok"}` as a process-liveness check; i
 
 ## Configuration
 
-| Variable                                                                 | App | Purpose                                                                                        |
-| ------------------------------------------------------------------------ | --- | ---------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                           | API | PostgreSQL URL using the `postgresql+psycopg` SQLAlchemy driver                                |
-| `API_HOST`, `API_PORT`                                                   | API | API bind address and port                                                                      |
-| `WEB_APP_URL`                                                            | API | Public frontend URL returned by the API root endpoint                                          |
-| `API_BASE_URL`                                                           | Web | Server-only URL for the FastAPI service                                                        |
-| `GITHUB_USERNAME`, `GITHUB_PAT`                                          | API | Optional server-side GitHub configuration for README rendering of eligible public repositories |
-| `API_ACCESS_SECRET`, `OWNER_ID`, `OWNER_USERNAME`, `OWNER_PASSWORD_HASH` | API | Optional owner authentication; configure all four together                                     |
-| `ADMIN_WEB_ORIGIN`                                                       | Web | Exact site origin required for owner administration                                            |
-| `MEDIA_ROOT`, `MAX_AVATAR_BYTES`                                         | API | Profile image storage location and upload size limit                                           |
+| Variable                         | App | Purpose                                                                                        |
+| -------------------------------- | --- | ---------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                   | API | PostgreSQL URL using the `postgresql+psycopg` SQLAlchemy driver                                |
+| `API_HOST`, `API_PORT`           | API | API bind address and port                                                                      |
+| `WEB_APP_URL`                    | API | Public frontend URL returned by the API root endpoint                                          |
+| `API_BASE_URL`                   | Web | Server-only URL for the FastAPI service                                                        |
+| `GITHUB_USERNAME`, `GITHUB_PAT`  | API | Optional server-side GitHub configuration for README rendering of eligible public repositories |
+| `NEON_AUTH_BASE_URL`             | API | Neon Managed Better Auth endpoint for the selected branch                                      |
+| `ADMIN_WEB_ORIGIN`               | Web | Exact site origin required for owner administration                                            |
+| `MEDIA_ROOT`, `MAX_AVATAR_BYTES` | API | Profile image storage location and upload size limit                                           |
 
 See [`apps/api/.env.example`](./apps/api/.env.example) and [`apps/web/.env.example`](./apps/web/.env.example) for the full examples. Owner settings are optional; without valid configuration, public browsing remains available and administration is disabled. `ADMIN_WEB_ORIGIN` must match the site's exact origin and use HTTPS in production.
 
@@ -175,14 +175,43 @@ Installing the npm workspace also installs its Husky Git hooks. Before each comm
 
 The GitHub Actions workflow runs the frontend checks and production build, backend checks, tracked-file secret scanning, changed-file formatting, and repository file validation on pull requests targeting `main` (and on pushes to `main`). To require these checks before merging, enable branch protection or a ruleset for `main` in the GitHub repository settings and require the **Web checks**, **API checks**, and **Repository file checks** statuses.
 
-## Optional owner administration
+## Neon Managed Better Auth
 
-Administration is disabled unless all four API owner settings are configured: `API_ACCESS_SECRET`, `OWNER_ID`, `OWNER_USERNAME`, and `OWNER_PASSWORD_HASH`. Store only an Argon2id password hash, never the plaintext password. The frontend keeps the short-lived owner token in a server-managed HttpOnly cookie and requires same-origin checks for mutations.
+Accounts, passwords, email verification and sessions are managed by Neon. The
+Next.js server uses the official `@neondatabase/auth` SDK and managed HttpOnly
+cookies. FastAPI verifies Neon-issued Ed25519 JWTs for service-to-service requests;
+it no longer issues login tokens or verifies passwords itself.
 
-The default login limiter is process-local. Set `LOGIN_RATE_LIMIT_STORAGE=database`
-for a shared PostgreSQL limiter when running multiple workers or serverless
-instances. For setup instructions and the complete route behavior, see the
-[API README](./apps/api/README.md) and [web README](./apps/web/README.md).
+All resumes/projects are public. New accounts receive an empty portfolio on first
+verified editor access. Each edit is restricted to that user's portfolio through
+scoped database sessions and ownership constraints. Share `/u/<account-id>` to
+view a portfolio without signing in.
+
+Enable **Managed Better Auth** on the intended branch of the `online-portfolio`
+Neon project. Configure its localhost/trusted-domain settings, then copy its Auth
+URL into `NEON_AUTH_BASE_URL` in both `apps/web/.env.local` and `apps/api/.env`.
+Generate `NEON_AUTH_COOKIE_SECRET` only for the frontend server with
+`openssl rand -base64 32`; never publish it or use a `NEXT_PUBLIC_*` variable.
+`ADMIN_WEB_ORIGIN` must exactly match the browser origin. Run from `apps/api/`:
+
+```bash
+uv sync --locked --group dev
+uv run alembic upgrade head
+```
+
+Back up an existing database before migrating. The migration preserves existing
+content and accommodates databases that ran the discarded custom-auth revision.
+Its old account/session tables, if present, remain unused for a reviewed export;
+their passwords and tokens cannot authenticate anyone. No Neon-owned schema is
+created or modified by Alembic. If you need to edit the existing portfolio, bind
+`LEGACY_NEON_USER_ID` deliberately before that account first opens the editor;
+normal new users never inherit it.
+
+Visit `/auth/register` to create a managed account, verify email if required, then
+sign in at `/auth/signin`. Sessions and authentication throttling belong to Neon.
+The former `API_ACCESS_SECRET`, `OWNER_*` and login-bucket settings no longer
+authenticate users. See [setup and verification](docs/neon-auth.md) for contracts,
+migration details, live-setup status, and actual checks.
 
 ## PostgreSQL lifecycle
 
@@ -236,10 +265,9 @@ vercel deploy --prod --yes --scope datanerdbytes-4121
 
 Configure these production variables in the API project: `DATABASE_URL`
 (`postgresql+psycopg://` with Neon's pooled endpoint and SSL), `WEB_APP_URL`,
-`MEDIA_STORAGE=database`, `DATABASE_POOL_MODE=external`, and
-`LOGIN_RATE_LIMIT_STORAGE=database`. External pooling uses Neon's pooler without
+`MEDIA_STORAGE=database`, `DATABASE_POOL_MODE=external`, and `NEON_AUTH_BASE_URL`. External pooling uses Neon's pooler without
 an additional per-instance SQLAlchemy connection pool. Configure
-the four owner variables together to enable administration. Optional GitHub
+`NEON_AUTH_BASE_URL` for the selected branch to enable managed authentication. Optional GitHub
 credentials remain server-only. The frontend's `API_BASE_URL` points to the
 backend origin; `ADMIN_WEB_ORIGIN` must match the exact frontend production origin.
 
@@ -253,8 +281,7 @@ With database media storage, avatars, banners, and screenshots live in
 PostgreSQL `bytea` rows with the existing 2 MiB upload limit. This suits this
 small portfolio and avoids ephemeral serverless filesystem storage. If media
 volume grows, move the storage adapter to object storage. The database login
-limiter uses one atomic owner-wide bucket across all API instances and returns
-503 if its database operation fails.
+authentication service manages credential throttling and sessions.
 
 `GET /api/v1/health` checks process liveness. `GET /api/v1/ready` executes a real
 database query and returns 503 without database exception details on failure.

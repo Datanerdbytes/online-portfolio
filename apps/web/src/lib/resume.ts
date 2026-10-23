@@ -202,8 +202,8 @@ export function resolveResume(apiResume: ApiResume | null): ResolvedResume {
   const source: ResumeSource = apiResume ? "api" : "static";
   const hasApiContent = Boolean(
     apiResume?.profile ||
-      (apiResume?.skills.length ?? 0) > 0 ||
-      (apiResume?.experience.length ?? 0) > 0
+    (apiResume?.skills.length ?? 0) > 0 ||
+    (apiResume?.experience.length ?? 0) > 0
   );
 
   return {
@@ -224,5 +224,17 @@ export function resolveResume(apiResume: ApiResume | null): ResolvedResume {
     source,
     isSample: hasApiContent ? false : staticResume.isSample,
     sampleNotice: hasApiContent ? null : (staticResume.sampleNotice ?? null),
+  };
+}
+
+export function resolveAccountResume(data: ApiResume): ResolvedResume | null {
+  if (!data.profile) return null;
+  return {
+    ...data,
+    profile: data.profile,
+    contact: data.contact ?? { id: 0, phone: null, email: null, links: [] },
+    source: "api",
+    isSample: false,
+    sampleNotice: null,
   };
 }

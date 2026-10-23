@@ -93,8 +93,8 @@ be recorded against the failed workflow run.
 
 ```bash
 node --test scripts/tests/deployment-smoke.test.mjs
-node scripts/deployment-smoke.mjs api https://online-portfolio-api.vercel.app
-node scripts/deployment-smoke.mjs web https://online-portfolio-two-swart.vercel.app
+node scripts/deployment-smoke.mjs api https://online-portfolio-api-datanerdbytes-4121.vercel.app
+node scripts/deployment-smoke.mjs web https://online-portfolio-datanerdbytes-4121.vercel.app
 ```
 
 The last two commands require a Vercel-authenticated CLI and make no data writes.

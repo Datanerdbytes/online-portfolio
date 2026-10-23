@@ -19,7 +19,7 @@ class NextResponse extends Response {
 function loadProxy(fetch) {
   const source = readFileSync(
     new URL("../src/app/api/resume/[...path]/route.ts", import.meta.url),
-    "utf8",
+    "utf8"
   );
   const code = ts.transpileModule(source, {
     compilerOptions: {
@@ -52,15 +52,15 @@ function loadProxy(fetch) {
       Response,
       Headers,
     },
-    { filename: "resume-proxy" },
+    { filename: "resume-proxy" }
   );
   return compiledModule.exports;
 }
 
-test("public resume route provides the base path used to refresh resume data", async () => {
+test("editor resume refresh forwards the managed bearer credential", async () => {
   const source = readFileSync(
     new URL("../src/app/api/resume/route.ts", import.meta.url),
-    "utf8",
+    "utf8"
   );
   const code = ts.transpileModule(source, {
     compilerOptions: {
@@ -77,6 +77,8 @@ test("public resume route provides the base path used to refresh resume data", a
       exports: compiledModule.exports,
       require: (id) => {
         if (id === "next/server") return { NextResponse };
+        if (id === "@/lib/auth")
+          return { readAdminToken: async () => "test-bearer-token" };
         if (id === "@/lib/api") return { API_BASE_URL: "http://api.test" };
         throw new Error(`Unexpected import: ${id}`);
       },
@@ -91,17 +93,21 @@ test("public resume route provides the base path used to refresh resume data", a
       Response,
       Headers,
     },
-    { filename: "resume-root-proxy" },
+    { filename: "resume-root-proxy" }
   );
 
   const response = await compiledModule.exports.GET(
-    new Request("http://localhost:3000/api/resume"),
+    new Request("http://localhost:3000/api/resume")
   );
 
   assert.equal(response.status, 200);
   assert.equal(upstreamRequest.url, "http://api.test/api/v1/resume");
   assert.equal(upstreamRequest.init.method, "GET");
   assert.equal(upstreamRequest.init.cache, "no-store");
+  assert.equal(
+    upstreamRequest.init.headers.Authorization,
+    "Bearer test-bearer-token"
+  );
   assert.deepEqual(await response.json(), {
     profile: { name: "Test" },
     skills: [],
@@ -114,7 +120,7 @@ test("resume POST proxy forwards the idempotency key to FastAPI", async () => {
     upstreamRequest = { url, init };
     return Response.json(
       { id: 4, item: "Python", display_order: 1 },
-      { status: 201 },
+      { status: 201 }
     );
   });
 
@@ -129,7 +135,7 @@ test("resume POST proxy forwards the idempotency key to FastAPI", async () => {
         "Idempotency-Key": "a49ca978-f74c-46d9-9462-41ddc513f66c",
       },
       body: JSON.stringify({ item: "Python", display_order: 1 }),
-    },
+    }
   );
 
   const response = await POST(request, {
@@ -139,11 +145,11 @@ test("resume POST proxy forwards the idempotency key to FastAPI", async () => {
   assert.equal(response.status, 201);
   assert.equal(
     upstreamRequest.init.headers["Idempotency-Key"],
-    "a49ca978-f74c-46d9-9462-41ddc513f66c",
+    "a49ca978-f74c-46d9-9462-41ddc513f66c"
   );
   assert.equal(
     upstreamRequest.init.headers.Authorization,
-    "Bearer test-bearer-token",
+    "Bearer test-bearer-token"
   );
 });
 
@@ -163,7 +169,7 @@ test("resume DELETE proxy forwards skill-item deletion to FastAPI", async () => 
         Origin: "http://localhost:3000",
         "X-Requested-With": "online-resume-admin",
       },
-    },
+    }
   );
 
   const response = await DELETE(request, {
@@ -171,6 +177,9 @@ test("resume DELETE proxy forwards skill-item deletion to FastAPI", async () => 
   });
 
   assert.equal(response.status, 204);
-  assert.equal(upstreamRequest.url, "http://api.test/api/v1/resume/skills/items/47");
+  assert.equal(
+    upstreamRequest.url,
+    "http://api.test/api/v1/resume/skills/items/47"
+  );
   assert.equal(upstreamRequest.init.method, "DELETE");
 });

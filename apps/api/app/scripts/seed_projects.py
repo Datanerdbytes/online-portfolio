@@ -23,7 +23,9 @@ from sqlalchemy.engine.url import make_url
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.session import SessionLocal
+from app.db.session import engine
+from app.db.tenant import TenantSession
+from app.models.owner import LEGACY_OWNER_ID
 from app.models.project import Project
 
 SAMPLE_PROJECTS: list[dict] = [
@@ -126,7 +128,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         return 2
 
-    session = SessionLocal()
+    session = TenantSession(engine, user_id=LEGACY_OWNER_ID)
     try:
         inserted, skipped = seed_projects(session, allow_sample_data=True)
         session.commit()  # one transaction: all or nothing

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.api.v1.auth import AuthRoute
 from app.core.auth import TokenClaims, verify_owner_token
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.models.resume import (
     Contact,
     ContactLink,

@@ -65,10 +65,10 @@ export function smoke(kind, origin, request) {
       ? [
           "/api/v1/health",
           "/api/v1/ready",
-          "/api/v1/resume",
-          "/api/v1/projects",
+          "/api/v1/public/resume",
+          "/api/v1/public/projects",
         ]
-      : ["/", "/api/health", "/api/resume", "/api/projects"];
+      : ["/", "/api/health", "/api/public/resume", "/api/public/projects"];
   if (!["api", "web"].includes(kind)) throw new Error("Expected api or web.");
   for (const path of paths) {
     validateResponse(kind, path, request(path, origin));

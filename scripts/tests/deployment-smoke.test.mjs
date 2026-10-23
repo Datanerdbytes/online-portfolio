@@ -71,8 +71,17 @@ test("check both the database-backed API and frontend proxy routes", () => {
       if (path.endsWith("/projects")) return '{"items":[]}';
       return '{"status":"ok"}';
     });
-    assert.equal(calls.length, 4);
-    assert.ok(calls.includes(kind === "api" ? "/api/v1/ready" : "/api/resume"));
+    assert.deepEqual(
+      calls,
+      kind === "api"
+        ? [
+            "/api/v1/health",
+            "/api/v1/ready",
+            "/api/v1/public/resume",
+            "/api/v1/public/projects",
+          ]
+        : ["/", "/api/health", "/api/public/resume", "/api/public/projects"]
+    );
   }
 });
 

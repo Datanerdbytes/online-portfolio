@@ -96,7 +96,9 @@ function ProjectCard({ project }: { project: Project }) {
   const screenshotSrc = profileImageUrl(
     project.screenshot_url,
     project.screenshot_updated_at,
-    `/api/projects/${encodeURIComponent(project.slug)}/screenshot`
+    project.screenshot_url?.startsWith("/api/v1/public/")
+      ? project.screenshot_url.replace("/api/v1/", "/api/")
+      : `/api/public/projects/${encodeURIComponent(project.slug)}/screenshot`
   );
   const demoUrl = isAbsoluteHttpUrl(project.demo_url) ? project.demo_url : null;
 
@@ -246,7 +248,7 @@ export function ProjectsClient({
     let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
       timeout = setTimeout(() => controller.abort(), PROJECTS_TIMEOUT_MS);
-      const response = await fetch("/api/projects", {
+      const response = await fetch("/api/public/projects", {
         cache: "no-store",
         signal: controller.signal,
       });

@@ -1,3 +1,4 @@
+const TEST_PASSWORD = "fixture-password"; // pragma: allowlist secret
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -14,6 +15,10 @@ function harness(options = {}) {
   const env = {
     ADMIN_WEB_ORIGIN: "http://localhost:3000",
     NODE_ENV: "development",
+    NEON_AUTH_BASE_URL:
+      "https://test.neonauth.us-east-1.aws.neon.tech/neondb/auth",
+    NEON_AUTH_COOKIE_SECRET:
+      "test-cookie-signing-secret-longer-than-32-characters",
     ...options.env,
   };
   const jar = new Map();
@@ -51,12 +56,40 @@ function harness(options = {}) {
           if (id === "next/server") return { NextResponse };
           if (id === "@/app/api/projects/[slug]/route")
             return load("app/api/projects/[slug]/route");
+          if (id === "@/lib/auth/server")
+            return {
+              getNeonAuth: () =>
+                options.neon ?? {
+                  token: async () => ({
+                    data: { token: jar.get("portfolio-admin")?.value },
+                    error: null,
+                  }),
+                  signIn: {
+                    email: async () => ({
+                      data: { user: { id: "provider-user" } },
+                      error: null,
+                    }),
+                  },
+                  signUp: {
+                    email: async () => ({
+                      data: { user: { id: "provider-user" } },
+                      error: null,
+                    }),
+                  },
+                  signOut: async () => {
+                    jar.clear();
+                    return { data: null, error: null };
+                  },
+                },
+            };
           if (id === "@/lib/auth") return load("lib/auth");
+          if (id === "@/lib/auth/recovery") return load("lib/auth/recovery");
           if (id === "@/lib/projects") return load("lib/projects");
           if (id === "@/lib/project-management")
             return load("lib/project-management");
           if (id === "@/lib/api")
             return {
+              API_BASE_URL: "http://api.test",
               fetchProjects: async () => {
                 throw new Error("fetchProjects not used by handler tests");
               },
@@ -70,6 +103,7 @@ function harness(options = {}) {
         Response,
         Date,
         TextEncoder,
+        TextDecoder,
         AbortController,
         fetch: (...args) => upstream(...args),
         setTimeout: (callback) => {
@@ -107,12 +141,6 @@ function mutation(body, extraHeaders = {}) {
   });
 }
 const expires = () => Math.floor(Date.now() / 1000) + 900;
-const token = () => ({
-  access_token: "header.payload.signature",
-  token_type: "bearer",
-  owner_id: "test-owner",
-  expires_at: expires(),
-});
 
 test("CSRF requires canonical configured origin, custom header and same-origin fetch metadata", () => {
   const h = harness();
@@ -136,65 +164,6 @@ test("CSRF requires canonical configured origin, custom header and same-origin f
   }
   h.env.ADMIN_WEB_ORIGIN = "";
   assert.equal(h.auth.validateMutation(mutation()).status, 503);
-});
-
-test("cookie names and attributes agree for login and clearing, expiry never slides", () => {
-  const h = harness();
-  const expiry = expires();
-  const dev = h.auth.adminCookieOptions(expiry);
-  assert.equal(dev.name, "portfolio-admin");
-  assert.equal(dev.httpOnly, true);
-  assert.equal(dev.sameSite, "lax");
-  assert.equal(dev.path, "/");
-  assert.equal(dev.domain, undefined);
-  assert.ok(dev.maxAge > 0 && dev.maxAge <= 900);
-  assert.equal(dev.expires.getTime(), expiry * 1000);
-  h.env.NODE_ENV = "production";
-  h.env.ADMIN_WEB_ORIGIN = "https://portfolio.example";
-  const prod = h.auth.adminCookieOptions(expiry);
-  assert.equal(prod.name, "__Host-portfolio-admin");
-  assert.equal(prod.secure, true);
-  const cleared = h.auth.clearAdminCookieOptions();
-  assert.equal(cleared.name, prod.name);
-  assert.equal(cleared.maxAge, 0);
-  assert.equal(cleared.expires.getTime(), 0);
-  for (const value of [
-    0,
-    -1,
-    Infinity,
-    NaN,
-    expires() + 100,
-    String(expiry),
-    true,
-  ]) {
-    assert.equal(h.auth.validExpiration(value), false);
-  }
-});
-
-test("malformed identity and token response cannot become an authenticated session", async () => {
-  const h = harness();
-  for (const body of [
-    null,
-    [],
-    {},
-    { authenticated: false },
-    { owner_id: "x", authenticated: true, expires_at: 0 },
-    { owner_id: "x", authenticated: true, expires_at: String(expires()) },
-  ]) {
-    h.setFetch(async () => Response.json(body));
-    const result = await h.auth.verifyIdentityViaBackend("test-token");
-    assert.equal(result.identity, null);
-    assert.equal(result.error.status, 502);
-  }
-  for (const body of [
-    null,
-    {},
-    { ...token(), access_token: {} },
-    { ...token(), token_type: "other" },
-    { ...token(), expires_at: expires() + 50 },
-  ]) {
-    assert.equal(h.auth.isTokenResponse(body), false);
-  }
 });
 
 test("upstream network errors, invalid JSON and HTTP 500 remain generic outages", async () => {
@@ -261,41 +230,6 @@ test("login rejects invalid bodies and MIME types without touching upstream", as
     ).status,
     400
   );
-});
-
-test("login sets a host-only HttpOnly cookie and returns only sanitized identity", async () => {
-  const h = harness({
-    fetch: async (_url, init) => {
-      assert.equal(init.headers.Authorization, undefined);
-      assert.equal(init.cache, "no-store");
-      return Response.json(token());
-    },
-  });
-  const response = await h
-    .load("app/api/auth/login/route")
-    .POST(mutation({ username: "x", password: "p" }));
-  assert.equal(response.status, 200);
-  const body = await response.json();
-  assert.deepEqual(Object.keys(body).sort(), [
-    "authenticated",
-    "expires_at",
-    "owner_id",
-  ]);
-  assert.equal(response.headers.get("cache-control"), "no-store");
-  const cookie = response.headers.get("set-cookie");
-  assert.match(cookie, /portfolio-admin=header.payload.signature/);
-  assert.match(cookie, /HttpOnly/);
-  assert.match(cookie, /SameSite=lax/);
-  assert.doesNotMatch(cookie, /Domain=/);
-});
-
-test("logout always clears the same cookie during an outage and is not cached", async () => {
-  const h = harness();
-  const response = await h.load("app/api/auth/logout/route").POST(mutation());
-  assert.equal(response.status, 204);
-  assert.equal(response.headers.get("cache-control"), "no-store");
-  assert.match(response.headers.get("set-cookie"), /portfolio-admin=;/);
-  assert.match(response.headers.get("set-cookie"), /Max-Age=0/);
 });
 
 test("protected check and identity require the cookie, not spoofed identity headers", async () => {
@@ -370,8 +304,36 @@ const detailFor = {
   503: "Administration unavailable",
 };
 
-test("public GET /api/projects stays unauthenticated and keeps its outage contract", async () => {
+test("editor reads reject missing or unavailable sessions without fetching default content", async () => {
+  for (const neon of [
+    undefined,
+    {
+      token: async () => {
+        throw new Error("provider unavailable");
+      },
+    },
+  ]) {
+    let upstreamCalls = 0;
+    const h = harness({
+      neon,
+      fetch: async () => {
+        upstreamCalls++;
+        throw new Error("must not fetch");
+      },
+    });
+    for (const route of ["app/api/projects/route", "app/api/resume/route"]) {
+      const response = await h.load(route).GET();
+      assert.equal(response.status, 401);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      assert.deepEqual(await response.json(), { detail: "Not authenticated" });
+    }
+    assert.equal(upstreamCalls, 0);
+  }
+});
+
+test("authenticated GET /api/projects keeps its outage contract", async () => {
   const h = harness();
+  h.jar.set("portfolio-admin", { value: "test-bearer-token" });
   const { GET } = h.load("app/api/projects/route");
   h.setFetch(async () => {
     throw new Error("raw upstream secret");
@@ -1073,4 +1035,308 @@ test("the legal reorder slug supports project CRUD alongside batch POST", async 
     );
     assert.equal(response.status, method === "DELETE" ? 204 : 200);
   }
+});
+
+test("login delegates credentials to Neon and never returns provider tokens", async () => {
+  let seen;
+  const h = harness({
+    neon: {
+      signIn: {
+        email: async (body) => {
+          seen = body;
+          return {
+            data: { token: "must-not-leak", user: { id: "user" } },
+            error: null,
+          };
+        },
+      },
+    },
+  });
+  const response = await h.load("app/api/auth/login/route").POST(
+    mutation({ username: " User@Example.com ", password: TEST_PASSWORD }) // pragma: allowlist secret
+  );
+  assert.equal(response.status, 200);
+  assert.equal(seen.email, "user@example.com");
+  assert.deepEqual(await response.json(), { authenticated: true });
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
+test("registration uses Neon and does not publish login email as profile data", async () => {
+  let called = 0;
+  const h = harness({
+    neon: {
+      signUp: {
+        email: async (body) => {
+          called++;
+          assert.equal(body.email, "new@example.com");
+          return { data: { token: "must-not-leak" }, error: null };
+        },
+      },
+    },
+  });
+  const handler = h.load("app/api/auth/register/route");
+  const body = {
+    name: "Example",
+    email: "new@example.com",
+    password: TEST_PASSWORD,
+  };
+  assert.equal(
+    (await handler.POST(mutation(body, { Origin: "https://evil.example" })))
+      .status,
+    403
+  );
+  assert.equal(called, 0);
+  const response = await handler.POST(mutation(body));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { registered: true });
+});
+
+test("logout delegates to Neon's managed session revocation", async () => {
+  let signedOut = false;
+  const h = harness({
+    neon: {
+      signOut: async () => {
+        signedOut = true;
+        return { data: null, error: null };
+      },
+    },
+  });
+  const response = await h.load("app/api/auth/logout/route").POST(mutation());
+  assert.equal(response.status, 204);
+  assert.equal(signedOut, true);
+});
+
+test("provider outages never become successful login or logout", async () => {
+  const fail = async () => {
+    throw new Error("private provider detail");
+  };
+  const h = harness({ neon: { signIn: { email: fail }, signOut: fail } });
+  assert.equal(
+    (
+      await h
+        .load("app/api/auth/login/route")
+        .POST(
+          mutation({ username: "user@example.com", password: TEST_PASSWORD })
+        )
+    ).status,
+    503
+  );
+  assert.equal(
+    (await h.load("app/api/auth/logout/route").POST(mutation())).status,
+    503
+  );
+});
+
+test("provider credential failures and email verification are distinguished", async () => {
+  for (const status of [401, 403, 429]) {
+    const h = harness({
+      neon: {
+        signIn: { email: async () => ({ data: null, error: { status } }) },
+      },
+    });
+    const result = await h
+      .load("app/api/auth/login/route")
+      .POST(
+        mutation({ username: "user@example.com", password: TEST_PASSWORD })
+      );
+    assert.equal(result.status, status);
+  }
+});
+
+test("provider HTTP failures return service unavailable for login and registration", async () => {
+  const fail = async () => ({ data: null, error: { status: 502 } });
+  const h = harness({
+    neon: { signIn: { email: fail }, signUp: { email: fail } },
+  });
+  assert.equal(
+    (
+      await h
+        .load("app/api/auth/login/route")
+        .POST(
+          mutation({ username: "user@example.com", password: TEST_PASSWORD })
+        )
+    ).status,
+    503
+  );
+  assert.equal(
+    (
+      await h.load("app/api/auth/register/route").POST(
+        mutation({
+          name: "Test",
+          email: "user@example.com",
+          password: TEST_PASSWORD,
+        })
+      )
+    ).status,
+    503
+  );
+});
+
+test("reset requests use a fixed trusted callback and do not reveal accounts", async () => {
+  let seen;
+  const h = harness({
+    neon: {
+      requestPasswordReset: async (body) => {
+        seen = body;
+        return { data: null, error: null };
+      },
+    },
+  });
+  const handler = h.load("app/api/auth/forgot-password/route");
+  assert.equal(
+    (
+      await handler.POST(
+        mutation({
+          email: "someone@example.com",
+          redirectTo: "https://evil.example",
+        })
+      )
+    ).status,
+    400
+  );
+  const ok = await handler.POST(mutation({ email: " User@Example.com " }));
+  assert.equal(ok.status, 200);
+  assert.deepEqual(JSON.parse(JSON.stringify(seen)), {
+    email: "user@example.com",
+    redirectTo: "http://localhost:3000/auth/reset-password",
+  });
+  const unknown = harness({
+    neon: {
+      requestPasswordReset: async () => ({
+        data: null,
+        error: { status: 400, message: "no such account" },
+      }),
+    },
+  });
+  const absent = await unknown
+    .load("app/api/auth/forgot-password/route")
+    .POST(mutation({ email: "none@example.com" }));
+  assert.equal(absent.status, 200);
+  assert.deepEqual(await absent.json(), await ok.json());
+});
+
+test("recovery enforces CSRF, bounded JSON and provider throttling", async () => {
+  let called = 0;
+  const h = harness({
+    neon: {
+      requestPasswordReset: async () => {
+        called++;
+        return { data: null, error: { status: 429 } };
+      },
+    },
+  });
+  const handler = h.load("app/api/auth/forgot-password/route");
+  assert.equal(
+    (
+      await handler.POST(
+        mutation(
+          { email: "user@example.com" },
+          { Origin: "https://evil.example" }
+        )
+      )
+    ).status,
+    403
+  );
+  assert.equal(
+    (await handler.POST(mutation({ email: "x".repeat(9000) }))).status,
+    400
+  );
+  assert.equal(called, 0);
+  assert.equal(
+    (await handler.POST(mutation({ email: "user@example.com" }))).status,
+    429
+  );
+});
+
+test("password reset delegates the token and password without echoing either", async () => {
+  let seen;
+  const h = harness({
+    neon: {
+      resetPassword: async (body) => {
+        seen = body;
+        return { data: { token: "private-provider-value" }, error: null };
+      },
+    },
+  });
+  const handler = h.load("app/api/auth/reset-password/route");
+  const token = "fixture-reset-token-123456789";
+  const response = await handler.POST(
+    mutation({ token, password: TEST_PASSWORD })
+  );
+  assert.equal(response.status, 200);
+  assert.equal(seen.token, token);
+  assert.equal(seen.newPassword, TEST_PASSWORD);
+  assert.deepEqual(await response.json(), { reset: true });
+  assert.equal(
+    (await handler.POST(mutation({ token, password: "short" }))).status, // pragma: allowlist secret (invalid fixture)
+    400
+  );
+  const expired = harness({
+    neon: {
+      resetPassword: async () => ({
+        data: null,
+        error: { status: 400, message: "private reset detail" },
+      }),
+    },
+  });
+  const failed = await expired
+    .load("app/api/auth/reset-password/route")
+    .POST(mutation({ token, password: TEST_PASSWORD }));
+  assert.equal(failed.status, 400);
+  assert.ok(!(await failed.text()).includes("private reset detail"));
+});
+
+test("verification uses provider codes and never accepts a client verified flag", async () => {
+  let seen;
+  const h = harness({
+    neon: {
+      emailOtp: {
+        verifyEmail: async (body) => {
+          seen = body;
+          return { data: { token: "private-session" }, error: null };
+        },
+        sendVerificationOtp: async () => ({ data: null, error: null }),
+      },
+    },
+  });
+  const handler = h.load("app/api/auth/verify-email/route");
+  assert.equal(
+    (
+      await handler.POST(
+        mutation({ email: "user@example.com", otp: "123456", verified: true })
+      )
+    ).status,
+    400
+  );
+  assert.equal(
+    (await handler.POST(mutation({ email: "user@example.com", otp: "bad" })))
+      .status,
+    400
+  );
+  const response = await handler.POST(
+    mutation({ email: "User@Example.com", otp: "123456" })
+  );
+  assert.equal(response.status, 200);
+  assert.equal(seen.email, "user@example.com");
+  assert.equal(seen.otp, "123456");
+  assert.deepEqual(await response.json(), { verified: true });
+  const sent = await h
+    .load("app/api/auth/send-verification/route")
+    .POST(mutation({ email: "user@example.com" }));
+  assert.deepEqual(await sent.json(), { accepted: true });
+});
+
+test("recovery provider outages remain generic service failures", async () => {
+  const h = harness({
+    neon: {
+      requestPasswordReset: async () => {
+        throw new Error("private upstream detail");
+      },
+    },
+  });
+  const response = await h
+    .load("app/api/auth/forgot-password/route")
+    .POST(mutation({ email: "user@example.com" }));
+  assert.equal(response.status, 503);
+  assert.ok(!(await response.text()).includes("private upstream detail"));
 });

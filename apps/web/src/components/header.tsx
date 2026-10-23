@@ -11,7 +11,6 @@ import {
   GraduationCap,
   Mail,
   Menu,
-  Settings2,
   UserRound,
   X,
 } from "lucide-react";
@@ -87,7 +86,7 @@ export function Header({
         const visible = entries.filter((entry) => entry.isIntersecting);
         if (visible.length) setActive(visible[0].target.id);
       },
-      { rootMargin: "-15% 0px -55% 0px" },
+      { rootMargin: "-15% 0px -55% 0px" }
     );
     navigation.forEach(({ id }) => {
       const section = document.getElementById(id);
@@ -175,16 +174,6 @@ export function Header({
               {label}
             </Link>
           ))}
-          <Link
-            href="/admin/resume"
-            aria-current={
-              pathname.startsWith("/admin/") ? "location" : undefined
-            }
-            onClick={() => setOpen(false)}
-          >
-            <Settings2 size={18} strokeWidth={1.8} aria-hidden="true" />
-            Admin
-          </Link>
         </nav>
         {email && (
           <a className="sidebar-contact" href={`mailto:${email}`}>

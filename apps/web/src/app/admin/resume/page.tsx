@@ -25,12 +25,12 @@ export default async function AdminResumePage() {
     return <Unavailable hasSession={Boolean(token)} />;
   }
 
-  const resume = await fetchResume();
+  const resume = await fetchResume(token);
 
   return (
     <section className="mx-auto max-w-4xl space-y-6 px-4 py-8">
       <div>
-        <h1 className="mb-2 text-2xl font-bold">Admin: Resume</h1>
+        <h1 className="mb-2 text-2xl font-bold">My resume</h1>
         <p className="break-words text-sm text-muted-foreground">
           Identity verified. Owner: {result.identity.owner_id}
         </p>
@@ -42,19 +42,22 @@ export default async function AdminResumePage() {
         <p className="break-words text-sm text-muted-foreground">
           Session expires at:{" "}
           <time
-            dateTime={new Date(
-              result.identity.expires_at * 1000
-            ).toISOString()}
+            dateTime={new Date(result.identity.expires_at * 1000).toISOString()}
           >
             {new Date(result.identity.expires_at * 1000).toISOString()}
           </time>
         </p>
         <p className="text-sm text-muted-foreground">
-          Sign in again after 15 minutes. Activity does not extend your
-          session.
+          Session and token renewal are managed by Neon.
         </p>
       </div>
 
+      <p className="text-sm">
+        Your content is public.{" "}
+        <Link href={`/u/${result.identity.owner_id}`} className="underline">
+          View your public portfolio
+        </Link>
+      </p>
       <AdminSessionControls />
 
       {resume ? (
@@ -70,8 +73,8 @@ export default async function AdminResumePage() {
       ) : (
         <div className="rounded-md border p-4">
           <p className="text-sm text-destructive">
-            Could not load resume data. Make sure the backend API is running
-            and try refreshing.
+            Could not load resume data. Make sure the backend API is running and
+            try refreshing.
           </p>
         </div>
       )}

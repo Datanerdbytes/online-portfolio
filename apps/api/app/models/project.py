@@ -1,13 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, text
+from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.models.owner import OwnedContent
 
 
-class Project(Base):
+class Project(OwnedContent, Base):
     """An illustrative project entry.
 
     Column and type choices, documented for maintainers:
@@ -36,9 +37,10 @@ class Project(Base):
     """
 
     __tablename__ = "projects"
+    __table_args__ = (UniqueConstraint("user_id", "slug", name="uq_projects_user_slug"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     summary: Mapped[str] = mapped_column(String(1000), nullable=False)
     technologies: Mapped[list[str]] = mapped_column(

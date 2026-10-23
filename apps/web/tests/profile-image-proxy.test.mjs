@@ -25,7 +25,7 @@ function imageProxy(path, fetch) {
     exports: compiled.exports,
     require: (id) => {
       if (id === "next/server") return { NextResponse };
-      if (id === "@/lib/auth") return {};
+      if (id === "@/lib/auth") return { readAdminToken: async () => null };
       if (id === "@/lib/api") return { API_BASE_URL: "https://api.test" };
       if (id === "@/lib/avatar") return { AVATAR_UPLOAD_MAX_BYTES: 2162688 };
       throw new Error(`Unexpected import: ${id}`);

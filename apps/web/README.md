@@ -99,30 +99,24 @@ CSRF, production/development cookies, malformed payloads, expired response data,
 upstream outages, and deadlines during JSON parsing. Also run `npm run lint`,
 `npm run typecheck`, and `npm run build`.
 
-## Owner sign-in (A0)
+## Neon Managed Better Auth
 
-Set server-only `API_BASE_URL` and `ADMIN_WEB_ORIGIN` in `apps/web/.env.local`.
-The origin must be the exact browser origin (scheme, hostname and port), without a
-path or trailing slash. For example, `http://localhost:3000` and
-`http://127.0.0.1:3000` are different origins. Production requires an HTTPS origin.
-Missing/invalid admin origin disables admin routes while public browsing works.
-Owner credentials and the signing key belong only in the FastAPI configuration.
-No Auth.js dependency, frontend signing secret or owner table is used.
+Use server-only `NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET` (32+ random
+characters), `API_BASE_URL`, and exact `ADMIN_WEB_ORIGIN` in `.env.local`. The
+Neon SDK owns cookie handling and session operations; the app never signs its
+own credential. `/api/auth/login`, `/register`, and `/logout` delegate to the
+managed service, preserve CSRF checks and return sanitized results.
+`/api/auth/[...path]` provides the SDK proxy for provider flows such as email
+verification. Registration is at `/auth/register`; sign-in is `/auth/signin`.
 
-Visit `/auth/signin`. `/admin/projects` shows verified identity and session
-diagnostics, plus owner project management: create, edit, delete (with an
-accessible confirmation) and atomic display-order reorder. The browser sends
-JSON to the same-origin proxy routes; Next.js keeps the backend bearer token in
-a host-only HttpOnly cookie. JSON/HTML/client props contain only sanitized
-identity. Development uses `portfolio-admin`; production uses
-`__Host-portfolio-admin` with Secure, HttpOnly, SameSite=Lax and Path=/, no Domain.
-Cookie expiry is the backend's original 15-minute expiry, never sliding.
-
-Login, diagnostic and logout POSTs require an exact configured Origin and
-`X-Requested-With: online-resume-admin`; `Sec-Fetch-Site`, when present, must be
-`same-origin`. The browser supplies Origin automatically. Normal HTML forms do
-not meet this custom-header contract. Logout clears the cookie even when FastAPI
-is offline. Copied tokens remain valid until expiry or backend key rotation.
+The BFF obtains a provider JWT with the server SDK's `auth.token()`, never by
+misusing the opaque `getSession().data.session.token`. FastAPI independently
+validates it and enforces record ownership. Managed sign-out ends the provider
+session. An already-issued JWT can remain valid for its provider-controlled
+15-minute lifetime; do not promise immediate revocation of copied JWTs.
+All resume/project content remains public and each user can edit only their own.
+Missing configuration fails closed for authentication and leaves public pages
+available. See [setup and verification](../../docs/neon-auth.md).
 
 Run `npm run test:auth` for the Node regression suite (uses the installed
 TypeScript compiler and real handlers; no additional test framework). It covers

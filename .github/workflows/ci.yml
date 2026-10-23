@@ -110,7 +110,7 @@ jobs:
     timeout-minutes: 30
     environment:
       name: production
-      url: https://online-portfolio-two-swart.vercel.app
+      url: https://online-portfolio-datanerdbytes-4121.vercel.app
     env:
       VERCEL_ORG_ID: team_aWWXAsZiAMPGuRFGhIqQyyFA
       VERCEL_CLI_VERSION: "64.2.0"
@@ -193,8 +193,8 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Verify live domains and frontend-to-API reads
         run: |
-          node scripts/deployment-smoke.mjs api https://online-portfolio-api.vercel.app
-          node scripts/deployment-smoke.mjs web https://online-portfolio-two-swart.vercel.app
+          node scripts/deployment-smoke.mjs api https://online-portfolio-api-datanerdbytes-4121.vercel.app
+          node scripts/deployment-smoke.mjs web https://online-portfolio-datanerdbytes-4121.vercel.app
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Report incomplete release

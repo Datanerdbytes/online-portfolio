@@ -16,7 +16,7 @@ async function proxy(
   req: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
 ) {
-  const mutationError = validateMutation(req);
+  const mutationError = req.method === "GET" ? null : validateMutation(req);
   if (mutationError) {
     return NextResponse.json(
       { detail: mutationError.detail },
@@ -33,7 +33,7 @@ async function proxy(
   }
 
   const { path } = await params;
-  const upstreamPath = `/api/v1/resume/${path.join("/")}`;
+  const upstreamPath = `/api/v1/resume/${path.map(encodeURIComponent).join("/")}`;
   const idempotencyKey =
     req.method === "POST" ? req.headers.get("idempotency-key") : null;
   const controller = new AbortController();
@@ -48,9 +48,7 @@ async function proxy(
       method: req.method,
       headers: {
         ...(body ? { "Content-Type": "application/json" } : {}),
-        ...(idempotencyKey
-          ? { "Idempotency-Key": idempotencyKey }
-          : {}),
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
         Authorization: `Bearer ${token}`,
       },
       body,

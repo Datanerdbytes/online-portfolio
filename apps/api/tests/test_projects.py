@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.main import app
 
 

@@ -13,7 +13,7 @@ from app.api.v1.auth import AuthRoute
 from app.api.v1.project_screenshot import remove_screenshot_quietly
 from app.core.auth import TokenClaims, verify_owner_token
 from app.core.storage import ProfileImageStore, get_image_store
-from app.db.session import get_db
+from app.db.tenant import get_content_db as get_db
 from app.models.project import Project
 from app.schemas.project import (
     ProjectCreate,

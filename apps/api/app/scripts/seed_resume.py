@@ -19,6 +19,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.db.tenant import TenantSession
+from app.models.owner import LEGACY_OWNER_ID
 from app.models.resume import (
     Contact,
     ContactLink,
@@ -180,7 +182,7 @@ def sync_skills(session: Session) -> None:
 
 
 def seed():
-    with Session(engine) as session:
+    with TenantSession(engine, user_id=LEGACY_OWNER_ID) as session:
         # --- Profile ---
         existing = session.execute(select(Profile)).scalar_one_or_none()
         if not existing:
