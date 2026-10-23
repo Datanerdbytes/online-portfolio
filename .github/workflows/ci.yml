@@ -139,6 +139,18 @@ jobs:
         run: vercel build --prod
         env:
           VERCEL_PROJECT_ID: prj_3sln5uC4QRmNGwwxQN3dCKFiNbSZ
+      - name: Verify backend bundle excludes local and test files
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const config = JSON.parse(readFileSync('apps/api/.vercel/output/functions/fastapi.func/.vc-config.json', 'utf8'));
+          assert.ok(Object.keys(config.filePathMap ?? {}).length > 0, 'Missing backend source map');
+          for (const path of Object.keys(config.filePathMap)) {
+            assert.ok(!/^(tests\/|\.env|media\/|\.pytest_cache\/|\.mypy_cache\/|\.ruff_cache\/)/.test(path), 'Backend bundle contains an excluded file');
+          }
+          console.log('Backend bundle excludes local environments, media, tests, and caches.');
+          JS
       - name: Stage backend without changing live domains
         working-directory: apps/api
         run: vercel deploy --prebuilt --prod --skip-domain --yes --json --scope datanerdbytes-4121 --meta githubCommitSha="$GITHUB_SHA" > "$RUNNER_TEMP/api-deploy.json"

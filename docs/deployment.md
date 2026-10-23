@@ -57,6 +57,11 @@ remain in Vercel. `vercel pull` downloads settings into the runner's ignored
 `.vercel` directories; these files are never uploaded as workflow artifacts.
 The deployment token is supplied only to authenticated deployment steps.
 
+The backend's `vercel.json` excludes local environment files, media, tests, and
+caches from the Python function bundle itself. This complements `.vercelignore`:
+prebuilt function source maps must not reference files that upload rules omit.
+The deployment job checks the generated source map before uploading the backend.
+
 Both Vercel projects were configured without Git integration when this workflow
 was introduced. Keep automatic Git production deployments disabled so they do
 not release a commit before these checks pass. Routine production changes
