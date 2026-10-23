@@ -1,6 +1,6 @@
 import base64
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from argon2 import Type, extract_parameters
 from argon2.exceptions import InvalidHashError
@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     # Directory that holds stored avatars. parents[2] resolves to apps/api.
     MEDIA_ROOT: Path = Path(__file__).resolve().parents[2] / "media"
     MAX_AVATAR_BYTES: int = 2097152
+    MEDIA_STORAGE: Literal["local", "database"] = "local"
+    LOGIN_RATE_LIMIT_STORAGE: Literal["local", "database"] = "local"
+    DATABASE_POOL_MODE: Literal["local", "external"] = "local"
 
     # Optional so missing/invalid admin configuration never prevents public startup.
     API_ACCESS_SECRET: str | None = None

@@ -14,8 +14,11 @@ from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import HTTPException
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import is_auth_configured, settings
+from app.db.session import engine
 
 ISSUER = "online-resume-api"
 AUDIENCE = "online-resume-web"
@@ -176,7 +179,42 @@ _rate_limiter = LoginRateLimiter()
 
 
 def rate_limited_login() -> None:
-    _rate_limiter.check_and_record()
+    if settings.LOGIN_RATE_LIMIT_STORAGE == "database":
+        check_database_login_limit()
+    else:
+        _rate_limiter.check_and_record()
+
+
+def check_database_login_limit() -> None:
+    """Atomic, bounded owner-wide bucket shared by every API instance.
+
+    Use the database clock so cold starts and host clock differences cannot
+    reset the window. Commit denied attempts too; failures never bypass limits.
+    """
+    seconds = settings.LOGIN_RATE_LIMIT_WINDOW_SECONDS
+    limit = settings.LOGIN_RATE_LIMIT_ATTEMPTS
+    try:
+        with engine.begin() as connection:
+            attempts, now, recorded_window = connection.execute(
+                text(
+                    """
+                    INSERT INTO login_buckets (scope, "window", attempts)
+                    VALUES ('owner-login',
+                        floor(extract(epoch FROM CURRENT_TIMESTAMP) / :seconds)::bigint, 1)
+                    ON CONFLICT (scope) DO UPDATE SET
+                        "window" = greatest(login_buckets."window", EXCLUDED."window"),
+                        attempts = CASE WHEN EXCLUDED."window" > login_buckets."window"
+                            THEN 1 ELSE least(login_buckets.attempts + 1, :cap) END
+                    RETURNING attempts, extract(epoch FROM clock_timestamp()), "window"
+                    """
+                ),
+                {"seconds": seconds, "cap": limit + 1},
+            ).one()
+    except SQLAlchemyError:
+        raise HTTPException(503, "Administration unavailable") from None
+    if attempts > limit:
+        retry = max(1, math.ceil((recorded_window + 1) * seconds - float(now)))
+        raise HTTPException(429, "Too many login attempts", headers={"Retry-After": str(retry)})
 
 
 class TokenResponse(BaseModel):

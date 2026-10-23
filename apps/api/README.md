@@ -152,11 +152,19 @@ logout/refresh route exists. The Next.js logout route deletes its browser cookie
 a copied bearer token remains valid until expiry. Rotating `API_ACCESS_SECRET`
 invalidates all outstanding tokens immediately.
 
-Login permits five attempts per fixed 300-second monotonic-clock window, including
-failed logins and unknown usernames. The concurrency-safe bucket is process-local:
-use **one worker/replica** until a shared limiter is implemented. Restart resets
-the bucket. Invalid/missing configuration gives admin endpoints a generic 503;
-public startup and liveness remain independent.
+Login permits five attempts per fixed 300-second window, including failed logins
+and unknown usernames. By default the bucket is process-local, uses a monotonic
+clock, and requires **one worker/replica**. Set
+`LOGIN_RATE_LIMIT_STORAGE=database` on stateless/multiple-instance hosts to use an
+atomic PostgreSQL bucket and the database clock instead. Database limiter
+failures return 503. Invalid/missing configuration gives admin endpoints a generic
+503; public startup and liveness remain independent.
+
+For Vercel, set `MEDIA_STORAGE=database` after applying migrations. Images remain
+behind the existing API routes and upload validation, but their bytes persist in
+Neon rather than on ephemeral local disks. Local development defaults to
+`MEDIA_STORAGE=local` and `MEDIA_ROOT`. The application does not automatically
+transfer existing files when this setting changes.
 
 `uv run pytest` covers auth without PostgreSQL, including malformed configuration,
 strict claims, absolute expiry/key rotation, rate limits and credential-free

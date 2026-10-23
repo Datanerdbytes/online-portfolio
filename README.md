@@ -179,7 +179,10 @@ The GitHub Actions workflow runs the frontend checks and production build, backe
 
 Administration is disabled unless all four API owner settings are configured: `API_ACCESS_SECRET`, `OWNER_ID`, `OWNER_USERNAME`, and `OWNER_PASSWORD_HASH`. Store only an Argon2id password hash, never the plaintext password. The frontend keeps the short-lived owner token in a server-managed HttpOnly cookie and requires same-origin checks for mutations.
 
-The login limiter is process-local. Run a single API worker/replica unless a shared limiter is added. For setup instructions and the complete route behavior, see the [API README](./apps/api/README.md) and [web README](./apps/web/README.md).
+The default login limiter is process-local. Set `LOGIN_RATE_LIMIT_STORAGE=database`
+for a shared PostgreSQL limiter when running multiple workers or serverless
+instances. For setup instructions and the complete route behavior, see the
+[API README](./apps/api/README.md) and [web README](./apps/web/README.md).
 
 ## PostgreSQL lifecycle
 
@@ -191,6 +194,65 @@ docker compose down      # Stop it; preserve the named data volume
 ```
 
 `docker compose down -v` also deletes the local PostgreSQL volume and its data. Use it only when you intend to discard that development database.
+
+## Vercel frontend deployment
+
+The frontend is deployed to the Vercel project `online-portfolio` under
+`datanerdbytes-4121`. Its project settings use the Next.js preset, Node.js 24.x,
+and `apps/web` as the root directory. The install command is:
+
+```bash
+cd ../.. && HUSKY=0 npm ci --include=dev --workspaces --include-workspace-root
+```
+
+To deploy from the repository root with the Vercel CLI:
+
+```bash
+vercel link --project online-portfolio --scope datanerdbytes-4121 --yes
+vercel project inspect --non-interactive --scope datanerdbytes-4121
+vercel deploy --prod --yes --scope datanerdbytes-4121
+```
+
+The frontend connects to the separate `online-portfolio-api` Vercel project
+through server-only `API_BASE_URL`. Neon PostgreSQL stores the application data.
+The checked-in resume remains an outage fallback. Local environment files are
+excluded from uploads through `.vercelignore`.
+
+### FastAPI and Neon
+
+The API deploys from `apps/api`, using Python 3.12, the FastAPI preset, and
+`app.main:app` as its entry point. Run these commands from `apps/api`:
+
+```bash
+vercel link --project online-portfolio-api --scope datanerdbytes-4121 --yes
+vercel project inspect --non-interactive --scope datanerdbytes-4121
+vercel deploy --prod --yes --scope datanerdbytes-4121
+```
+
+Configure these production variables in the API project: `DATABASE_URL`
+(`postgresql+psycopg://` with Neon's pooled endpoint and SSL), `WEB_APP_URL`,
+`MEDIA_STORAGE=database`, `DATABASE_POOL_MODE=external`, and
+`LOGIN_RATE_LIMIT_STORAGE=database`. External pooling uses Neon's pooler without
+an additional per-instance SQLAlchemy connection pool. Configure
+the four owner variables together to enable administration. Optional GitHub
+credentials remain server-only. The frontend's `API_BASE_URL` points to the
+backend origin; `ADMIN_WEB_ORIGIN` must match the exact frontend production origin.
+
+Apply migrations separately before deployment using Neon's direct connection
+and the same `postgresql+psycopg://` driver. Never run migrations on request or
+automatically seed sample projects in production. The local ignored file
+`apps/api/.env.production.local` is a deployment credential input; FastAPI does
+not load it automatically and normal local development still uses `.env`.
+
+With database media storage, avatars, banners, and screenshots live in
+PostgreSQL `bytea` rows with the existing 2 MiB upload limit. This suits this
+small portfolio and avoids ephemeral serverless filesystem storage. If media
+volume grows, move the storage adapter to object storage. The database login
+limiter uses one atomic owner-wide bucket across all API instances and returns
+503 if its database operation fails.
+
+`GET /api/v1/health` checks process liveness. `GET /api/v1/ready` executes a real
+database query and returns 503 without database exception details on failure.
 
 ## Further documentation
 

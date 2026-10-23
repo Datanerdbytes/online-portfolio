@@ -77,3 +77,4 @@ apps/api/media/
 # Misc
 *.local
 .cache/
+.vercel

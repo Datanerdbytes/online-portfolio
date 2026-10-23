@@ -1,20 +1,26 @@
 """Storage for the owner profile portrait.
 
-The API owns the image bytes. Routes depend on the `ProfileImageStore` protocol so the
-storage mechanism can be replaced without touching route code. The only implementation
-today stores files in a flat directory under `settings.MEDIA_ROOT`.
+The API owns the image bytes. Routes depend on the `ProfileImageStore` protocol.
+Local development uses MEDIA_ROOT; stateless hosting uses PostgreSQL bytea rows.
+Database uploads retain the same 2 MiB limit and private filenames.
 """
 
 from __future__ import annotations
 
 import contextlib
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 from uuid import uuid4
 
+from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
+
 from app.core.config import settings
+from app.db.session import SessionLocal
+from app.models.hosting import StoredImage
 
 # Detected content type -> stored file extension. Never derived from the client filename.
 CONTENT_TYPE_EXTENSIONS: dict[str, str] = {
@@ -137,6 +143,61 @@ class LocalProfileImageStore:
             raise ProfileImageStorageUnavailable("avatar storage unavailable") from exc
 
 
+class DatabaseProfileImageStore:
+    """Keep bounded image uploads durable across serverless instances."""
+
+    @staticmethod
+    def _validate_filename(filename: str) -> None:
+        if not re.fullmatch(r"[a-f0-9]{32}\.(jpg|png|webp)", filename):
+            raise ProfileImageStorageUnavailable("image storage unavailable")
+
+    def path_for(self, filename: str) -> Path:
+        raise ProfileImageStorageUnavailable("database images have no filesystem path")
+
+    def save(self, data: bytes, content_type: str) -> str:
+        extension = CONTENT_TYPE_EXTENSIONS.get(content_type)
+        if extension is None:
+            raise ValueError("unsupported avatar content type")
+        if not data or len(data) > settings.MAX_AVATAR_BYTES:
+            raise ProfileImageStorageUnavailable("image exceeds storage limit")
+        filename = f"{uuid4().hex}.{extension}"
+        try:
+            with SessionLocal.begin() as session:
+                session.add(StoredImage(filename=filename, content_type=content_type, data=data))
+        except SQLAlchemyError:
+            raise ProfileImageStorageUnavailable("image storage unavailable") from None
+        return filename
+
+    def read(self, filename: str) -> bytes:
+        self._validate_filename(filename)
+        try:
+            with SessionLocal() as session:
+                data = session.execute(
+                    select(StoredImage.data).where(StoredImage.filename == filename)
+                ).scalar_one_or_none()
+        except SQLAlchemyError:
+            raise ProfileImageStorageUnavailable("image storage unavailable") from None
+        if data is None:
+            raise ProfileImageNotFound("image not found")
+        return bytes(data)
+
+    def delete(self, filename: str) -> None:
+        self._validate_filename(filename)
+        try:
+            with SessionLocal.begin() as session:
+                removed = session.execute(
+                    delete(StoredImage)
+                    .where(StoredImage.filename == filename)
+                    .returning(StoredImage.filename)
+                ).scalar_one_or_none()
+        except SQLAlchemyError:
+            raise ProfileImageStorageUnavailable("image storage unavailable") from None
+        if removed is None:
+            raise ProfileImageNotFound("image not found")
+
+
 def get_image_store() -> ProfileImageStore:
     """Request-scoped store bound to the current settings."""
+    if settings.MEDIA_STORAGE == "database":
+        return DatabaseProfileImageStore()
     return LocalProfileImageStore(Path(settings.MEDIA_ROOT))
