@@ -98,6 +98,7 @@ function ProjectCard({ project }: { project: Project }) {
     project.screenshot_updated_at,
     `/api/projects/${encodeURIComponent(project.slug)}/screenshot`
   );
+  const demoUrl = isAbsoluteHttpUrl(project.demo_url) ? project.demo_url : null;
 
   return (
     <Card key={project.id} className="project-card flex min-w-0 flex-col">
@@ -144,14 +145,32 @@ function ProjectCard({ project }: { project: Project }) {
               className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md border border-input bg-muted sm:w-28"
               aria-label={`${project.title} screenshot thumbnail`}
             >
-              <Image
-                src={screenshotSrc}
-                alt={`${project.title} screenshot`}
-                fill
-                sizes="(max-width: 640px) 96px, 112px"
-                className="object-cover"
-                unoptimized
-              />
+              {demoUrl ? (
+                <a
+                  href={demoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block h-full"
+                >
+                  <Image
+                    src={screenshotSrc}
+                    alt={`${project.title} screenshot`}
+                    fill
+                    sizes="(max-width: 640px) 96px, 112px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </a>
+              ) : (
+                <Image
+                  src={screenshotSrc}
+                  alt={`${project.title} screenshot`}
+                  fill
+                  sizes="(max-width: 640px) 96px, 112px"
+                  className="object-cover"
+                  unoptimized
+                />
+              )}
             </div>
           ) : null}
         </div>
