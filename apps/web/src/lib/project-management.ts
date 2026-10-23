@@ -154,6 +154,50 @@ export function parseOrder(value: string): number | null {
   const parsed = Number(value);
   return isStrictOrder(parsed) ? parsed : null;
 }
+
+export function orderedProjects(
+  projects: Project[],
+  drafts: Record<string, string>
+) {
+  const priority = (project: Project) =>
+    parseOrder(drafts[project.slug] ?? "") ?? project.display_order;
+  return [...projects].sort((a, b) => priority(a) - priority(b) || a.id - b.id);
+}
+
+export function moveProjectToPosition(
+  projects: Project[],
+  drafts: Record<string, string>,
+  slug: string,
+  position: number
+): Record<string, string> {
+  const current = orderedProjects(projects, drafts);
+  const from = current.findIndex((project) => project.slug === slug);
+  if (
+    from < 0 ||
+    !Number.isInteger(position) ||
+    position < 0 ||
+    position >= current.length ||
+    from === position
+  )
+    return drafts;
+
+  // Reuse priority slots, resolving ties so a move survives the API's ID tie-break.
+  let previous = -1;
+  let slots = current.map((project) => {
+    previous = Math.max(
+      previous + 1,
+      parseOrder(drafts[project.slug] ?? "") ?? project.display_order
+    );
+    return previous;
+  });
+  if (previous > MAX_ORDER) slots = current.map((_, index) => index);
+  const [moved] = current.splice(from, 1);
+  current.splice(position, 0, moved);
+  return Object.fromEntries(
+    current.map((project, index) => [project.slug, String(slots[index])])
+  );
+}
+
 export function changedOrders(
   projects: Project[],
   drafts: Record<string, string>

@@ -2,17 +2,11 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { Project } from "@/lib/api";
@@ -33,6 +27,8 @@ import {
 } from "@/lib/avatar";
 import {
   changedOrders,
+  orderedProjects,
+  moveProjectToPosition,
   isSlug,
   MAX_ORDER,
   formTechnologies,
@@ -364,7 +360,7 @@ export function ProjectManager({
     }
     if (order === null) {
       setError(
-        "Display order must be a whole number between 0 and 2147483647."
+        "Sort priority must be a whole number between 0 and 2147483647."
       );
       return;
     }
@@ -432,7 +428,9 @@ export function ProjectManager({
             Object.entries(drafts).filter(([slug]) => !submitted.has(slug))
           )
         );
-        setSuccess("Order saved.");
+        setSuccess(
+          "Project order saved. The public portfolio now uses this order."
+        );
       },
       onError: (err) => {
         const error = err as ApiError;
@@ -506,7 +504,7 @@ export function ProjectManager({
           </Button>
         ) : null}
       </div>
-      {!deleteTarget ? messages : null}
+      {mode !== "list" && !deleteTarget ? messages : null}
       {mode !== "list" ? (
         <form onSubmit={submit} className="space-y-5" noValidate>
           {mode === "edit" ? (
@@ -640,10 +638,11 @@ export function ProjectManager({
               htmlFor="project-order"
               className="mb-1 block text-sm font-medium"
             >
-              Display order
+              Sort priority
             </label>
             <input
               id="project-order"
+              aria-describedby="project-order-help"
               type="number"
               min={0}
               max={MAX_ORDER}
@@ -655,6 +654,13 @@ export function ProjectManager({
                 setValues({ ...values, display_order: event.target.value })
               }
             />
+            <p
+              id="project-order-help"
+              className="mt-1 text-xs text-muted-foreground"
+            >
+              Lower values appear first. Use the project list’s position
+              controls to choose an exact place in the list.
+            </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button type="submit" size="lg" disabled={pending}>
@@ -689,18 +695,11 @@ export function ProjectManager({
             >
               {projectsQuery.isFetching ? "Loading…" : "Refresh projects"}
             </Button>
-            <Button
-              size="lg"
-              disabled={
-                pending ||
-                Boolean(deleteTarget) ||
-                (!orderChanges.error && !orderChanges.orders?.length)
-              }
-              onClick={saveOrder}
-            >
-              {pending ? "Saving…" : "Save order"}
-            </Button>
           </div>
+          <p className="text-sm text-muted-foreground">
+            Move projects up or down, or choose a position. Preview the order,
+            then select Save order to publish it.
+          </p>
           {listStatus === "unavailable" ? (
             <p role="status" className="text-sm text-destructive">
               Projects unavailable. Any cards below are from the last successful
@@ -712,105 +711,215 @@ export function ProjectManager({
               No projects yet. Add one above.
             </p>
           ) : null}
-          <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
-              <Card key={project.id} className="flex min-w-0 flex-col">
-                <CardHeader>
-                  <CardTitle className="[overflow-wrap:anywhere]">
-                    {project.title}
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                    {project.slug}
-                  </p>
-                  {project.is_sample ? (
-                    <Badge variant="outline" className="w-fit">
-                      Sample
-                    </Badge>
-                  ) : null}
-                  <CardDescription className="[overflow-wrap:anywhere]">
-                    {project.summary}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="min-w-0 flex-1 space-y-4">
-                  <div className="flex min-w-0 flex-wrap gap-2">
-                    {project.technologies.map((tech, index) => (
-                      <Badge
-                        key={`${tech}-${index}`}
+          <div className="space-y-4">
+            {orderedProjects(projects, orders).map((project, index, list) => {
+              const thumbnail = profileImageUrl(
+                project.screenshot_url,
+                project.screenshot_updated_at,
+                `/api/projects/${encodeURIComponent(project.slug)}/screenshot`
+              );
+              const move = (position: number) => {
+                clearMessages();
+                setOrders((drafts) =>
+                  moveProjectToPosition(
+                    projects,
+                    drafts,
+                    project.slug,
+                    position
+                  )
+                );
+              };
+              return (
+                <Card key={project.id} className="min-w-0 p-4 sm:p-5">
+                  <div className="grid min-w-0 grid-cols-[80px_minmax(0,1fr)] items-start gap-4 sm:grid-cols-[112px_minmax(0,1fr)]">
+                    <div className="relative aspect-[4/3] overflow-hidden rounded-md border bg-muted">
+                      {thumbnail ? (
+                        <Image
+                          src={thumbnail}
+                          alt={`${project.title} screenshot`}
+                          fill
+                          sizes="(min-width: 640px) 112px, 80px"
+                          className="object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <span className="flex h-full items-center justify-center px-2 text-center text-xs text-muted-foreground">
+                          No screenshot
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="min-w-0 text-base font-semibold [overflow-wrap:anywhere]">
+                          {project.title}
+                        </h3>
+                        {project.is_sample ? (
+                          <Badge variant="outline">Sample</Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                        {project.slug}
+                      </p>
+                      <p className="line-clamp-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+                        {project.summary}
+                      </p>
+                    </div>
+                    <div className="col-span-2 min-w-0 space-y-2 sm:col-span-1 sm:col-start-2">
+                      <div className="flex min-w-0 flex-wrap gap-2">
+                        {project.technologies.slice(0, 4).map((tech, i) => (
+                          <Badge
+                            key={`${tech}-${i}`}
+                            variant="outline"
+                            className="max-w-full whitespace-normal [overflow-wrap:anywhere]"
+                          >
+                            {tech}
+                          </Badge>
+                        ))}
+                      </div>
+                      {project.technologies.length > 4 ? (
+                        <details>
+                          <summary className="w-fit cursor-pointer rounded text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4">
+                            Show {project.technologies.length - 4} more
+                            technologies
+                          </summary>
+                          <div className="mt-2 flex min-w-0 flex-wrap gap-2">
+                            {project.technologies.slice(4).map((tech, i) => (
+                              <Badge
+                                key={`${tech}-${i}`}
+                                variant="outline"
+                                className="max-w-full whitespace-normal [overflow-wrap:anywhere]"
+                              >
+                                {tech}
+                              </Badge>
+                            ))}
+                          </div>
+                        </details>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label
+                        htmlFor={`position-${project.id}`}
+                        className="text-xs font-medium"
+                      >
+                        Position{" "}
+                        <span className="sr-only">for {project.title}</span>
+                      </label>
+                      <select
+                        id={`position-${project.id}`}
+                        value={index}
+                        disabled={pending}
+                        onChange={(event) => move(Number(event.target.value))}
+                        className="h-11 rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        {list.map((item, position) => (
+                          <option key={item.id} value={position}>
+                            {position + 1} of {list.length}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="icon"
                         variant="outline"
-                        className="min-w-0 max-w-full whitespace-normal [overflow-wrap:anywhere]"
+                        className="h-11 w-11"
+                        disabled={pending || index === 0}
+                        onClick={() => move(index - 1)}
+                        aria-label={`Move ${project.title} up`}
+                        title="Move up"
                       >
-                        {tech}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div>
-                    <label
-                      htmlFor={`order-${project.id}`}
-                      className="mb-1 block text-sm font-medium"
-                    >
-                      Display order{" "}
-                      <span className="sr-only">for {project.title}</span>
-                    </label>
-                    <input
-                      id={`order-${project.id}`}
-                      type="number"
-                      min={0}
-                      max={MAX_ORDER}
-                      step={1}
-                      value={
-                        orders[project.slug] ?? String(project.display_order)
-                      }
-                      disabled={pending}
-                      onChange={(event) =>
-                        setOrders({
-                          ...orders,
-                          [project.slug]: event.target.value,
-                        })
-                      }
-                      className={inputClass}
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {safeProjectLink(project.repository_url) ? (
-                      <a
-                        href={project.repository_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center rounded text-sm underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                        <ArrowUp className="size-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-11 w-11"
+                        disabled={pending || index === list.length - 1}
+                        onClick={() => move(index + 1)}
+                        aria-label={`Move ${project.title} down`}
+                        title="Move down"
                       >
-                        Repository
-                      </a>
-                    ) : null}
-                    {safeProjectLink(project.demo_url) ? (
-                      <a
-                        href={project.demo_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex min-h-11 items-center rounded text-sm underline focus-visible:outline-2 focus-visible:outline-offset-2"
-                      >
-                        Demo
-                      </a>
-                    ) : null}
+                        <ArrowDown className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {safeProjectLink(project.repository_url) ? (
+                        <a
+                          href={project.repository_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 items-center rounded text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                          Repository
+                        </a>
+                      ) : null}
+                      {safeProjectLink(project.demo_url) ? (
+                        <a
+                          href={project.demo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-h-11 items-center rounded text-xs text-primary underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                          Demo
+                        </a>
+                      ) : null}
+                      <RecordActionButtons
+                        recordTitle={project.title}
+                        onEdit={() => {
+                          setEditing(project);
+                          setValues(valuesFor(project));
+                          clearMessages();
+                          setMode("edit");
+                        }}
+                        onDelete={() => {
+                          setDeleteTarget(project);
+                          clearMessages();
+                        }}
+                        disabled={pending}
+                      />
+                    </div>
                   </div>
-                </CardContent>
-                <CardFooter className="flex flex-wrap gap-2">
-                  <RecordActionButtons
-                    recordTitle={project.title}
-                    onEdit={() => {
-                      setEditing(project);
-                      setValues(valuesFor(project));
-                      clearMessages();
-                      setMode("edit");
-                    }}
-                    onDelete={() => {
-                      setDeleteTarget(project);
-                      clearMessages();
-                    }}
+                </Card>
+              );
+            })}
+          </div>
+          <div className="sticky bottom-4 z-10 space-y-3 rounded-lg border bg-background p-4 shadow-md">
+            {!deleteTarget ? messages : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p role="status" className="text-sm text-muted-foreground">
+                {orderChanges.error ??
+                  (orderChanges.orders?.length
+                    ? "Order preview — changes are not saved yet."
+                    : "Showing the saved project order.")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {orderChanges.error || orderChanges.orders?.length ? (
+                  <Button
+                    variant="outline"
+                    className="min-h-11"
                     disabled={pending}
-                  />
-                </CardFooter>
-              </Card>
-            ))}
+                    onClick={() => {
+                      setOrders({});
+                      clearMessages();
+                    }}
+                  >
+                    Discard order changes
+                  </Button>
+                ) : null}
+                <Button
+                  className="min-h-11"
+                  disabled={
+                    pending ||
+                    Boolean(deleteTarget) ||
+                    !orderChanges.orders?.length ||
+                    Boolean(orderChanges.error)
+                  }
+                  onClick={saveOrder}
+                >
+                  {reorderMutation.isPending ? "Saving order…" : "Save order"}
+                </Button>
+              </div>
+            </div>
           </div>
         </>
       )}
