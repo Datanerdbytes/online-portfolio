@@ -197,6 +197,11 @@ docker compose down      # Stop it; preserve the named data volume
 
 ## Vercel frontend deployment
 
+Routine production releases use the [GitHub Actions deployment workflow](docs/deployment.md).
+It requires all frontend, backend, PostgreSQL integration, and repository checks
+to pass before staging and checking both apps, then promoting their production
+deployments. The direct CLI commands below are for manual recovery and setup.
+
 The frontend is deployed to the Vercel project `online-portfolio` under
 `datanerdbytes-4121`. Its project settings use the Next.js preset, Node.js 24.x,
 and `apps/web` as the root directory. The install command is:

@@ -1,40 +1,69 @@
-name: CI
+name: CI and production deployment
 
 on:
   pull_request:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Do not interrupt a production rollout between backend and frontend promotion.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  HUSKY: "0"
 
 jobs:
   web:
     name: Web checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          node-version: 22
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint:web
       - run: npm run typecheck:web
       - run: npm run test:web
+      - run: node --test scripts/tests/deployment-smoke.test.mjs
       - run: npm run build:web
 
   api:
     name: API checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci # pragma: allowlist secret — disposable CI service
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
         with:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
@@ -43,26 +72,119 @@ jobs:
         working-directory: apps/api
       - run: uv run mypy --explicit-package-bases app
         working-directory: apps/api
-      - run: uv run pytest
+      - name: Unit and PostgreSQL integration tests, including migrations
+        run: uv run pytest --run-integration
         working-directory: apps/api
+        env:
+          # Disposable runner-local service. Never use Neon credentials here.
+          TEST_DATABASE_ADMIN_URL: postgresql+psycopg://ci:ci@localhost:5432/postgres # pragma: allowlist secret — disposable CI service
       - name: Scan tracked files for secrets
         run: node scripts/check-secrets.mjs
 
   repository-files:
     name: Repository file checks
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
       - run: npm ci
       - run: uv sync --project apps/api --locked
       - run: npm run format:check:pr
         env:
           GITHUB_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
       - run: node scripts/check-staged-files.mjs --all
+
+  deploy:
+    name: Deploy production
+    needs: [web, api, repository-files]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://online-portfolio-two-swart.vercel.app
+    env:
+      VERCEL_ORG_ID: team_aWWXAsZiAMPGuRFGhIqQyyFA
+      VERCEL_CLI_VERSION: "64.2.0"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+      - name: Require deployment credential
+        run: test -n "$VERCEL_TOKEN" || { echo 'Set VERCEL_TOKEN in the production environment secrets.'; exit 1; }
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Install pinned Vercel CLI
+        run: npm install --global "vercel@$VERCEL_CLI_VERSION"
+      - name: Pull backend production settings
+        working-directory: apps/api
+        run: vercel pull --yes --environment=production --scope datanerdbytes-4121
+        env:
+          VERCEL_PROJECT_ID: prj_3sln5uC4QRmNGwwxQN3dCKFiNbSZ
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Build backend
+        working-directory: apps/api
+        run: vercel build --prod
+        env:
+          VERCEL_PROJECT_ID: prj_3sln5uC4QRmNGwwxQN3dCKFiNbSZ
+      - name: Stage backend without changing live domains
+        working-directory: apps/api
+        run: vercel deploy --prebuilt --prod --skip-domain --yes --json --scope datanerdbytes-4121 --meta githubCommitSha="$GITHUB_SHA" > "$RUNNER_TEMP/api-deploy.json"
+        env:
+          VERCEL_PROJECT_ID: prj_3sln5uC4QRmNGwwxQN3dCKFiNbSZ
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Pull frontend production settings
+        run: vercel pull --yes --environment=production --scope datanerdbytes-4121
+        env:
+          VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Build frontend
+        run: vercel build --prod
+        env:
+          VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
+      - name: Stage frontend without changing live domains
+        run: vercel deploy --prebuilt --prod --skip-domain --yes --json --scope datanerdbytes-4121 --meta githubCommitSha="$GITHUB_SHA" > "$RUNNER_TEMP/web-deploy.json"
+        env:
+          VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Check staged apps before promotion
+        run: |
+          node scripts/deployment-smoke.mjs api "$RUNNER_TEMP/api-deploy.json"
+          node scripts/deployment-smoke.mjs web "$RUNNER_TEMP/web-deploy.json"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Promote backend, then frontend
+        run: |
+          api_url="$(node scripts/deployment-smoke.mjs url "$RUNNER_TEMP/api-deploy.json")"
+          web_url="$(node scripts/deployment-smoke.mjs url "$RUNNER_TEMP/web-deploy.json")"
+          vercel promote "$api_url" --cwd apps/api --yes --scope datanerdbytes-4121
+          vercel promote "$web_url" --yes --scope datanerdbytes-4121
+          {
+            echo '### Production deployment'
+            echo "Commit: $GITHUB_SHA"
+            echo "Backend: $api_url"
+            echo "Frontend: $web_url"
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Verify live domains and frontend-to-API reads
+        run: |
+          node scripts/deployment-smoke.mjs api https://online-portfolio-api.vercel.app
+          node scripts/deployment-smoke.mjs web https://online-portfolio-two-swart.vercel.app
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Report incomplete release
+        if: failure()
+        run: echo 'Deployment failed. If promotion already started, inspect both projects before retrying; see docs/deployment.md for recovery.' >> "$GITHUB_STEP_SUMMARY"
