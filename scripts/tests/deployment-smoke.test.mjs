@@ -9,6 +9,26 @@ import {
 const deployment = (url, readyState = "READY") =>
   JSON.stringify({ status: "ok", deployment: { url, readyState } });
 
+test("accept the CLI's plain CI JSON deployment format", () => {
+  assert.equal(
+    deploymentUrl(
+      JSON.stringify({
+        url: "https://portfolio-123.vercel.app",
+        readyState: "READY",
+      })
+    ),
+    "https://portfolio-123.vercel.app"
+  );
+  assert.throws(() =>
+    deploymentUrl(
+      JSON.stringify({
+        url: "https://portfolio-123.vercel.app",
+        readyState: "ERROR",
+      })
+    )
+  );
+});
+
 test("only ready HTTPS Vercel origins can be promoted", () => {
   assert.equal(
     deploymentUrl(deployment("https://portfolio-123.vercel.app")),

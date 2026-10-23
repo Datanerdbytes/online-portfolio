@@ -5,14 +5,19 @@ import { pathToFileURL } from "node:url";
 
 export function deploymentUrl(value) {
   const result = JSON.parse(value);
-  if (result.status !== "ok" || result.deployment?.readyState !== "READY") {
+  // The CLI wraps JSON in agent mode and returns the deployment directly in CI.
+  const deployment = result.deployment ?? result;
+  if (
+    (result.status !== undefined && result.status !== "ok") ||
+    deployment.readyState !== "READY"
+  ) {
     throw new Error("Deployment is not ready; refusing promotion.");
   }
-  const url = new URL(result.deployment.url);
+  const url = new URL(deployment.url);
   if (
     url.protocol !== "https:" ||
     !url.hostname.endsWith(".vercel.app") ||
-    url.origin !== result.deployment.url
+    url.origin !== deployment.url
   ) {
     throw new Error("Unexpected deployment origin; refusing promotion.");
   }
