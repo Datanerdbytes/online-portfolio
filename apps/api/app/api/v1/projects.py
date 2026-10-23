@@ -144,6 +144,24 @@ def list_projects(db: Session = Depends(get_db)):  # noqa: B008  # FastAPI idiom
     return {"items": items}
 
 
+@router.get(
+    "/projects/{slug}",
+    response_model=ProjectResponse,
+    summary="Get a project",
+    description="Return one published project by slug. Public: no authentication required.",
+)
+def get_project(slug: str, db: Session = Depends(get_db)):  # noqa: B008  # FastAPI idiom
+    try:
+        project = db.query(Project).filter(Project.slug == slug).first()
+    except SQLAlchemyError:
+        raise HTTPException(
+            status_code=503, detail="Projects service temporarily unavailable."
+        ) from None
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
 @router.put(
     "/projects/{slug}",
     response_model=ProjectResponse,

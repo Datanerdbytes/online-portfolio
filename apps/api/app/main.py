@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.v1 import auth, avatar, health, projects, resume
+from app.api.v1 import auth, avatar, github, health, projects, resume
 from app.core.config import settings
 from app.core.middleware import MULTIPART_OVERHEAD_BYTES, RequestBodyLimitMiddleware
 from app.schemas.root import RootResponse
@@ -12,6 +12,7 @@ app.include_router(avatar.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(projects.router, prefix="/api/v1")
 app.include_router(resume.router, prefix="/api/v1")
+app.include_router(github.router, prefix="/api/v1")
 
 # The portrait upload is bounded before the multipart parser runs, so an
 # oversized file never reaches the disk spool of the request handler.

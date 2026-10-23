@@ -33,6 +33,8 @@ Configuration is loaded from `apps/web/`. Copy `apps/web/.env.example` to `apps/
 - `GET /api/projects` (Next.js server route, `src/app/api/projects/route.ts`) forwards to `GET /api/v1/projects` on the FastAPI backend using the server-only `API_BASE_URL`.
 - The proxy applies a bounded upstream timeout, disables caching (`no-store`), validates the response payload at runtime, and returns a controlled `502` with `{ status: "unavailable" }` for upstream failures, timeouts, invalid payloads, or non-2xx responses. Raw upstream errors and connection details are never exposed.
 - The browser requests `/api/projects` through the client `ProjectsClient` component (`src/components/projects.tsx`) with its own bounded timeout, abort-on-unmount, and request deduplication so stale responses cannot overwrite newer ones.
+- Project titles and the **Read project details** action link to `/projects/{slug}`. The dynamic page loads public project metadata and GitHub-rendered README HTML server-side using the same `API_BASE_URL`; README content is revalidated hourly, and the browser never receives the GitHub token.
+- `GET /api/v1/github/projects/{slug}/readme` is restricted to published projects whose configured GitHub repository belongs to `GITHUB_USERNAME` and is public. README failures leave the detail page usable and link to the configured repository when available.
 
 Authenticated project-management proxy routes (require the admin session cookie and pass CSRF/origin checks):
 

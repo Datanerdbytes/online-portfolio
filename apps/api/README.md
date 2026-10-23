@@ -26,6 +26,8 @@ FastAPI backend for the online resume portfolio. Runs on http://localhost:8000.
 | `DATABASE_URL` | PostgreSQL connection string (`postgresql+psycopg` driver, used by SQLAlchemy and Alembic) | `postgresql+psycopg://resume:resume@localhost:5432/resume` |
 | `API_HOST` | Host to bind | `0.0.0.0` |
 | `API_PORT` | Port to bind | `8000` |
+| `GITHUB_USERNAME` | GitHub account that owns repositories linked by published projects | unset |
+| `GITHUB_PAT` | Server-side token used for GitHub API requests; no public-repository scope is needed | unset |
 
 ## API endpoints
 
@@ -33,6 +35,8 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 
 - `GET /api/v1/health` — `{"status": "ok"}`. Process liveness only; never claims PostgreSQL is connected.
 - `GET /api/v1/projects` — Returns `{"items": [...]}` of project entries ordered by `display_order` ascending, then `id` ascending. Returns `{"items": []}` when none exist. A database failure returns a controlled HTTP 503 without exposing connection strings or raw exceptions. Public: no authentication required.
+- `GET /api/v1/projects/{slug}` — Returns one published project, including its summary, repository URL, and technology tags. Missing projects return 404. Public: no authentication required.
+- `GET /api/v1/github/projects/{slug}/readme` — Returns GitHub-rendered README HTML for a published project whose repository URL belongs to `GITHUB_USERNAME`. The repository must also be public according to GitHub; private repositories and projects without an eligible GitHub URL return 404. Requires `GITHUB_USERNAME` and `GITHUB_PAT`; the token is never sent to the browser.
 - `GET /api/v1/resume/profile/avatar` and `GET /api/v1/resume/profile/banner` — Public image reads for the independent sidebar profile photo and square hero banner. Both return the image bytes with an ETag; absent images return 404.
 - `PUT` and `DELETE` on those image paths — Owner-only uploads and removals. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default). Image files are stored beneath `MEDIA_ROOT`; the database stores only generated filenames and image metadata.
 
@@ -98,6 +102,9 @@ functions for URL parsing.
   auth enforcement, validation, null/omitted semantics, sample-marker
   preservation, duplicate-create race (sanitized 409 after rollback), and
   atomic-reorder rollback behavior.
+- `tests/test_github_readme.py` — database-free tests for published-project
+  allowlisting, public-repository verification, rendered HTML, and sanitized
+  GitHub failure handling.
 - `tests/test_projects_integration.py` — opt-in PostgreSQL tests for create
   persistence, duplicate slug (409), and atomic reorder (no partial writes).
 

@@ -49,6 +49,51 @@ def test_empty_projects_returns_empty_items():
     assert response.json() == {"items": []}
 
 
+def test_get_project_returns_project_details():
+    from app.models.project import Project
+
+    project = Project(
+        id=12,
+        slug="my-awesome-app",
+        title="My Awesome App",
+        summary="A project summary",
+        technologies=["Next.js", "FastAPI"],
+        repository_url="https://github.com/example/my-awesome-app",
+        demo_url=None,
+        display_order=1,
+        is_sample=False,
+    )
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = project
+
+    with _client_with_session(mock_session) as client:
+        response = client.get("/api/v1/projects/my-awesome-app")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 12,
+        "slug": "my-awesome-app",
+        "title": "My Awesome App",
+        "summary": "A project summary",
+        "technologies": ["Next.js", "FastAPI"],
+        "repository_url": "https://github.com/example/my-awesome-app",
+        "demo_url": None,
+        "display_order": 1,
+        "is_sample": False,
+    }
+
+
+def test_get_missing_project_returns_404():
+    mock_session = MagicMock()
+    mock_session.query.return_value.filter.return_value.first.return_value = None
+
+    with _client_with_session(mock_session) as client:
+        response = client.get("/api/v1/projects/missing")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Project not found"}
+
+
 def test_database_unavailable_returns_503():
     failing_session = FailingSession()
 

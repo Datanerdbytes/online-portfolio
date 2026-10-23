@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_ATTEMPTS: ClassVar[int] = 5
     LOGIN_RATE_LIMIT_WINDOW_SECONDS: ClassVar[int] = 300
 
+    # GitHub README sync
+    GITHUB_PAT: str | None = None
+    GITHUB_USERNAME: str | None = None
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CodeXml, FolderOpen } from "lucide-react";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,7 +74,7 @@ function ProjectLinks({ project }: { project: Project }) {
   if (validLinks.length === 0) return null;
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2">
       {validLinks.map((link) => (
         <a
           key={link.label}
@@ -99,7 +100,14 @@ function ProjectCard({ project }: { project: Project }) {
       </div>
       <CardHeader>
         <div className="flex flex-col gap-2 min-w-0">
-          <h3 className="min-w-0 break-words">{project.title}</h3>
+          <h3 className="min-w-0 break-words">
+            <Link
+              href={`/projects/${encodeURIComponent(project.slug)}`}
+              className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {project.title}
+            </Link>
+          </h3>
           {project.is_sample && (
             <Badge variant="outline" className="w-fit">
               Sample
@@ -120,7 +128,15 @@ function ProjectCard({ project }: { project: Project }) {
         </div>
       </CardContent>
       <CardFooter className="mt-auto pt-0">
-        <ProjectLinks project={project} />
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <Link
+            href={`/projects/${encodeURIComponent(project.slug)}`}
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Read project details
+          </Link>
+          <ProjectLinks project={project} />
+        </div>
       </CardFooter>
     </Card>
   );
