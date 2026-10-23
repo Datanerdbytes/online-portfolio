@@ -156,6 +156,17 @@ h3 {
   margin-left: 272px;
   min-width: 0;
 }
+.project-readme > div > div > article > .markdown-heading:first-child h1 {
+  display: none;
+}
+.project-readme .mermaid {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.project-readme .mermaid svg {
+  height: auto;
+  max-width: 100%;
+}
 .content-width {
   width: min(100% - 96px, 1120px);
   margin-inline: auto;

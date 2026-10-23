@@ -12,20 +12,20 @@ This is the Next.js 16 App Router frontend of the online resume/portfolio monore
 
 All commands run from this directory (`apps/web/`) unless noted. From the repository root, use the equivalent workspace scripts (`npm run dev:web`, `npm run build:web`, `npm run lint:web`, `npm run typecheck:web`).
 
-| Command | Description |
-| --- | --- |
-| `npm run dev` | Start dev server (http://localhost:3000) |
-| `npm run build` | Production build |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run typecheck` | Run TypeScript compiler check |
+| Command             | Description                              |
+| ------------------- | ---------------------------------------- |
+| `npm run dev`       | Start dev server (http://localhost:3000) |
+| `npm run build`     | Production build                         |
+| `npm run start`     | Start production server                  |
+| `npm run lint`      | Run ESLint                               |
+| `npm run typecheck` | Run TypeScript compiler check            |
 
 ## Environment
 
 Configuration is loaded from `apps/web/`. Copy `apps/web/.env.example` to `apps/web/.env.local` and adjust as needed. Do not commit `.env.local` or other `.env.*` files.
 
-| Variable | Description | Default |
-| --- | --- | --- |
+| Variable       | Description                                                                  | Default                 |
+| -------------- | ---------------------------------------------------------------------------- | ----------------------- |
 | `API_BASE_URL` | FastAPI backend base URL; server-side only, never exposed via `NEXT_PUBLIC_` | `http://localhost:8000` |
 
 ## API integration
@@ -35,6 +35,7 @@ Configuration is loaded from `apps/web/`. Copy `apps/web/.env.example` to `apps/
 - The browser requests `/api/projects` through the client `ProjectsClient` component (`src/components/projects.tsx`) with its own bounded timeout, abort-on-unmount, and request deduplication so stale responses cannot overwrite newer ones.
 - Project titles and the **Read project details** action link to `/projects/{slug}`. The dynamic page loads public project metadata and GitHub-rendered README HTML server-side using the same `API_BASE_URL`; README content is revalidated hourly, and the browser never receives the GitHub token.
 - `GET /api/v1/github/projects/{slug}/readme` is restricted to published projects whose configured GitHub repository belongs to `GITHUB_USERNAME` and is public. README failures leave the detail page usable and link to the configured repository when available.
+- GitHub-rendered README fences marked `lang="mermaid"` are rendered as diagrams in the browser using Mermaid's strict security mode. Other code fences remain code blocks; invalid diagrams fall back to their original source.
 
 Authenticated project-management proxy routes (require the admin session cookie and pass CSRF/origin checks):
 
@@ -96,7 +97,6 @@ CSRF, production/development cookies, malformed payloads, expired response data,
 upstream outages, and deadlines during JSON parsing. Also run `npm run lint`,
 `npm run typecheck`, and `npm run build`.
 
-
 ## Owner sign-in (A0)
 
 Set server-only `API_BASE_URL` and `ADMIN_WEB_ORIGIN` in `apps/web/.env.local`.
@@ -127,7 +127,6 @@ TypeScript compiler and real handlers; no additional test framework). It covers
 CSRF, production/development cookies, malformed payloads, expired response data,
 upstream outages, and deadlines during JSON parsing. Also run `npm run lint`,
 `npm run typecheck`, and `npm run build`.
-
 
 ### Management edge cases and verification
 

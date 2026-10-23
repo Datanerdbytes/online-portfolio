@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { MermaidReadme } from "@/components/mermaid-readme";
 import { API_BASE_URL, isProject, type Project } from "@/lib/api";
 import { staticResumeProjects } from "@/lib/resume";
 
@@ -27,7 +28,9 @@ async function getProject(slug: string): Promise<Project | null> {
   }
 }
 
-async function getReadmeFromBackend(projectSlug: string): Promise<string | null> {
+async function getReadmeFromBackend(
+  projectSlug: string,
+): Promise<string | null> {
   try {
     const response = await fetch(
       `${API_BASE_URL}/api/v1/github/projects/${encodeURIComponent(projectSlug)}/readme`,
@@ -61,7 +64,11 @@ function ReadmeSkeleton() {
   );
 }
 
-function ReadmeUnavailable({ repositoryUrl }: { repositoryUrl: string | null }) {
+function ReadmeUnavailable({
+  repositoryUrl,
+}: {
+  repositoryUrl: string | null;
+}) {
   return (
     <div
       role="status"
@@ -108,7 +115,7 @@ async function ProjectReadme({
 
   return (
     <div
-      className="
+      className="project-readme
         prose max-w-none break-words dark:prose-invert
         [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:border-b [&_h1]:border-border [&_h1]:pb-2 [&_h1]:text-2xl [&_h1]:font-bold
         [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:text-xl [&_h2]:font-semibold
@@ -120,7 +127,7 @@ async function ProjectReadme({
         [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4
       "
     >
-      <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+      <MermaidReadme html={htmlContent} />
     </div>
   );
 }
@@ -262,7 +269,10 @@ export default async function ProjectDetailPage({ params }: Props) {
             <ProjectTitle projectSlug={slug} projectPromise={projectPromise} />
           </Suspense>
           <Suspense fallback={<ProjectMetadataSkeleton />}>
-            <ProjectMetadata projectSlug={slug} projectPromise={projectPromise} />
+            <ProjectMetadata
+              projectSlug={slug}
+              projectPromise={projectPromise}
+            />
           </Suspense>
         </header>
 
