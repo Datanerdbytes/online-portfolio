@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, List, Optional
 from urllib.parse import urlparse
 
@@ -37,6 +38,8 @@ class ProjectResponse(BaseModel):
     demo_url: Optional[str]
     display_order: int
     is_sample: bool
+    screenshot_url: Optional[str] = None
+    screenshot_updated_at: Optional[datetime] = None
 
 
 class ProjectsResponse(BaseModel):

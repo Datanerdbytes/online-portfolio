@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CodeXml, FolderOpen } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isProjectsResponse, type Project } from "@/lib/api";
+import { profileImageUrl } from "@/lib/avatar";
 
 const PROJECTS_TIMEOUT_MS = 8000;
 const SKELETON_COUNT = 3;
@@ -68,7 +70,7 @@ function ProjectLinks({ project }: { project: Project }) {
 
   const validLinks = links.filter(
     (link): link is { label: string; url: string } =>
-      isAbsoluteHttpUrl(link.url),
+      isAbsoluteHttpUrl(link.url)
   );
 
   if (validLinks.length === 0) return null;
@@ -91,6 +93,12 @@ function ProjectLinks({ project }: { project: Project }) {
 }
 
 function ProjectCard({ project }: { project: Project }) {
+  const screenshotSrc = profileImageUrl(
+    project.screenshot_url,
+    project.screenshot_updated_at,
+    `/api/projects/${encodeURIComponent(project.slug)}/screenshot`
+  );
+
   return (
     <Card key={project.id} className="project-card flex min-w-0 flex-col">
       <div className="project-visual" aria-hidden="true">
@@ -119,12 +127,33 @@ function ProjectCard({ project }: { project: Project }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="flex flex-wrap gap-2 min-w-0">
-          {project.technologies.map((tech) => (
-            <Badge key={tech} variant="outline" className="min-w-0 max-w-full">
-              <span className="min-w-0 [overflow-wrap:anywhere]">{tech}</span>
-            </Badge>
-          ))}
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
+            {project.technologies.map((tech) => (
+              <Badge
+                key={tech}
+                variant="outline"
+                className="min-w-0 max-w-full"
+              >
+                <span className="min-w-0 [overflow-wrap:anywhere]">{tech}</span>
+              </Badge>
+            ))}
+          </div>
+          {screenshotSrc ? (
+            <div
+              className="relative aspect-[4/3] w-24 shrink-0 overflow-hidden rounded-md border border-input bg-muted sm:w-28"
+              aria-label={`${project.title} screenshot thumbnail`}
+            >
+              <Image
+                src={screenshotSrc}
+                alt={`${project.title} screenshot`}
+                fill
+                sizes="(max-width: 640px) 96px, 112px"
+                className="object-cover"
+                unoptimized
+              />
+            </div>
+          ) : null}
         </div>
       </CardContent>
       <CardFooter className="mt-auto pt-0">
@@ -185,7 +214,7 @@ export function ProjectsClient({
     setState(
       fallback.length > 0
         ? { status: "ok", items: fallback, source: "fallback" }
-        : { status: "unavailable" },
+        : { status: "unavailable" }
     );
   }, []);
 
@@ -216,7 +245,7 @@ export function ProjectsClient({
       setState(
         body.items.length === 0
           ? { status: "empty" }
-          : { status: "ok", items: body.items, source: "api" },
+          : { status: "ok", items: body.items, source: "api" }
       );
     } catch {
       if (requestId !== requestIdRef.current) return;

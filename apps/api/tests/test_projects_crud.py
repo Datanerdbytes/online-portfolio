@@ -7,6 +7,7 @@ on validation, null/omitted semantics, sample preservation, errors, and rollback
 """
 
 from contextlib import contextmanager
+from unittest.mock import Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,6 +16,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from app.api.v1.projects import get_current_owner
 from app.core.auth import TokenClaims, create_access_token
 from app.core.config import settings
+from app.core.storage import get_image_store
 from app.db.session import get_db
 from app.main import app
 from app.models.project import Project
@@ -104,16 +106,19 @@ class StubSession:
 
 
 @contextmanager
-def _client_with_overrides(session=None, override_owner=True):
+def _client_with_overrides(session=None, override_owner=True, store=None):
     if session is not None:
         app.dependency_overrides[get_db] = lambda: session
     if override_owner:
         app.dependency_overrides[get_current_owner] = lambda: OWNER_CLAIMS
+    if store is not None:
+        app.dependency_overrides[get_image_store] = lambda: store
     try:
         yield TestClient(app)
     finally:
         app.dependency_overrides.pop(get_db, None)
         app.dependency_overrides.pop(get_current_owner, None)
+        app.dependency_overrides.pop(get_image_store, None)
 
 
 def _configure_auth(monkeypatch):
@@ -601,6 +606,29 @@ class TestDelete:
         with _client_with_overrides(session) as client:
             response = client.delete("/api/v1/projects/nope")
         assert response.status_code == 404
+
+    def test_delete_removes_screenshot_after_project_commit(self):
+        project = Project(
+            slug="resume-site",
+            title="T",
+            summary="S",
+            technologies=[],
+            display_order=0,
+            screenshot_filename="screenshot.png",
+        )
+        session = StubSession(first=project)
+        store = Mock()
+
+        def assert_commit_before_cleanup(filename):
+            assert session.committed
+            assert filename == "screenshot.png"
+
+        store.delete.side_effect = assert_commit_before_cleanup
+        with _client_with_overrides(session, store=store) as client:
+            response = client.delete("/api/v1/projects/resume-site")
+
+        assert response.status_code == 204
+        store.delete.assert_called_once_with("screenshot.png")
 
 
 class TestReorder:

@@ -12,6 +12,7 @@ buffers at most `max_bytes` before answering with the API's own error vocabulary
 from __future__ import annotations
 
 import json
+from typing import Pattern
 
 from starlette.types import Message, Receive, Scope, Send
 
@@ -34,17 +35,30 @@ class RequestBodyLimitMiddleware:
     exceeded the request is answered with 413 and the body is never replayed.
     """
 
-    def __init__(self, app, *, max_bytes: int, method: str, path: str) -> None:
+    def __init__(
+        self,
+        app,
+        *,
+        max_bytes: int,
+        method: str,
+        path: str | None = None,
+        path_pattern: Pattern[str] | None = None,
+        too_large_detail: str = "Avatar too large",
+    ) -> None:
+        if (path is None) == (path_pattern is None):
+            raise ValueError("Configure exactly one of path or path_pattern")
         self.app = app
         self.max_bytes = max_bytes
         self.method = method.upper()
         self.path = path
+        self.path_pattern = path_pattern
+        self.too_large_detail = too_large_detail
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (
             scope["type"] != "http"
             or scope.get("method") != self.method
-            or scope.get("path") != self.path
+            or not self._matches_path(scope.get("path", ""))
         ):
             await self.app(scope, receive, send)
             return
@@ -94,8 +108,13 @@ class RequestBodyLimitMiddleware:
                 return None
         return None
 
+    def _matches_path(self, path: str) -> bool:
+        if self.path is not None:
+            return path == self.path
+        return bool(self.path_pattern and self.path_pattern.fullmatch(path))
+
     async def _reject(self, send: Send) -> None:
-        body = _json_body({"detail": "Avatar too large"})
+        body = _json_body({"detail": self.too_large_detail})
         await send(
             {
                 "type": "http.response.start",

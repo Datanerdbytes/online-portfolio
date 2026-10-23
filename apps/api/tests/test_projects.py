@@ -80,6 +80,8 @@ def test_get_project_returns_project_details():
         "demo_url": None,
         "display_order": 1,
         "is_sample": False,
+        "screenshot_url": None,
+        "screenshot_updated_at": None,
     }
 
 

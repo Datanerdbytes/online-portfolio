@@ -1,5 +1,4 @@
-export const API_BASE_URL =
-  process.env.API_BASE_URL || "http://localhost:8000";
+export const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8000";
 
 // ---------------------------------------------------------------------------
 // Resume types (mirrors the FastAPI response schemas)
@@ -107,6 +106,8 @@ export type Project = {
   demo_url: string | null;
   display_order: number;
   is_sample: boolean;
+  screenshot_url?: string | null;
+  screenshot_updated_at?: string | null;
 };
 
 export type ProjectsResponse = {
@@ -135,14 +136,18 @@ export function isProject(value: unknown): value is Project {
     value.technologies.every(isString) &&
     (value.repository_url === null || isString(value.repository_url)) &&
     (value.demo_url === null || isString(value.demo_url)) &&
+    (value.screenshot_url === undefined ||
+      value.screenshot_url === null ||
+      isString(value.screenshot_url)) &&
+    (value.screenshot_updated_at === undefined ||
+      value.screenshot_updated_at === null ||
+      isString(value.screenshot_updated_at)) &&
     typeof value.display_order === "number" &&
     typeof value.is_sample === "boolean"
   );
 }
 
-export function isProjectsResponse(
-  value: unknown
-): value is ProjectsResponse {
+export function isProjectsResponse(value: unknown): value is ProjectsResponse {
   return (
     isPlainObject(value) &&
     Array.isArray(value.items) &&
