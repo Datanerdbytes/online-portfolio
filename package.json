@@ -6,14 +6,19 @@
     "apps/web"
   ],
   "scripts": {
+    "prepare": "husky",
     "dev:web": "npm run dev --workspace=apps/web",
     "build:web": "npm run build --workspace=apps/web",
     "lint:web": "npm run lint --workspace=apps/web",
     "typecheck:web": "npm run typecheck --workspace=apps/web",
+    "test:web": "npm test --workspace=apps/web",
+    "format:check:pr": "node scripts/check-format.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md,yml,yaml}\""
   },
   "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "prettier": "^3.3.3",
     "prettier-plugin-tailwindcss": "^0.6.5"
   },

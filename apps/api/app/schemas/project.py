@@ -136,12 +136,13 @@ class ProjectReplace(_ProjectMutableFields):
 class ProjectPatch(_ProjectMutableFields):
     """Request body for PATCH /api/v1/projects/{slug}; omitted fields are unchanged."""
 
-    title: Optional[ProjectTitle] = None
-    summary: Optional[ProjectSummary] = None
-    technologies: Optional[ProjectTechnologies] = None
+    # Patches make normally required fields optional to represent omission.
+    title: Optional[ProjectTitle] = None  # type: ignore[assignment]
+    summary: Optional[ProjectSummary] = None  # type: ignore[assignment]
+    technologies: Optional[ProjectTechnologies] = None  # type: ignore[assignment]
     repository_url: Optional[str] = None
     demo_url: Optional[str] = None
-    display_order: Optional[DisplayOrder] = None
+    display_order: Optional[DisplayOrder] = None  # type: ignore[assignment]
 
     @field_validator("title", "summary", "technologies", "display_order", mode="before")
     @classmethod

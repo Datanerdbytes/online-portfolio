@@ -11,14 +11,14 @@ from app.core.config import settings  # noqa: E402
 from app.db.base import Base  # noqa: E402
 from app.models import Project  # noqa: E402, F401  (registers model metadata for autogeneration)
 from app.models.resume import (  # noqa: E402, F401
+    Contact,
+    ContactLink,
+    Education,
+    Experience,
+    ExperienceHighlight,
     Profile,
     SkillGroup,
     SkillItem,
-    Experience,
-    ExperienceHighlight,
-    Education,
-    Contact,
-    ContactLink,
 )
 
 config = context.config
