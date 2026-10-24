@@ -128,6 +128,10 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Install pinned Vercel CLI
         run: npm install --global "vercel@$VERCEL_CLI_VERSION"
+      - name: Validate production migration configuration
+        run: uv run --frozen --project apps/api python scripts/migrate-production.py --check-config
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
       - name: Pull backend production settings
         working-directory: apps/api
         run: vercel pull --yes --environment=production --scope datanerdbytes-4121
@@ -172,7 +176,9 @@ jobs:
           VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       - name: Apply approved production schema migrations
-        run: uv run --project apps/api python scripts/migrate-production.py
+        run: uv run --frozen --project apps/api python scripts/migrate-production.py
+        env:
+          MIGRATION_DATABASE_URL: ${{ secrets.MIGRATION_DATABASE_URL }}
       - name: Check staged apps before promotion
         run: |
           node scripts/deployment-smoke.mjs api "$RUNNER_TEMP/api-deploy.json"

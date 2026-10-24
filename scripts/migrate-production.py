@@ -1,4 +1,4 @@
-"""Apply committed migrations using only the API project's pulled production URL."""
+"""Apply committed migrations using the protected GitHub production secret."""
 
 import os
 import sys
@@ -6,8 +6,33 @@ from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from dotenv import dotenv_values
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.engine import make_url
+
+
+def production_url():
+    value = os.environ.get("MIGRATION_DATABASE_URL")
+    if not value:
+        raise RuntimeError(
+            "Set MIGRATION_DATABASE_URL in GitHub production environment secrets"
+        )
+    try:
+        url = make_url(value)
+    except ArgumentError:
+        raise RuntimeError("MIGRATION_DATABASE_URL must be a PostgreSQL URL") from None
+    # Neon issues standard PostgreSQL URLs; migrations use our pinned psycopg driver.
+    if url.drivername in {"postgres", "postgresql"}:
+        url = url.set(drivername="postgresql+psycopg")
+    if (
+        url.drivername != "postgresql+psycopg"
+        or url.database != "onlineportfoliodb"
+        or not url.host
+        or not url.host.endswith(".neon.tech")
+    ):
+        raise RuntimeError(
+            "Expected the configured production application PostgreSQL database"
+        )
+    return url
 
 
 def main():
@@ -20,17 +45,10 @@ def main():
         )
     root = Path(__file__).resolve().parents[1]
     api = root / "apps" / "api"
-    values = dotenv_values(api / ".vercel" / ".env.production.local")
-    url = make_url(values.get("DATABASE_URL") or "")
-    if (
-        url.drivername != "postgresql+psycopg"
-        or url.database != "onlineportfoliodb"
-        or not url.host
-        or not url.host.endswith(".neon.tech")
-    ):
-        raise RuntimeError(
-            "Expected the configured production application PostgreSQL database"
-        )
+    url = production_url()
+    if sys.argv[1:] == ["--check-config"]:
+        print("Production migration configuration validated.")
+        return
     os.chdir(api)
     config = Config(str(api / "alembic.ini"))
     config.attributes["sqlalchemy.url"] = url
