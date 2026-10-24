@@ -163,6 +163,11 @@ def ground_proposals(payload: object, text: str) -> object:
         for key, value in list(candidate["values"].items()):
             quote = evidence.get(key)
             if key in {"items", "highlights", "technologies"} and isinstance(value, list):
+                limit = {"items": 100, "highlights": 50, "technologies": 20}[key]
+                if len(value) > limit or any(not isinstance(item, str) for item in value):
+                    # Malformed data must reach strict schema validation, not be
+                    # converted into a plausible empty list by source filtering.
+                    continue
                 verified = [
                     (item, source_excerpt(item, text)) for item in value if isinstance(item, str)
                 ]

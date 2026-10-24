@@ -263,3 +263,19 @@ def test_wrapped_url_is_verified_without_following_it():
     )
     result = validate_extraction(payload, TEXT + "\nGitHub: https://github.com/\nexample")
     assert result.candidates[1].evidence["url"] == "https://github.com/\nexample"
+
+
+@pytest.mark.parametrize("items", [[42], ["Data Engineer"] * 101])
+def test_malformed_lists_are_rejected_before_source_filtering(items):
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "skills",
+            "values": {"label": "Data Engineer", "items": items},
+            "evidence": {"label": "Data Engineer", "items": ["Data Engineer"]},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(payload, TEXT)
