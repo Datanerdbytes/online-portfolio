@@ -792,7 +792,9 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
                           Source excerpt for {label(key)}
                         </summary>
                         <blockquote className="whitespace-pre-wrap break-words border-l-2 pl-3">
-                          {c.evidence[key]}
+                          {Array.isArray(c.evidence[key])
+                            ? c.evidence[key].join("\n\n")
+                            : c.evidence[key]}
                         </blockquote>
                       </details>
                     ) : (

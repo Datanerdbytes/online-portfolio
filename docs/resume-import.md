@@ -22,14 +22,16 @@ The picker stays visible while AI import is disabled so the setup state is clear
 The feature is **disabled by default**. Set these only on the FastAPI service:
 
 - `NVIDIA_API_KEY`: server-side Secret, never `NEXT_PUBLIC_` or committed.
-- `NVIDIA_MODEL`: defaults to `meta/llama-3.3-70b-instruct`.
+- `NVIDIA_MODEL`: defaults to `nvidia/nemotron-3.5-super-vl-120b-a12b`.
 - `RESUME_IMPORT_ENABLED`: enable only after the evaluation below passes.
 
 The adapter calls `https://integrate.api.nvidia.com/v1/chat/completions` without
 redirects, tools, automatic retries, or sending existing account data. It requests
-JSON then validates the result and exact source excerpts locally. The hosted
-model is not assumed to support self-hosted NIM structured-generation parameters.
-Each call has a 75-second total deadline and 4096 output tokens; truncated results
+JSON constrained by the import schema, then validates fields and exact source
+excerpts locally, with section-specific field names/types and length limits. Hosted JSON-schema support was verified with synthetic requests,
+rather than assumed from self-hosted NIM documentation. Reasoning is disabled
+for this extraction task.
+Each call has a 75-second total deadline and 8192 output tokens; truncated results
 are rejected rather than partially imported.
 
 From the repository root, load the key securely into the process environment,
@@ -60,7 +62,13 @@ uploaded to a provider file endpoint. Extracted text goes to NVIDIA, whose own
 policies govern its handling. App deletion is not a provider-retention promise.
 No source text, names, contact data, filenames, or proposals are logged. PDF
 extraction uses text order rather than layout padding; Unicode ligatures are
-normalized before mapping. A four-page user-provided PDF was verified locally
+normalized before mapping. Missing citation strings can be recovered only from the actual
+field value appearing in the source; reflowed whitespace is mapped back to the
+exact source span. Lists are grounded item by item; unsupported wording is omitted
+with a review warning. Wrapped URLs are matched without following them. Unverified
+current-role flags are omitted so owners can confirm their dates. Null list/evidence
+values mean absence, never invented facts.
+A four-page user-provided PDF was verified locally
 without sending its contents to NVIDIA; no private fixture is committed.
 
 Uploads are bounded at both proxies before multipart parsing: 3 MiB plus 64 KiB
@@ -97,3 +105,27 @@ node --test apps/web/tests/resume-import.test.mjs
 Full CI also runs lint, types, production build, all existing tests, and disposable
 PostgreSQL migrations. Provider calls are mocked in CI. No live model-quality or
 real-document end-to-end verification is claimed until performed explicitly.
+
+## Model selection verification (2026-10-24)
+
+Selected `nvidia/nemotron-3.5-super-vl-120b-a12b`, in non-reasoning mode with an
+8192-token output ceiling and hosted JSON-schema constraints. The final synthetic
+run passed basic section coverage/evidence (6.7s), ambiguous dates (25.1s), and
+embedded instruction isolation (69.8s). Earlier runs were about 3–4 seconds; hosted
+latency varied substantially but remained inside the 75-second gate. This is a small application-specific gate,
+not a general model benchmark or a latency guarantee.
+
+The originally planned Llama 3.3 model and the older Nemotron Nano ID returned
+HTTP 410. Lightning 3.5 was available and fast, but did not consistently pass
+coverage/evidence checks, so it was not selected. Catalog presence alone did not
+prove model access; inference availability was checked with the configured key.
+
+The NVIDIA key remains only in ignored local configuration. Production key
+provisioning and feature enablement are separate from committing this default.
+
+With the owner's explicit consent, the four-page PDF also completed the real
+browser → authenticated API → NVIDIA → validated review flow: 18 review entries
+(profile, contact, two contact links, four skill groups, six projects, three
+experience entries, and education). The review was left unsaved; neither private
+draft fields nor the published snapshot were changed by that browser test. No
+real resume text, proposals, or provider key is included in the repository.

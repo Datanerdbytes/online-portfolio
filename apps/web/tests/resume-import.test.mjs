@@ -163,3 +163,18 @@ test("context is authenticated and provider errors are sanitized", async () => {
     404
   );
 });
+
+test("candidate validation accepts individually quoted list evidence", () => {
+  const candidate = {
+    section: "skills",
+    values: { label: "Tools", items: ["Python"] },
+    evidence: { label: "Tools", items: ["Python"] },
+    generated: [],
+    warnings: [],
+  };
+  assert.equal(mapping.candidateValid(candidate), true);
+  assert.equal(
+    mapping.candidateValid({ ...candidate, evidence: { items: [42] } }),
+    false
+  );
+});

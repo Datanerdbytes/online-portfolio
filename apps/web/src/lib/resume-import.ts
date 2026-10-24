@@ -12,7 +12,7 @@ export type Entry = { id: number; values: Values };
 export type Candidate = {
   section: Section;
   values: Values;
-  evidence: Record<string, string>;
+  evidence: Record<string, string | string[]>;
   generated: string[];
   warnings: string[];
 };
@@ -206,7 +206,11 @@ export function candidateValid(value: unknown): value is Candidate {
     ) &&
     !!c.evidence &&
     typeof c.evidence === "object" &&
-    Object.values(c.evidence).every((v) => typeof v === "string") &&
+    Object.values(c.evidence).every(
+      (v) =>
+        typeof v === "string" ||
+        (Array.isArray(v) && v.every((x) => typeof x === "string"))
+    ) &&
     Array.isArray(c.generated) &&
     c.generated.every((v) => typeof v === "string") &&
     Array.isArray(c.warnings) &&

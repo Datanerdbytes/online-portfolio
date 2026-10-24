@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     RESUME_IMPORT_ENABLED: bool = False
     RESUME_IMPORT_LOCAL_PREVIEW: bool = False
     NVIDIA_API_KEY: str | None = None
-    NVIDIA_MODEL: str = "meta/llama-3.3-70b-instruct"
+    NVIDIA_MODEL: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
 
     # GitHub README sync
     GITHUB_PAT: str | None = None

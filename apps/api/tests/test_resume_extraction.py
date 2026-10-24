@@ -106,6 +106,9 @@ def test_excerpts_and_generated_fields_are_verified():
     assert validate_extraction(proposal(), TEXT).candidates[0].values["name"] == "Alex Example"
     invented = proposal()
     invented["candidates"][0]["evidence"]["name"] = "Invented Person"
+    corrected = validate_extraction(invented, TEXT)
+    assert corrected.candidates[0].evidence["name"] == "Alex Example"
+    invented["candidates"][0]["values"]["name"] = "Unsupported person"
     with pytest.raises(ImportProblem, match="verified"):
         validate_extraction(invented, TEXT)
     generated = proposal()
@@ -146,6 +149,8 @@ def test_provider_receives_only_source_and_mapping_instructions(monkeypatch):
         body = json.loads(request.content)
         assert body["messages"][1] == {"role": "user", "content": TEXT}
         assert "tools" not in body and body["stream"] is False
+        assert body["response_format"]["type"] == "json_schema"
+        assert body["chat_template_kwargs"]["enable_thinking"] is False
         return httpx.Response(
             200,
             json={
@@ -175,3 +180,86 @@ def test_normalizes_document_ligatures_without_generating_words():
     )
     assert "Snowflake" in text
     assert "Alex Example" in text
+
+
+def test_absent_evidence_null_is_not_accepted_as_proof():
+    payload = proposal()
+    payload["candidates"][0]["values"]["location"] = None
+    payload["candidates"][0]["evidence"]["location"] = None
+    assert "location" not in validate_extraction(payload, TEXT).candidates[0].evidence
+    payload["candidates"][0]["evidence"]["name"] = None
+    payload["candidates"][0]["values"]["name"] = "Unsupported person"
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(payload, TEXT)
+
+
+def test_missing_list_null_is_absence_not_a_factual_value():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "experience",
+            "values": {"role": "Data Engineer", "highlights": None},
+            "evidence": {"role": "Data Engineer", "highlights": None},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, TEXT)
+    assert "highlights" not in result.candidates[1].values
+
+
+def test_missing_scalar_citation_requires_the_value_to_exist_in_source():
+    payload = proposal()
+    payload["candidates"][0]["evidence"] = {}
+    assert validate_extraction(payload, TEXT).candidates[0].evidence["name"] == "Alex Example"
+    payload["candidates"][0]["values"]["name"] = "Invented Name"
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(payload, TEXT)
+
+
+def test_reflowed_quote_is_replaced_with_actual_source_span():
+    payload = proposal()
+    payload["candidates"][0]["evidence"]["name"] = "Alex Example"
+    result = validate_extraction(payload, "Alex\nExample: Data Engineer")
+    assert result.candidates[0].evidence["name"] == "Alex\nExample"
+
+
+def test_empty_suggestion_is_omitted_instead_of_inventing_content():
+    payload = proposal()
+    payload["candidates"][0]["values"]["headline"] = None
+    payload["candidates"][0]["generated"] = ["headline"]
+    candidate = validate_extraction(payload, TEXT).candidates[0]
+    assert "headline" not in candidate.values
+    assert candidate.generated == []
+
+
+def test_list_items_are_grounded_individually_and_unverified_items_omitted():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "skills",
+            "values": {"label": "Data Engineer", "items": ["Data Engineer", "Unsupported tool"]},
+            "evidence": {"label": "Data Engineer", "items": "invented joined quote"},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    candidate = validate_extraction(payload, TEXT).candidates[1]
+    assert candidate.values["items"] == ["Data Engineer"]
+    assert candidate.evidence["items"] == ["Data Engineer"]
+    assert candidate.warnings
+
+
+def test_wrapped_url_is_verified_without_following_it():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "links",
+            "values": {"label": "GitHub", "url": "https://github.com/example"},
+            "evidence": {"label": "GitHub", "url": "https://github.com/example"},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, TEXT + "\nGitHub: https://github.com/\nexample")
+    assert result.candidates[1].evidence["url"] == "https://github.com/\nexample"

@@ -1,6 +1,6 @@
 """Strict, bounded import proposals; the provider never chooses database IDs."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -83,9 +83,43 @@ REQUIRED = {
 class Candidate(StrictModel):
     section: Section
     values: dict[str, Any]
-    evidence: dict[str, str]
-    generated: list[str] = Field(default_factory=list, max_length=2)
+    evidence: dict[
+        str,
+        Annotated[str, Field(max_length=1000)]
+        | Annotated[list[Annotated[str, Field(max_length=1000)]], Field(max_length=100)],
+    ]
+    generated: list[Literal["headline", "introduction"]] = Field(default_factory=list, max_length=2)
     warnings: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="before")
+    @classmethod
+    def omit_absent_evidence(cls, data):
+        # Providers often emit null for missing fields. Null is absence, never
+        # evidence: remove it, then require a real quote for every extracted value.
+        if not isinstance(data, dict):
+            return data
+        normalized = dict(data)
+        if isinstance(data.get("evidence"), dict):
+            normalized["evidence"] = {
+                k: v for k, v in data["evidence"].items() if v is not None and v != "" and v != []
+            }
+        if isinstance(data.get("values"), dict):
+            normalized["values"] = {
+                k: v
+                for k, v in data["values"].items()
+                if not (v is None and k in {"items", "highlights", "technologies"})
+            }
+        if isinstance(data.get("generated"), list) and isinstance(data.get("values"), dict):
+            normalized["generated"] = [
+                key
+                for key in data["generated"]
+                if not (
+                    isinstance(key, str)
+                    and key in {"headline", "introduction"}
+                    and not data["values"].get(key)
+                )
+            ]
+        return normalized
 
     @model_validator(mode="after")
     def validate_values(self):
