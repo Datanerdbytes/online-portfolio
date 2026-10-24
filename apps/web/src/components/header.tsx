@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   BriefcaseBusiness,
   ChartNoAxesCombined,
@@ -14,9 +15,96 @@ import {
   UserRound,
   X,
 } from "lucide-react";
+import {
+  faDiscord,
+  faGithub,
+  faSlack,
+} from "@fortawesome/free-brands-svg-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { profileImageUrl } from "@/lib/avatar";
+
+type SocialBrand = "github" | "tableau" | "slack" | "discord";
+
+const BRAND_ICONS = {
+  github: faGithub,
+  slack: faSlack,
+  discord: faDiscord,
+} as const;
+
+const SOCIAL_PLACEHOLDERS: { label: string; brand: SocialBrand }[] = [
+  { label: "Slack", brand: "slack" },
+  { label: "Discord", brand: "discord" },
+];
+
+function identifySocialBrand(label: string, url: string): SocialBrand | null {
+  const normalizedLabel = label.toLowerCase();
+  let hostname = "";
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    // Unknown or malformed destinations retain their text label.
+  }
+
+  if (
+    normalizedLabel.includes("github") ||
+    hostname === "github.com" ||
+    hostname.endsWith(".github.com")
+  )
+    return "github";
+  if (
+    normalizedLabel.includes("tableau") ||
+    hostname === "tableau.com" ||
+    hostname.endsWith(".tableau.com")
+  )
+    return "tableau";
+  if (
+    normalizedLabel.includes("slack") ||
+    hostname === "slack.com" ||
+    hostname.endsWith(".slack.com")
+  )
+    return "slack";
+  if (
+    normalizedLabel.includes("discord") ||
+    hostname === "discord.com" ||
+    hostname.endsWith(".discord.com") ||
+    hostname === "discord.gg" ||
+    hostname.endsWith(".discord.gg")
+  )
+    return "discord";
+  return null;
+}
+
+function SocialMark({ brand }: { brand: SocialBrand }) {
+  if (brand === "tableau") {
+    return (
+      <Image
+        className="sidebar-social-tableau"
+        src="/brands/tableau.png"
+        alt=""
+        width={24}
+        height={24}
+        aria-hidden="true"
+      />
+    );
+  }
+
+  const icon = BRAND_ICONS[brand];
+  const [width, height, , , pathData] = icon.icon;
+  const paths = Array.isArray(pathData) ? pathData : [pathData];
+  return (
+    <svg
+      className="sidebar-social-mark"
+      viewBox={`0 0 ${width} ${height}`}
+      aria-hidden="true"
+      focusable="false"
+    >
+      {paths.map((path, index) => (
+        <path d={path} key={index} />
+      ))}
+    </svg>
+  );
+}
 
 const navigation = [
   { id: "about", label: "About me", icon: UserRound, href: "/#about" },
@@ -67,6 +155,19 @@ export function Header({
   const menuButton = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const avatarSrc = profileImageUrl(avatarUrl, avatarUpdatedAt);
+  const configuredSocials = links.map((link) => ({
+    ...link,
+    brand: identifySocialBrand(link.label, link.url),
+  }));
+  const configuredBrands = new Set(
+    configuredSocials.flatMap((link) => (link.brand ? [link.brand] : []))
+  );
+  const socialItems = [
+    ...configuredSocials,
+    ...SOCIAL_PLACEHOLDERS.filter(
+      ({ brand }) => !configuredBrands.has(brand)
+    ).map((link) => ({ ...link, url: null })),
+  ];
 
   useEffect(() => {
     function escape(event: KeyboardEvent) {
@@ -138,17 +239,36 @@ export function Header({
           </div>
           <p className="sidebar-headline">{headline}</p>
           {isSample && <p className="sidebar-sample">Placeholder profile</p>}
-          <div className="sidebar-socials">
-            {links.map((link) => (
-              <a
-                key={link.url}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {link.label}
-              </a>
-            ))}
+          <div className="sidebar-socials" aria-label="Social profiles">
+            {socialItems.map((link) =>
+              link.url ? (
+                <a
+                  key={link.url}
+                  className="sidebar-social-link"
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={link.label}
+                  title={link.label}
+                >
+                  {link.brand ? (
+                    <SocialMark brand={link.brand} />
+                  ) : (
+                    <span>{link.label}</span>
+                  )}
+                </a>
+              ) : (
+                <span
+                  key={link.label}
+                  className="sidebar-social-link is-placeholder"
+                  role="img"
+                  aria-label={`${link.label} link not configured`}
+                  title={`${link.label} link not configured`}
+                >
+                  {link.brand && <SocialMark brand={link.brand} />}
+                </span>
+              )
+            )}
           </div>
         </div>
         <nav aria-label="Main" className="sidebar-nav">
