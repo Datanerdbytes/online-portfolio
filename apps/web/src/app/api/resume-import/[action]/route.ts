@@ -97,6 +97,7 @@ async function proxy(request: Request, action: string) {
           "The AI draft was too large. Your text is unchanged.",
           "The AI draft was incomplete. Your text is unchanged.",
           "The AI draft did not fit this field. Your text is unchanged.",
+          "The AI draft included other sections. Retry for only the requested field.",
           "The AI draft added an unsupported number. Retry or write manually.",
           "AI writing could not finish. Your text is unchanged; retry later.",
         ]);

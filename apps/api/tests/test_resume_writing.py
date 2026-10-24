@@ -13,17 +13,23 @@ from app.services.resume_extraction import ImportProblem
 
 def request(**changes):
     return WritingRequest(
-        consent=True,
-        expected_owner_id="owner",
-        section="profile",
-        field="headline",
-        facts="Data engineering candidate. Builds Python pipelines.",
-        **changes,
+        **{
+            "consent": True,
+            "expected_owner_id": "owner",
+            "section": "profile",
+            "field": "headline",
+            "facts": "Data engineering candidate. Builds Python pipelines.",
+            **changes,
+        }
     )
 
 
 def mock_provider(
-    monkeypatch, text="Data engineering candidate | Python pipelines", status=200, finish="stop"
+    monkeypatch,
+    text="Data engineering candidate | Python pipelines",
+    status=200,
+    finish="stop",
+    limit=300,
 ):
     original = httpx.AsyncClient
 
@@ -32,7 +38,7 @@ def mock_provider(
         assert payload["chat_template_kwargs"]["enable_thinking"] is False
         assert (
             payload["response_format"]["json_schema"]["schema"]["properties"]["text"]["maxLength"]
-            == 300
+            == limit
         )
         assert "tools" not in payload
         assert "expected_owner_id" not in payload["messages"][1]["content"]
@@ -56,6 +62,26 @@ def test_writing_returns_separate_plain_text_draft(monkeypatch):
     mock_provider(monkeypatch)
     result = writing.write_field(request())
     assert "candidate" in result.text
+
+
+def test_introduction_accepts_only_requested_prose(monkeypatch):
+    text = "I build Python pipelines and validate transformed data with SQL tests."
+    mock_provider(monkeypatch, text=text, limit=2000)
+    assert writing.write_field(request(field="introduction")).text == text
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "HEADLINE: Data candidate. INTRODUCTION: I build pipelines. "
+        "ABOUT: My background is support.",
+        "I build pipelines.\n\n**About:** My background is support.",
+    ],
+)
+def test_introduction_rejects_multiple_profile_sections(monkeypatch, text):
+    mock_provider(monkeypatch, text=text, limit=2000)
+    with pytest.raises(ImportProblem, match="requested field"):
+        writing.write_field(request(field="introduction"))
 
 
 @pytest.mark.parametrize("field", ["name", "email", "started", "role", "institution"])

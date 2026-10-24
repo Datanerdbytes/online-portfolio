@@ -34,34 +34,32 @@ def write_field(body: WritingRequest) -> WritingResult:
 
     if body.section == "profile":
         prompt += (
-            " The profile has three complementary fields with different purposes: "
-            "HEADLINE identifies professional direction at a glance; INTRODUCTION gives a "
-            "visitor a quick overview of current focus and capabilities; ABOUT explains "
-            "background and approach in more depth. Do not produce the same resume summary "
-            "for all three. Select facts that serve the requested field instead of copying "
-            "the source summary or listing every tool. "
+            " This request is for exactly ONE field. Do not write any other profile fields, "
+            "section headings, field labels, or prefixes. The JSON text value must contain "
+            "only the requested field's prose. Select facts that serve this field instead of "
+            "copying the source summary or listing every tool. "
             " For profile text, avoid dates, numerical claims, and aggregate years of experience. "
             "Describe portfolio projects as technical work, never as real company revenue "
             "or business results personally generated. Preserve career-transition qualifiers."
         )
         prompt += {
             "headline": (
-                " HEADLINE: Write a single short role/focus label of about 6–12 words, "
+                " Write a single short role/focus label of about 6–12 words, "
                 "at most 18 words. Use a compact phrase, not a biography or full paragraph. "
                 "Prioritize the target discipline and one distinguishing focus. No first "
                 "person, degree history, career-transition explanation, or tool inventory. "
                 "Keep candidate/aspiring status when needed to avoid implying an established role."
             ),
             "introduction": (
-                " INTRODUCTION: Write one short paragraph of about 35–60 words, normally "
+                " Write one short paragraph of about 35–60 words, normally "
                 "two sentences, in first person. Lead with present focus and explain what "
                 "the person builds or contributes, using one or two supported capabilities. "
-                "Keep education history, career-transition story, detailed project walkthroughs, "
-                "and long technology lists for About. Do not open with a degree or repeat a "
+                "Omit education history, career-transition stories, detailed project walkthroughs, "
+                "and long technology lists. Do not open with a degree or repeat a "
                 "headline-style label. Preserve experience level through accurate wording."
             ),
             "about": (
-                " ABOUT: Write two short paragraphs of about 80–140 words in total, in "
+                " Write two short paragraphs of about 80–140 words in total, in "
                 "first person. Explain relevant background or career transition, then show "
                 "the person's working approach through a concrete, supported project or "
                 "process detail. Connect background to current direction instead of repeating "
@@ -89,6 +87,7 @@ def write_field(body: WritingRequest) -> WritingResult:
                                 "role": "user",
                                 "content": json.dumps(
                                     {
+                                        "field": body.field,
                                         "facts": body.facts,
                                         "current_text": body.current_text,
                                         "guidance": body.guidance,
@@ -140,6 +139,15 @@ def write_field(body: WritingRequest) -> WritingResult:
                     if not result.text or len(result.text) > limit:
                         raise ImportProblem(
                             "The AI draft did not fit this field. Your text is unchanged."
+                        )
+                    if body.section == "profile" and re.search(
+                        r"\b(?:headline|introduction|about)\s*(?:\*\*)?\s*:",
+                        result.text,
+                        flags=re.IGNORECASE,
+                    ):
+                        raise ImportProblem(
+                            "The AI draft included other sections. "
+                            "Retry for only the requested field."
                         )
                     numbers = set(re.findall(r"\d+(?:[.,]\d+)*%?", result.text))
                     source_numbers = set(
