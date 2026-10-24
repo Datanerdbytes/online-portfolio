@@ -1,5 +1,6 @@
 "use client";
 
+import { useImportNavigationGuard } from "@/lib/use-import-navigation-guard";
 import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -1343,6 +1344,9 @@ export function ResumeManager({
     } as ApiResume,
   });
 
+  const editorContainer = useRef<HTMLDivElement>(null);
+  useImportNavigationGuard(editorContainer, resume.dataUpdatedAt, tab);
+
   const tabs: { id: Tab; label: string }[] = [
     { id: "profile", label: "Profile" },
     { id: "skills", label: "Skills" },
@@ -1352,7 +1356,7 @@ export function ResumeManager({
   ];
 
   return (
-    <div className="space-y-6">
+    <div ref={editorContainer} className="space-y-6">
       <nav className="flex flex-wrap gap-2" aria-label="Resume sections">
         {tabs.map((t) => (
           <Button

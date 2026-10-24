@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     OWNER_USERNAME: str | None = None
     OWNER_PASSWORD_HASH: str | None = None
 
+    # Resume import remains off until the hosted model passes evaluation.
+    RESUME_IMPORT_ENABLED: bool = False
+    RESUME_IMPORT_LOCAL_PREVIEW: bool = False
+    NVIDIA_API_KEY: str | None = None
+    NVIDIA_MODEL: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+
     # GitHub README sync
     GITHUB_PAT: str | None = None
     GITHUB_USERNAME: str | None = None

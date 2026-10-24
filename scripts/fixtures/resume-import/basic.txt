@@ -1,0 +1,18 @@
+Alex Example
+Data Engineer
+Builds reliable data pipelines with Python and SQL.
+Location: Example City
+Email: alex@example.invalid
+Skills: Python, SQL
+Experience
+Data Engineer, Example Company
+2022-01 to Present
+Builds batch data pipelines.
+Education
+BSc Computer Science, Example University
+2018-09 to 2021-06
+Projects
+Sales Pipeline: A batch pipeline that validates sales records.
+Technologies: Python, SQL
+GitHub: https://github.com/example/sales-pipeline
+Certifications: Example Training Certificate

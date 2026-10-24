@@ -311,3 +311,6 @@ copies, including media references, before drafts become private. Back up local
 data before `uv run alembic upgrade head` from `apps/api`. Production migrations
 and releases run through `.github/workflows/ci.yml`; never deploy local files or
 run production migrations manually. See [the flow plan](docs/plans/portfolio-publishing-flow.md).
+
+Resume upload and mapping: see [Resume import](docs/resume-import.md) for the
+private review flow, NVIDIA configuration, limits, and model evaluation gate.
