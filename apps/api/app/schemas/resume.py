@@ -3,8 +3,37 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+MAX_DISPLAY_ORDER = 2_147_483_647
+MAX_SKILL_GROUPS = 30
+MAX_SKILL_ITEMS_PER_GROUP = 30
+MAX_EXPERIENCE_ENTRIES = 50
+MAX_HIGHLIGHTS_PER_EXPERIENCE = 20
+MAX_EDUCATION_ENTRIES = 50
+MAX_CONTACT_LINKS = 30
+
+DisplayOrder = Annotated[int, Field(ge=0, le=MAX_DISPLAY_ORDER)]
+ProfileName = Annotated[str, Field(max_length=200)]
+Headline = Annotated[str, Field(max_length=300)]
+ProfileText = Annotated[str, Field(max_length=6000)]
+Location = Annotated[str, Field(max_length=200)]
+SkillText = Annotated[str, Field(min_length=1, max_length=200)]
+EntrySlug = Annotated[
+    str,
+    Field(min_length=1, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$"),
+]
+EntryTitle = Annotated[str, Field(min_length=1, max_length=200)]
+EducationTitle = Annotated[str, Field(min_length=1, max_length=300)]
+DateText = Annotated[str, Field(max_length=20)]
+Description = Annotated[str, Field(max_length=4000)]
+HighlightText = Annotated[str, Field(min_length=1, max_length=500)]
+ContactEmail = Annotated[str, Field(max_length=200)]
+ContactPhone = Annotated[str, Field(max_length=50)]
+LinkLabel = Annotated[str, Field(min_length=1, max_length=100)]
+LinkUrl = Annotated[str, Field(min_length=1, max_length=1024)]
 
 # ---------------------------------------------------------------------------
 # Profile
@@ -33,11 +62,11 @@ class ProfileResponse(ProfileBase):
 
 
 class ProfilePatch(BaseModel):
-    name: str | None = None
-    headline: str | None = None
-    introduction: str | None = None
-    about: str | None = None
-    location: str | None = None
+    name: ProfileName | None = None
+    headline: Headline | None = None
+    introduction: ProfileText | None = None
+    about: ProfileText | None = None
+    location: Location | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -61,24 +90,24 @@ class SkillGroupResponse(BaseModel):
 
 
 class SkillGroupCreate(BaseModel):
-    label: str
-    display_order: int = 0
-    items: list[str] = []
+    label: Annotated[str, Field(min_length=1, max_length=200)]
+    display_order: DisplayOrder = 0
+    items: list[SkillText] = Field(default_factory=list, max_length=MAX_SKILL_ITEMS_PER_GROUP)
 
 
 class SkillGroupPatch(BaseModel):
-    label: str | None = None
-    display_order: int | None = None
+    label: Annotated[str, Field(min_length=1, max_length=200)] | None = None
+    display_order: DisplayOrder | None = None
 
 
 class SkillItemCreate(BaseModel):
-    item: str
-    display_order: int = 0
+    item: SkillText
+    display_order: DisplayOrder = 0
 
 
 class SkillItemPatch(BaseModel):
-    item: str | None = None
-    display_order: int | None = None
+    item: SkillText | None = None
+    display_order: DisplayOrder | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -108,35 +137,37 @@ class ExperienceResponse(BaseModel):
 
 
 class ExperienceCreate(BaseModel):
-    slug: str
-    role: str
-    organization: str
-    started: str
-    ended: str | None = None
+    slug: EntrySlug
+    role: EntryTitle
+    organization: EntryTitle
+    started: DateText
+    ended: DateText | None = None
     current: bool = False
-    description: str = ""
-    display_order: int = 0
-    highlights: list[str] = []
+    description: Description = ""
+    display_order: DisplayOrder = 0
+    highlights: list[HighlightText] = Field(
+        default_factory=list, max_length=MAX_HIGHLIGHTS_PER_EXPERIENCE
+    )
 
 
 class ExperiencePatch(BaseModel):
-    role: str | None = None
-    organization: str | None = None
-    started: str | None = None
-    ended: str | None = None
+    role: EntryTitle | None = None
+    organization: EntryTitle | None = None
+    started: DateText | None = None
+    ended: DateText | None = None
     current: bool | None = None
-    description: str | None = None
-    display_order: int | None = None
+    description: Description | None = None
+    display_order: DisplayOrder | None = None
 
 
 class HighlightCreate(BaseModel):
-    text: str
-    display_order: int = 0
+    text: HighlightText
+    display_order: DisplayOrder = 0
 
 
 class HighlightPatch(BaseModel):
-    text: str | None = None
-    display_order: int | None = None
+    text: HighlightText | None = None
+    display_order: DisplayOrder | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,20 +187,20 @@ class EducationResponse(BaseModel):
 
 
 class EducationCreate(BaseModel):
-    slug: str
-    qualification: str
-    institution: str
-    started: str | None = None
-    ended: str | None = None
-    display_order: int = 0
+    slug: EntrySlug
+    qualification: EducationTitle
+    institution: EducationTitle
+    started: DateText | None = None
+    ended: DateText | None = None
+    display_order: DisplayOrder = 0
 
 
 class EducationPatch(BaseModel):
-    qualification: str | None = None
-    institution: str | None = None
-    started: str | None = None
-    ended: str | None = None
-    display_order: int | None = None
+    qualification: EducationTitle | None = None
+    institution: EducationTitle | None = None
+    started: DateText | None = None
+    ended: DateText | None = None
+    display_order: DisplayOrder | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -194,20 +225,20 @@ class ContactResponse(BaseModel):
 
 
 class ContactPatch(BaseModel):
-    phone: str | None = None
-    email: str | None = None
+    phone: ContactPhone | None = None
+    email: ContactEmail | None = None
 
 
 class ContactLinkCreate(BaseModel):
-    label: str
-    url: str
-    display_order: int = 0
+    label: LinkLabel
+    url: LinkUrl
+    display_order: DisplayOrder = 0
 
 
 class ContactLinkPatch(BaseModel):
-    label: str | None = None
-    url: str | None = None
-    display_order: int | None = None
+    label: LinkLabel | None = None
+    url: LinkUrl | None = None
+    display_order: DisplayOrder | None = None
 
 
 # ---------------------------------------------------------------------------

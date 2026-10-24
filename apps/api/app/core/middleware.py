@@ -40,25 +40,29 @@ class RequestBodyLimitMiddleware:
         app,
         *,
         max_bytes: int,
-        method: str,
+        method: str | tuple[str, ...],
         path: str | None = None,
         path_pattern: Pattern[str] | None = None,
+        content_type: str | None = None,
         too_large_detail: str = "Avatar too large",
     ) -> None:
         if (path is None) == (path_pattern is None):
             raise ValueError("Configure exactly one of path or path_pattern")
         self.app = app
         self.max_bytes = max_bytes
-        self.method = method.upper()
+        methods = (method,) if isinstance(method, str) else method
+        self.methods = frozenset(item.upper() for item in methods)
         self.path = path
         self.path_pattern = path_pattern
+        self.content_type = content_type.lower() if content_type else None
         self.too_large_detail = too_large_detail
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if (
             scope["type"] != "http"
-            or scope.get("method") != self.method
+            or scope.get("method") not in self.methods
             or not self._matches_path(scope.get("path", ""))
+            or not self._matches_content_type(scope.get("headers", []))
         ):
             await self.app(scope, receive, send)
             return
@@ -114,6 +118,14 @@ class RequestBodyLimitMiddleware:
         if self.path is not None:
             return path == self.path
         return bool(self.path_pattern and self.path_pattern.fullmatch(path))
+
+    def _matches_content_type(self, headers: list[tuple[bytes, bytes]]) -> bool:
+        if self.content_type is None:
+            return True
+        for key, value in headers:
+            if key.lower() == b"content-type":
+                return value.decode("latin-1").split(";", 1)[0].strip().lower() == self.content_type
+        return False
 
     async def _reject(self, send: Send) -> None:
         body = _json_body({"detail": self.too_large_detail})

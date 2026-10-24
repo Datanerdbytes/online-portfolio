@@ -25,6 +25,15 @@ from app.models.resume import (
     SkillItem,
 )
 from app.models.resume_import import ImportAttempt, ImportReceipt
+from app.schemas.project import MAX_PROJECTS_PER_PORTFOLIO
+from app.schemas.resume import (
+    MAX_CONTACT_LINKS,
+    MAX_EDUCATION_ENTRIES,
+    MAX_EXPERIENCE_ENTRIES,
+    MAX_HIGHLIGHTS_PER_EXPERIENCE,
+    MAX_SKILL_GROUPS,
+    MAX_SKILL_ITEMS_PER_GROUP,
+)
 from app.schemas.resume_import import REQUIRED, ApplyImport
 
 MODELS: dict[str, Any] = {
@@ -35,6 +44,14 @@ MODELS: dict[str, Any] = {
     "education": Education,
     "projects": Project,
     "links": ContactLink,
+}
+
+MAX_RECORDS_BY_SECTION = {
+    "skills": MAX_SKILL_GROUPS,
+    "experience": MAX_EXPERIENCE_ENTRIES,
+    "education": MAX_EDUCATION_ENTRIES,
+    "projects": MAX_PROJECTS_PER_PORTFOLIO,
+    "links": MAX_CONTACT_LINKS,
 }
 
 
@@ -208,6 +225,16 @@ def apply_import(db: Session, owner: str, body: ApplyImport):
         )
         nested = values.pop(nested_key, []) if nested_key else []
         if row is None:
+            section_limit = MAX_RECORDS_BY_SECTION.get(section)
+            if section_limit is not None:
+                current_count = db.scalar(
+                    select(func.count()).select_from(model).where(model.user_id == owner)
+                )
+                if (current_count or 0) >= section_limit:
+                    raise HTTPException(
+                        409,
+                        f"This portfolio has reached its {section} entry limit ({section_limit}).",
+                    )
             defaults: dict[str, Any] = {"user_id": owner}
             if section in {"experience", "education", "projects"}:
                 defaults["slug"] = "import-" + uuid4().hex
@@ -258,6 +285,15 @@ def apply_import(db: Session, owner: str, body: ApplyImport):
                 )
             )
             known = {getattr(c, text_key).casefold() for c in children}
+            child_limit = (
+                MAX_SKILL_ITEMS_PER_GROUP if section == "skills" else MAX_HIGHLIGHTS_PER_EXPERIENCE
+            )
+            additions = {value.casefold() for value in nested} - known
+            if len(children) + len(additions) > child_limit:
+                raise HTTPException(
+                    409,
+                    f"This entry can contain at most {child_limit} {nested_key}.",
+                )
             order = max((c.display_order for c in children), default=-1) + 1
             for value in nested:
                 if value.casefold() not in known:

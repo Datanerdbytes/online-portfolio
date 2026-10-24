@@ -1,6 +1,9 @@
 """GitHub README proxy routes."""
 
 import re
+import time
+from collections import OrderedDict
+from threading import Lock
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -17,7 +20,35 @@ router = APIRouter()
 
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_TIMEOUT_SECONDS = 5.0
+MAX_README_HTML_BYTES = 1024 * 1024
+README_CACHE_SECONDS = 300
+README_CACHE_ENTRIES = 128
+README_CACHE_CONTROL = "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
 _REPOSITORY_PART_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+$")
+_readme_cache: OrderedDict[str, tuple[float, str]] = OrderedDict()
+_readme_cache_lock = Lock()
+
+
+def _cached_readme(key: str) -> str | None:
+    now = time.monotonic()
+    with _readme_cache_lock:
+        cached = _readme_cache.get(key)
+        if cached is None:
+            return None
+        expires_at, html = cached
+        if expires_at <= now:
+            del _readme_cache[key]
+            return None
+        _readme_cache.move_to_end(key)
+        return html
+
+
+def _store_readme(key: str, html: str) -> None:
+    with _readme_cache_lock:
+        _readme_cache[key] = (time.monotonic() + README_CACHE_SECONDS, html)
+        _readme_cache.move_to_end(key)
+        while len(_readme_cache) > README_CACHE_ENTRIES:
+            _readme_cache.popitem(last=False)
 
 
 def _github_repository_name(repository_url: str | None, github_username: str) -> str | None:
@@ -49,7 +80,7 @@ def _github_repository_name(repository_url: str | None, github_username: str) ->
     response_class=HTMLResponse,
     summary="Get a project's rendered GitHub README",
 )
-async def get_github_readme(
+def get_github_readme(
     project_slug: str,
     db: Session = Depends(get_db),  # noqa: B008  # FastAPI idiom
 ):
@@ -83,6 +114,14 @@ async def get_github_readme(
         )
 
     repository_url = f"{GITHUB_API_URL}/repos/{github_username}/{repository_name}"
+    cache_key = f"{github_username.casefold()}/{repository_name.casefold()}"
+    cached_html = _cached_readme(cache_key)
+    if cached_html is not None:
+        return HTMLResponse(
+            content=cached_html,
+            status_code=200,
+            headers={"Cache-Control": README_CACHE_CONTROL},
+        )
     headers = {
         "Accept": "application/vnd.github+json",
         "Authorization": f"Bearer {github_pat}",
@@ -90,8 +129,8 @@ async def get_github_readme(
     }
 
     try:
-        async with httpx.AsyncClient(timeout=GITHUB_TIMEOUT_SECONDS) as client:
-            repository_response = await client.get(repository_url, headers=headers)
+        with httpx.Client(timeout=GITHUB_TIMEOUT_SECONDS, follow_redirects=False) as client:
+            repository_response = client.get(repository_url, headers=headers)
             if repository_response.status_code == 404:
                 raise HTTPException(
                     status_code=404,
@@ -110,20 +149,29 @@ async def get_github_readme(
                     detail="README is not available for this project.",
                 )
 
-            readme_response = await client.get(
+            with client.stream(
+                "GET",
                 f"{repository_url}/readme",
-                headers={
-                    **headers,
-                    "Accept": "application/vnd.github.html+json",
-                },
-            )
-            if readme_response.status_code == 404:
-                raise HTTPException(status_code=404, detail="README not found for this project.")
-            if readme_response.status_code != 200:
-                raise HTTPException(
-                    status_code=502,
-                    detail="GitHub README could not be retrieved.",
-                )
+                headers={**headers, "Accept": "application/vnd.github.html+json"},
+            ) as readme_response:
+                if readme_response.status_code == 404:
+                    raise HTTPException(
+                        status_code=404, detail="README not found for this project."
+                    )
+                if readme_response.status_code != 200:
+                    raise HTTPException(
+                        status_code=502,
+                        detail="GitHub README could not be retrieved.",
+                    )
+                content = bytearray()
+                for chunk in readme_response.iter_bytes():
+                    content.extend(chunk)
+                    if len(content) > MAX_README_HTML_BYTES:
+                        raise HTTPException(
+                            status_code=502,
+                            detail="GitHub README exceeds the supported size.",
+                        )
+                html = bytes(content).decode("utf-8")
     except httpx.TimeoutException:
         raise HTTPException(
             status_code=503, detail="GitHub documentation service timed out."
@@ -138,4 +186,9 @@ async def get_github_readme(
             status_code=502, detail="GitHub returned an invalid repository response."
         ) from None
 
-    return HTMLResponse(content=readme_response.text, status_code=200)
+    _store_readme(cache_key, html)
+    return HTMLResponse(
+        content=html,
+        status_code=200,
+        headers={"Cache-Control": README_CACHE_CONTROL},
+    )

@@ -32,6 +32,17 @@ app.include_router(project_screenshot.router, prefix="/api/v1")
 app.include_router(resume.router, prefix="/api/v1")
 app.include_router(github.router, prefix="/api/v1")
 
+# Bound JSON parsing across create/update routes before Starlette/FastAPI reads
+# the complete body. Multipart uploads have their own, larger route-specific caps.
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_bytes=512 * 1024,
+    method=("POST", "PUT", "PATCH"),
+    path_pattern=re.compile(r"/api/v1/.*"),
+    content_type="application/json",
+    too_large_detail="Request body too large.",
+)
+
 app.add_middleware(
     RequestBodyLimitMiddleware,
     max_bytes=3 * 1024 * 1024 + MULTIPART_OVERHEAD_BYTES,

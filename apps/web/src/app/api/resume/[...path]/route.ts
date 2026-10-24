@@ -7,7 +7,12 @@
  */
 
 import { type NextRequest, NextResponse } from "next/server";
-import { validateMutation, readAdminToken } from "@/lib/auth";
+import {
+  boundedRequestText,
+  RequestBodyTooLarge,
+  validateMutation,
+  readAdminToken,
+} from "@/lib/auth";
 import { API_BASE_URL } from "@/lib/api";
 
 const UPSTREAM_TIMEOUT_MS = 10000;
@@ -43,7 +48,7 @@ async function proxy(
     const body =
       req.method === "GET" || req.method === "HEAD" || req.method === "DELETE"
         ? undefined
-        : await req.text();
+        : await boundedRequestText(req, 512 * 1024);
     const upstream = await fetch(`${API_BASE_URL}${upstreamPath}`, {
       method: req.method,
       headers: {
@@ -64,7 +69,13 @@ async function proxy(
         "Cache-Control": "no-store",
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestBodyTooLarge) {
+      return NextResponse.json(
+        { detail: "Request body too large." },
+        { status: 413, headers: { "Cache-Control": "no-store" } }
+      );
+    }
     return NextResponse.json(
       { detail: "Resume service unavailable" },
       { status: 502, headers: { "Cache-Control": "no-store" } }

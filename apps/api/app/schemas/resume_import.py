@@ -15,8 +15,8 @@ class StrictModel(BaseModel):
 class ProfileValues(StrictModel):
     name: str | None = Field(None, max_length=200)
     headline: str | None = Field(None, max_length=300)
-    introduction: str | None = Field(None, max_length=10000)
-    about: str | None = Field(None, max_length=10000)
+    introduction: str | None = Field(None, max_length=6000)
+    about: str | None = Field(None, max_length=6000)
     location: str | None = Field(None, max_length=200)
 
 
@@ -27,7 +27,9 @@ class ContactValues(StrictModel):
 
 class SkillValues(StrictModel):
     label: str | None = Field(None, max_length=200)
-    items: list[str] = Field(default_factory=list, max_length=100)
+    items: list[Annotated[str, Field(min_length=1, max_length=200)]] = Field(
+        default_factory=list, max_length=50
+    )
 
 
 class ExperienceValues(StrictModel):
@@ -36,8 +38,10 @@ class ExperienceValues(StrictModel):
     started: str | None = Field(None, max_length=20)
     ended: str | None = Field(None, max_length=20)
     current: bool | None = None
-    description: str | None = Field(None, max_length=10000)
-    highlights: list[str] = Field(default_factory=list, max_length=50)
+    description: str | None = Field(None, max_length=4000)
+    highlights: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(
+        default_factory=list, max_length=50
+    )
 
 
 class EducationValues(StrictModel):
@@ -50,7 +54,9 @@ class EducationValues(StrictModel):
 class ProjectValues(StrictModel):
     title: str | None = Field(None, max_length=200)
     summary: str | None = Field(None, max_length=1000)
-    technologies: list[str] = Field(default_factory=list, max_length=20)
+    technologies: list[Annotated[str, Field(min_length=1, max_length=50)]] = Field(
+        default_factory=list, max_length=20
+    )
     repository_url: str | None = Field(None, max_length=1024)
     demo_url: str | None = Field(None, max_length=1024)
 

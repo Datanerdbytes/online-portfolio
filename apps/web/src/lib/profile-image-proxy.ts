@@ -132,16 +132,31 @@ export function createProfileImageHandlers(
         if (contentType) headers.set("content-type", contentType);
 
         const contentLength = req.headers.get("content-length");
-        if (contentLength) {
-          const length = Number(contentLength);
-          if (!Number.isNaN(length) && length > AVATAR_UPLOAD_MAX_BYTES) {
+        if (contentLength !== null) {
+          if (!/^\d+$/.test(contentLength)) {
+            return NextResponse.json(
+              { detail: "Invalid request" },
+              { status: 400, headers: { "Cache-Control": "no-store" } }
+            );
+          }
+          if (Number(contentLength) > AVATAR_UPLOAD_MAX_BYTES) {
             return tooLargeResponse(imageLabel);
           }
         }
-        const arrayBuffer = await req.arrayBuffer();
-        if (arrayBuffer.byteLength > AVATAR_UPLOAD_MAX_BYTES) {
+        let bodyBytes: Uint8Array;
+        try {
+          bodyBytes = await readBoundedBody(req, AVATAR_UPLOAD_MAX_BYTES);
+        } catch (error) {
+          if (error instanceof RequestBodyTooLarge) {
+            return tooLargeResponse(imageLabel);
+          }
+          throw error;
+        }
+        if (bodyBytes.byteLength > AVATAR_UPLOAD_MAX_BYTES) {
           return tooLargeResponse(imageLabel);
         }
+        const arrayBuffer = new ArrayBuffer(bodyBytes.byteLength);
+        new Uint8Array(arrayBuffer).set(bodyBytes);
         body = arrayBuffer;
       }
 
@@ -175,6 +190,35 @@ export function createProfileImageHandlers(
   }
 
   return { GET, PUT: mutate, DELETE: mutate };
+}
+
+class RequestBodyTooLarge extends Error {}
+
+async function readBoundedBody(
+  request: Request,
+  maxBytes: number
+): Promise<Uint8Array> {
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new RequestBodyTooLarge();
+    }
+    chunks.push(value);
+  }
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
 }
 
 function tooLargeResponse(imageLabel: string) {
