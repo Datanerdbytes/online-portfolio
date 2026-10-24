@@ -33,6 +33,51 @@ def test_production_migration_requires_github_main(monkeypatch):
         script.main()
 
 
+@pytest.mark.parametrize("driver", ["postgres", "postgresql", "postgresql+psycopg"])
+def test_production_migration_accepts_neon_urls(monkeypatch, driver):
+    script = load_module(ROOT / "scripts/migrate-production.py")
+    monkeypatch.setenv(
+        "MIGRATION_DATABASE_URL",
+        f"{driver}://ep-example.neon.tech/onlineportfoliodb?sslmode=require",
+    )
+    url = script.production_url()
+    assert url.drivername == "postgresql+psycopg"
+    assert url.query["sslmode"] == "require"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "",
+        "not-a-url",
+        "postgresql://localhost/onlineportfoliodb",
+        "postgresql://ep-example.neon.tech/neondb",
+    ],
+)
+def test_production_migration_rejects_missing_or_wrong_database(monkeypatch, value):
+    script = load_module(ROOT / "scripts/migrate-production.py")
+    monkeypatch.delenv("MIGRATION_DATABASE_URL", raising=False)
+    if value is not None:
+        monkeypatch.setenv("MIGRATION_DATABASE_URL", value)
+    with pytest.raises(RuntimeError):
+        script.production_url()
+
+
+def test_production_config_check_does_not_run_migrations(monkeypatch, capsys):
+    script = load_module(ROOT / "scripts/migrate-production.py")
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_REF", "refs/heads/main")
+    monkeypatch.setenv(
+        "MIGRATION_DATABASE_URL",
+        "postgresql://ep-example.neon.tech/onlineportfoliodb",
+    )
+    monkeypatch.setattr(script.sys, "argv", ["migrate-production.py", "--check-config"])
+    monkeypatch.setattr(script.command, "upgrade", lambda *_: pytest.fail("Must not migrate"))
+    script.main()
+    assert "configuration validated" in capsys.readouterr().out
+
+
 def test_nonempty_backfill_preserves_source_and_nested_content(integration_db):
     if integration_db is None:
         pytest.skip("requires disposable PostgreSQL integration database")

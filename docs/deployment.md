@@ -40,6 +40,9 @@ Its `production` environment must have:
   single-owner repository.
 - An environment secret named `VERCEL_TOKEN`, created by the owner in Vercel,
   scoped to the `datanerdbytes-4121` team, with an appropriate expiry.
+- An environment secret named `MIGRATION_DATABASE_URL` containing the API's
+  production Neon application database URL. Keep it synchronized when rotating
+  the API's `DATABASE_URL`; Vercel Secret values are unavailable in pulled settings.
 
 Create the token at <https://vercel.com/account/settings/tokens> and save it
 through GitHub's environment settings. Do not paste it into chat, commit it,
@@ -106,9 +109,11 @@ Workflow runs and their results are available in the repository's Actions tab.
 
 The GitHub Actions production job applies committed Alembic migrations after
 building both applications and before staged smoke checks and promotion.
-`scripts/migrate-production.py` accepts only the API project's pulled production
-`DATABASE_URL`, requires GitHub Actions on `main`, and checks that it targets
-`onlineportfoliodb` on Neon. Credentials and raw driver errors are never printed.
+`scripts/migrate-production.py` reads `MIGRATION_DATABASE_URL` from the protected
+GitHub production environment, requires GitHub Actions on `main`, and checks that
+it targets `onlineportfoliodb` on Neon. Standard PostgreSQL URLs are normalized to
+the pinned psycopg driver. A configuration-only check runs before either build;
+it never connects or migrates. Credentials and raw driver errors are never printed.
 
 Migration `84ac7d2e19f0` snapshots existing public portfolios while preserving the
 original editable rows and media. It briefly locks content tables against writes
