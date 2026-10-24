@@ -10,7 +10,6 @@ import { ContactSection } from "@/components/contact-section";
 import { EducationSection } from "@/components/education-section";
 import { ExperienceSection } from "@/components/experience-section";
 import { HealthStatus } from "@/components/health-status";
-import { ShareLinkButton } from "@/components/share-link-button";
 import { ProjectsClient } from "@/components/projects";
 import { SkillsSection } from "@/components/skills-section";
 import { profileImageUrl, BANNER_PATH } from "@/lib/avatar";
@@ -66,7 +65,6 @@ export default async function Home() {
                   View Resume
                 </Link>
               </Button>
-              <ShareLinkButton path="/" />
             </div>
             {profile.location && (
               <p className="hero-location">

@@ -61,7 +61,7 @@ export default async function WorkspacePage() {
             : "Private · not published yet"}
         </p>
         <Button asChild>
-          <Link href="/admin/preview">Preview and publish</Link>
+          <Link href="/admin/preview">Preview portfolio</Link>
         </Button>
         {status.is_published && (
           <ShareLinkButton path={`/u/${status.owner_id}`} />

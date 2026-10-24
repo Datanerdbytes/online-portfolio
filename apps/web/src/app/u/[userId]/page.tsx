@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { API_BASE_URL, type ApiResume, type ProjectsResponse } from "@/lib/api";
 import { resolveAccountResume } from "@/lib/resume";
 import { ResumeDocument } from "@/components/resume-document";
-import { ShareLinkButton } from "@/components/share-link-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Public resume and projects" };
@@ -45,9 +44,6 @@ export default async function PublicPortfolio({
   if (!data.resume) return <p>This portfolio has no resume yet.</p>;
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-6 flex justify-end print:hidden">
-        <ShareLinkButton path={`/u/${userId}`} />
-      </div>
       <ResumeDocument resume={data.resume} projects={data.projects.items} />
     </section>
   );
