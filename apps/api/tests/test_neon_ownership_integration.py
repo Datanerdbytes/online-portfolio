@@ -56,6 +56,15 @@ def test_new_users_are_empty_and_own_only_their_content(accounts):
         == 200
     )
     assert client.get("/api/v1/resume", headers=a).json()["profile"]["name"] == "A"
+    assert client.get(f"/api/v1/public/users/{ids[0]}/resume").status_code == 404
+    client.patch("/api/v1/resume/profile", headers=a, json={"headline": "A", "introduction": "A"})
+    state = client.get("/api/v1/portfolio", headers=a).json()
+    assert (
+        client.post(
+            "/api/v1/portfolio/publish", headers=a, json={"revision": state["revision"]}
+        ).status_code
+        == 200
+    )
     public = client.get(f"/api/v1/public/users/{ids[0]}/resume")
     assert public.status_code == 200 and public.json()["profile"]["name"] == "A"
     assert client.patch("/api/v1/resume/profile", json={"name": "anonymous"}).status_code == 401
@@ -102,6 +111,19 @@ def test_projects_and_public_reads_are_per_account(accounts):
         client.post("/api/v1/projects", headers=b, json={**payload, "title": "B"}).status_code
         == 201
     )
+    for header in (a, b):
+        client.patch(
+            "/api/v1/resume/profile",
+            headers=header,
+            json={"name": "Name", "headline": "Headline", "introduction": "Intro"},
+        )
+        state = client.get("/api/v1/portfolio", headers=header).json()
+        assert (
+            client.post(
+                "/api/v1/portfolio/publish", headers=header, json={"revision": state["revision"]}
+            ).status_code
+            == 200
+        )
     assert client.get(f"/api/v1/public/users/{ids[0]}/projects").json()["items"][0]["title"] == "A"
     assert client.get(f"/api/v1/public/users/{ids[1]}/projects").json()["items"][0]["title"] == "B"
 

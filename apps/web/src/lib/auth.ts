@@ -119,11 +119,13 @@ export async function fetchBackend(
       cache: "no-store",
     });
     if (!response.ok) {
-      if ([400, 401, 403, 429, 503].includes(response.status)) {
+      if ([400, 401, 403, 404, 409, 429, 503].includes(response.status)) {
         const detail: Record<number, string> = {
           400: "Invalid request",
           401: "Not authenticated",
           403: "Not authorized",
+          404: "Not found",
+          409: "Your draft changed. Refresh the preview and try again.",
           429: "Too many login attempts",
           503: "Administration unavailable",
         };

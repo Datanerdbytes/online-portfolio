@@ -51,17 +51,39 @@ export default function SignInPage() {
         setError("Too many login attempts. Please try again later.");
       else if (response.status === 401)
         setError("Invalid credentials. Please try again.");
-      else if (response.status === 403)
-        setError("Please verify your email before signing in.");
-      else if (!response.ok)
+      else if (response.status === 403) {
+        const body = await response.json().catch(() => null);
+        if (body?.detail === "Verify your email before signing in") {
+          try {
+            sessionStorage.setItem(
+              "portfolio-verification-email",
+              username.trim().toLowerCase()
+            );
+          } catch {
+            // The verification form also accepts an email entered manually.
+          }
+          setError(
+            "Your email has not been verified yet. Use the verification link below to enter your code or request a new one."
+          );
+        } else {
+          setError(
+            "This sign-in request could not be accepted. Refresh the page and try again."
+          );
+        }
+      } else if (!response.ok)
         setError("Administration is unavailable. Please try again.");
       else {
         form.reset();
         const next = new URLSearchParams(window.location.search).get("next");
-        const destination =
-          next === "/admin/resume" || next === "/admin/projects"
-            ? next
-            : "/admin/projects";
+        const destination = [
+          "/admin",
+          "/admin/resume",
+          "/admin/projects",
+          "/admin/preview",
+          "/admin/account",
+        ].includes(next ?? "")
+          ? next!
+          : "/admin";
         router.replace(destination);
         router.refresh();
       }
@@ -80,7 +102,7 @@ export default function SignInPage() {
   return (
     <AuthPanel
       title="Welcome back"
-      description="Sign in to update your resume and projects. Your public portfolio is always ready to share."
+      description="Sign in to work on your draft, preview changes, and manage your published portfolio."
       footer={
         <>
           New here? <Link href="/auth/register">Create your account</Link>

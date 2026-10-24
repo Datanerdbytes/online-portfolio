@@ -274,5 +274,5 @@ def delete_project(
         raise HTTPException(
             status_code=503, detail="Projects service temporarily unavailable."
         ) from None
-    remove_screenshot_quietly(store, screenshot_filename)
+    remove_screenshot_quietly(store, screenshot_filename, db)
     return None

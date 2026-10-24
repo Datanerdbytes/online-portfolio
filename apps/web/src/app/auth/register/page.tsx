@@ -61,7 +61,7 @@ export default function RegisterPage() {
   return (
     <AuthPanel
       title="Create your account"
-      description="Start with a blank portfolio and make it yours. Your resume and projects are public; only you can edit them."
+      description="Start with a private draft and make it yours. Verify your email, add your story, then publish when you’re ready."
       footer={
         <>
           Already have an account? <Link href="/auth/signin">Sign in</Link>

@@ -102,9 +102,7 @@ function ProfileImageControl({
       }
       try {
         await upload.mutateAsync(file);
-        setMessage(
-          `${label} resized and saved successfully. Reload the public page to see it.`
-        );
+        setMessage(`${label} saved to your draft. Publish when ready.`);
       } catch (err) {
         setIsError(true);
         setMessage(handleMutationError(err));
@@ -120,7 +118,9 @@ function ProfileImageControl({
     setIsError(false);
     try {
       await remove.mutateAsync();
-      setMessage(`${label} removed. Reload the public page to see it.`);
+      setMessage(
+        `${label} removed from your draft. Publish to update the public version.`
+      );
       setConfirmRemove(false);
     } catch (err) {
       setIsError(true);
@@ -250,7 +250,7 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
       });
       setSaving(false);
       setIsError(false);
-      setMessage("Saved. Reload the public page to see the change.");
+      setMessage("Draft saved. Preview and publish when ready.");
     } catch (err) {
       setSaving(false);
       setIsError(true);
@@ -368,7 +368,7 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
         body: { item: itemValue },
       });
       setIsError(false);
-      setMessage("Saved. Reload the public page to see it.");
+      setMessage("Draft saved. Preview and publish when ready.");
       setEditingItem(null);
     } catch (err) {
       setIsError(true);
@@ -385,7 +385,7 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
         body: { label: groupLabelValue },
       });
       setIsError(false);
-      setMessage("Saved. Reload the public page to see it.");
+      setMessage("Draft saved. Preview and publish when ready.");
       setEditingGroupId(null);
     } catch (err) {
       setIsError(true);
@@ -403,7 +403,7 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
           body: { item: newItemValue.trim(), display_order: 999 },
         });
         setIsError(false);
-        setMessage("Added. Reload the public page to see it.");
+        setMessage("Added to your draft. Publish when ready.");
         setAddingToGroup(null);
         setNewItemValue("");
       } catch (err) {
@@ -420,7 +420,9 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
     try {
       await deleteSkillGroup.mutateAsync(deleteTarget.id);
       setIsError(false);
-      setMessage("Deleted. Reload the public page to see it.");
+      setMessage(
+        "Removed from your draft. Publish to update your public portfolio."
+      );
       setDeleteTarget(null);
     } catch (err) {
       setIsError(true);
@@ -434,7 +436,9 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
       try {
         await deleteSkillItem.mutateAsync(id);
         setIsError(false);
-        setMessage("Deleted. Reload the public page to see it.");
+        setMessage(
+          "Removed from your draft. Publish to update your public portfolio."
+        );
       } catch (err) {
         setIsError(true);
         setMessage(handleMutationError(err));
@@ -685,7 +689,7 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
         },
       });
       setIsError(false);
-      setMessage("Saved. Reload the public page to see the change.");
+      setMessage("Draft saved. Preview and publish when ready.");
       setEditing(null);
     } catch (err) {
       setIsError(true);
@@ -707,7 +711,7 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
         display_order: experience.length,
       });
       setIsError(false);
-      setMessage("Added. Reload the public page to see it.");
+      setMessage("Added to your draft. Publish when ready.");
       setAdding(false);
       setNewValues({
         slug: "",
@@ -730,7 +734,9 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
     try {
       await deleteExperience.mutateAsync(deleteTarget.id);
       setIsError(false);
-      setMessage("Deleted. Reload the public page to see it.");
+      setMessage(
+        "Removed from your draft. Publish to update your public portfolio."
+      );
       setDeleteTarget(null);
     } catch (err) {
       setIsError(true);
@@ -1015,7 +1021,7 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
         },
       });
       setIsError(false);
-      setMessage("Saved. Reload the public page to see the change.");
+      setMessage("Draft saved. Preview and publish when ready.");
       setEditing(null);
     } catch (err) {
       setIsError(true);
@@ -1035,7 +1041,7 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
         display_order: education.length,
       });
       setIsError(false);
-      setMessage("Added. Reload the public page to see it.");
+      setMessage("Added to your draft. Publish when ready.");
       setAdding(false);
       setNewValues({
         slug: "",
@@ -1056,7 +1062,9 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
     try {
       await deleteEducation.mutateAsync(deleteTarget.id);
       setIsError(false);
-      setMessage("Deleted. Reload the public page to see it.");
+      setMessage(
+        "Removed from your draft. Publish to update your public portfolio."
+      );
       setDeleteTarget(null);
     } catch (err) {
       setIsError(true);
@@ -1248,7 +1256,7 @@ function ContactTab({ contact }: { contact: ApiContact | null }) {
         email: values.email || null,
       });
       setIsError(false);
-      setMessage("Saved. Reload the public page to see the change.");
+      setMessage("Draft saved. Preview and publish when ready.");
     } catch (err) {
       setIsError(true);
       setMessage(handleMutationError(err));

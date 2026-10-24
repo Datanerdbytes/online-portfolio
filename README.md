@@ -1,6 +1,6 @@
 # Online Resume & Portfolio
 
-A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI, and PostgreSQL. The project combines a public portfolio with multi-user editing through Neon Managed Better Auth. Resumes and projects remain public.
+A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI, and PostgreSQL. Neon Managed Better Auth protects each user's workspace. Saved edits remain private drafts until the owner publishes them; visitors browse published portfolios without an account.
 
 ## What it includes
 
@@ -182,7 +182,7 @@ Next.js server uses the official `@neondatabase/auth` SDK and managed HttpOnly
 cookies. FastAPI verifies Neon-issued Ed25519 JWTs for service-to-service requests;
 it no longer issues login tokens or verifies passwords itself.
 
-All resumes/projects are public. New accounts receive an empty portfolio on first
+Only published resumes/projects are public. New accounts receive a private, empty draft on first
 verified editor access. Each edit is restricted to that user's portfolio through
 scoped database sessions and ownership constraints. Share `/u/<account-id>` to
 view a portfolio without signing in.
@@ -291,3 +291,23 @@ database query and returns 503 without database exception details on failure.
 - [Backend API and database guide](./apps/api/README.md)
 - [Frontend guide and browser verification](./apps/web/README.md)
 - [Project design plan](./docs/plans/design-plan.md)
+
+## Portfolio workspace and publication
+
+After verification or sign-in, `/admin` shows the setup checklist and publication
+status. Edit the resume at `/admin/resume`, projects at `/admin/projects`, and
+review saved changes at `/admin/preview`. Only publishing makes changes public.
+`/admin/account` keeps sign-in details and session controls separate from public
+contact information. The optional verification recovery link stays on sign-in
+because this project uses Neon's shared email sender.
+
+Publishing requires a name, headline, and introduction. Experience and projects
+are optional. Saving an open form is separate from publishing: preview and publish
+include only saved changes. A stale preview returns a conflict rather than silently
+publishing a changed draft. Unpublish retains the draft and hides public routes.
+
+Migration `84ac7d2e19f0` preserves existing public portfolios in separate published
+copies, including media references, before drafts become private. Back up local
+data before `uv run alembic upgrade head` from `apps/api`. Production migrations
+and releases run through `.github/workflows/ci.yml`; never deploy local files or
+run production migrations manually. See [the flow plan](docs/plans/portfolio-publishing-flow.md).

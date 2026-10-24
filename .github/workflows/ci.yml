@@ -171,6 +171,8 @@ jobs:
         env:
           VERCEL_PROJECT_ID: prj_WO8baqdRYXxlA5aayCSvRggsmu53
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      - name: Apply approved production schema migrations
+        run: uv run --project apps/api python scripts/migrate-production.py
       - name: Check staged apps before promotion
         run: |
           node scripts/deployment-smoke.mjs api "$RUNNER_TEMP/api-deploy.json"

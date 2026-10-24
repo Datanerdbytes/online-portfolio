@@ -20,6 +20,8 @@ async function loadPortfolio(userId: string) {
         signal: AbortSignal.timeout(8000),
       }),
     ]);
+    if (resumeResponse.status === 404 || projectsResponse.status === 404)
+      return { missing: true as const };
     if (!resumeResponse.ok || !projectsResponse.ok) return null;
     return {
       resume: resolveAccountResume((await resumeResponse.json()) as ApiResume),
@@ -39,6 +41,7 @@ export default async function PublicPortfolio({
   if (!/^[a-zA-Z0-9-]{1,128}$/.test(userId)) notFound();
   const data = await loadPortfolio(userId);
   if (!data) return <p>Portfolio is temporarily unavailable. Please retry.</p>;
+  if ("missing" in data) notFound();
   if (!data.resume) return <p>This portfolio has no resume yet.</p>;
   return (
     <section className="mx-auto max-w-4xl px-4 py-8">

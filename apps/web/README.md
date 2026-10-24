@@ -44,7 +44,7 @@ Authenticated project-management proxy routes (require the admin session cookie 
 - `PATCH /api/projects/[slug]` → `PATCH /api/v1/projects/{slug}` — partial update (200). Null clears only `repository_url` or `demo_url`; omitted fields are unchanged.
 - `DELETE /api/projects/[slug]` → `DELETE /api/v1/projects/{slug}` — delete (204).
 - `POST /api/projects/reorder` → `POST /api/v1/projects/reorder` — atomic batch display-order update (200).
-- `GET`, `PUT`, and `DELETE /api/projects/[slug]/screenshot` → the corresponding `/api/v1/projects/{slug}/screenshot` routes — same-origin public image read plus owner-authenticated upload, replacement, and removal. Uploads accept JPEG, PNG, or WebP up to 2 MiB. Screenshot management is available when editing an existing project; uploaded screenshots appear as small thumbnails beside the technology tags in public project cards.
+- `GET`, `PUT`, and `DELETE /api/projects/[slug]/screenshot` → the corresponding `/api/v1/projects/{slug}/screenshot` routes — owner-authenticated draft image read, upload, replacement, and removal. Uploads accept JPEG, PNG, or WebP up to 2 MiB. Screenshot management is available when editing an existing project; uploaded screenshots appear as small thumbnails beside the technology tags in public project cards.
 
 All authenticated mutation proxies construct the backend `Authorization: Bearer` header only from the server-read admin cookie, set `Cache-Control: no-store`, apply a bounded deadline that stays active through body parsing, and return sanitized errors. They never forward browser-supplied `Authorization` or owner headers.
 
@@ -81,17 +81,17 @@ Check mobile and desktop layouts, keyboard focus, and the retry control. Report 
 
 These require a signed-in owner session and a stub or real FastAPI backend on `API_BASE_URL`.
 
-1. Sign in at `/auth/signin`; the `HttpOnly` cookie is set and `/admin/projects` renders the manager.
+1. Sign in at `/auth/signin`; the `HttpOnly` cookie is set and `/admin` opens the workspace overview. Open Projects to use the manager.
 2. Create a project — submit the form; a `201` creates it, the list refreshes, and the form resets.
 3. Create with a duplicate slug — the proxy returns `409`, the error shows, and entered values are retained.
-4. Edit a project — open the editor, change fields, save; a `200` refreshes the list and shows "Project saved."
+4. Edit a project — open the editor, change fields, save; a `200` refreshes the list and shows "Project draft saved."
 5. Clear a URL — set repository/demo URL to blank and save; the stored value becomes `null`.
 6. Edit with a `401`/session expiry — the error prompts sign-in again and entered values stay in the form.
 7. Delete a project — the confirmation dialog names the project and returns focus to "Delete project"; confirming deletes it (`204`) and refreshes the list.
 8. Cancel deletion — the dialog closes and the project remains.
 9. Reorder — change display-order numbers and save; `POST /api/projects/reorder` returns `{"updated":N}` and the list reflects the new order.
 10. Unavailable backend — create/edit/delete/reorder each show a clear error and distinguish "not authenticated" from "service unavailable."
-11. Project screenshot — edit an existing project, upload or replace a JPEG/PNG/WebP screenshot (up to 2 MiB), verify its preview and the public project-card thumbnail, then remove it; both disappear when no screenshot is stored.
+11. Project screenshot — edit an existing project, upload or replace a JPEG/PNG/WebP screenshot (up to 2 MiB), verify its draft preview, publish to check the public thumbnail, then remove it from the draft; the public image remains until another publication.
 
 Run `npm run test:auth` for the Node regression suite (uses the installed
 TypeScript compiler and real handlers; no additional test framework). It covers
@@ -114,7 +114,7 @@ misusing the opaque `getSession().data.session.token`. FastAPI independently
 validates it and enforces record ownership. Managed sign-out ends the provider
 session. An already-issued JWT can remain valid for its provider-controlled
 15-minute lifetime; do not promise immediate revocation of copied JWTs.
-All resume/project content remains public and each user can edit only their own.
+Only published content is public; each user can edit and preview only their own draft.
 Missing configuration fails closed for authentication and leaves public pages
 available. See [setup and verification](../../docs/neon-auth.md).
 
@@ -151,3 +151,17 @@ source-checked, not claimed as browser verified. The 30-test Node suite also
 covers exact response statuses, payload sanitization, path safety and CRUD for
 the `reorder` slug. A3 must still prove real FastAPI authorization, PostgreSQL
 persistence and atomic rollback with both implementation branches combined.
+
+## Workspace flow
+
+`/admin` is the authenticated overview and setup checklist. Resume and Projects
+save private drafts, Preview shows saved content with publish/update/unpublish
+controls, and Account contains private sign-in details and session controls.
+Verification continues directly into the workspace when Neon creates a session.
+The existing verification recovery link remains on sign-in.
+
+Draft image proxies require a session; public images use `/api/public/...`.
+Public pages use published API data and do not substitute repository content for
+an unpublished portfolio. Publication errors preserve the saved draft and offer
+retry or refresh guidance. An unavailable backend produces a workspace service
+message rather than claiming the password was rejected.

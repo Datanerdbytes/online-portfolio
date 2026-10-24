@@ -24,6 +24,7 @@ from app.core.storage import (
     ProfileImageStore,
     get_image_store,
 )
+from app.db.publishing import image_is_referenced
 from app.db.tenant import get_content_db as get_db
 from app.models.project import Project
 from app.schemas.project import ProjectResponse
@@ -93,14 +94,18 @@ def _matches_etag(header: str | None, etag: str) -> bool:
     return etag in {tag.strip() for tag in header.split(",")} or "*" in header
 
 
-def remove_screenshot_quietly(store: ProfileImageStore, filename: str | None) -> None:
+def remove_screenshot_quietly(
+    store: ProfileImageStore, filename: str | None, db: Session | None = None
+) -> None:
     if not filename:
         return
     try:
+        if db is not None and image_is_referenced(db, filename):
+            return
         store.delete(filename)
     except ProfileImageNotFound:
         pass
-    except ProfileImageError:
+    except (ProfileImageError, SQLAlchemyError):
         logger.warning("Could not remove stored project screenshot")
 
 
@@ -198,7 +203,7 @@ def upload_project_screenshot(
         raise HTTPException(status_code=503, detail="Screenshot upload failed") from None
 
     if previous_filename and previous_filename != filename:
-        remove_screenshot_quietly(store, previous_filename)
+        remove_screenshot_quietly(store, previous_filename, db)
     return project
 
 
@@ -230,4 +235,4 @@ def delete_project_screenshot(
     except SQLAlchemyError:
         db.rollback()
         raise HTTPException(status_code=503, detail="Screenshot removal failed") from None
-    remove_screenshot_quietly(store, filename)
+    remove_screenshot_quietly(store, filename, db)

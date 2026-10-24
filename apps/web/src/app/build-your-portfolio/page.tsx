@@ -44,7 +44,7 @@ const steps = [
   {
     title: "Share your work",
     description:
-      "Copy your portfolio link from the editor and send it to anyone.",
+      "Preview your saved draft, publish it, and share your portfolio link.",
   },
 ];
 
@@ -80,8 +80,8 @@ export default function BuildYourPortfolioPage() {
             </Button>
           </div>
           <p className="mt-5 max-w-xl text-sm leading-6 text-muted-foreground">
-            Your portfolio content is public. Only you can edit it after signing
-            in.
+            Your saved draft is private until you publish. Only you can edit it
+            after signing in.
           </p>
         </div>
       </section>

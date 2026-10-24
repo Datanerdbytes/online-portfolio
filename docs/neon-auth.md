@@ -2,8 +2,9 @@
 
 This integration replaces application-managed passwords and sessions with Neon
 Managed Better Auth. FastAPI remains the application API; it verifies the JWTs
-issued by Neon. All resume and project content is public. Authentication permits
-changes only to the signed-in user's portfolio.
+issued by Neon. Saved resume and project changes are private drafts. Explicit
+publication creates the version visitors can read. Authentication permits changes
+only to the signed-in user's portfolio.
 
 ## Configure the selected project
 
@@ -27,25 +28,56 @@ key as the cookie secret. `ADMIN_WEB_ORIGIN` is an exact origin, such as
 changing their environment. Configure equivalent variables in each hosting
 project; local files do not configure deployed apps.
 
+Production uses `https://online-portfolio-datanerdbytes-4121.vercel.app` as its
+canonical origin. Vercel permanently redirects
+`online-portfolio-two-swart.vercel.app` to that domain, preserving paths and
+query strings so account forms submit from the configured origin. Keep this
+project domain redirect in place across releases; see the
+[domain redirect record](deployments/auth-domain-redirect-2026-10-24.md).
+
 Run migrations from `apps/api` using `uv run alembic upgrade head` before running
 the API. Never use a production database for automated integration tests.
 
 ## Accounts and public portfolios
 
-Register at `/auth/register`, complete any email verification required by Neon,
-then sign in at `/auth/signin`. The editor links to `/u/<owner_id>`, which anyone
-can view. New identities receive blank profile/contact records on their first
+Register at `/auth/register` and complete email verification. A managed session
+created by successful verification continues directly to `/admin`; otherwise
+the workspace requests sign-in. Returning users go directly to the workspace
+after sign-in. New identities receive blank profile/contact records on their first
 authenticated API request, with no projects, skills, education or experience.
 Registration never copies another user's content or publishes their login email.
+
+The workspace includes Overview, Resume, Projects, Preview, and Account. Saves
+update the draft. Preview renders only the current owner's saved draft; Publish
+creates an atomic public copy at `/u/<owner_id>`. Unpublish hides the public copy
+without deleting the draft. A changed draft revision rejects a stale publication
+request with 409 so the owner can refresh before publishing. Existing public
+portfolios are copied and kept published by migration `84ac7d2e19f0`; accounts
+created after migration begin unpublished. Public content and images never fall
+back to private drafts. See [the flow implementation](plans/portfolio-publishing-flow.md).
 
 ### Email verification and password recovery
 
 Production now requires email verification. Registration opens
 `/auth/verify-email`, where users enter the six-digit code or request another.
-The sign-in page also links to verification for existing unverified accounts.
+The sign-in form includes **Verify your email or request a new code** so users
+can finish registration later. This link is retained at the user's request
+because the application uses Neon's shared email sender. Already verified
+accounts do not need to use it. An explicit unverified-email sign-in rejection
+explains the next step and pre-fills the verification form's email when session
+storage is available. Other forbidden requests do not claim that verification
+is required.
 Neon's shared email provider supports verification codes; verification links
 require a custom email provider. No existing account is marked verified by the
 application or by a database update.
+
+The shared Neon email body cannot be customized to include a link back to
+`/auth/verify-email`. Adding that link to registration emails requires an email
+delivery webhook and a configured transactional email provider. Subscribing to
+the delivery event replaces Neon's default email delivery. The user chose to
+retain the shared sender and the link on the sign-in form rather than configure
+a custom provider. See
+[Neon's email customization guide](https://neon.com/docs/auth/guides/customize-emails).
 
 Use **Forgot password?** on `/auth/signin`, or open `/auth/forgot-password`.
 Neon emails a reset link whose callback is fixed to the configured production

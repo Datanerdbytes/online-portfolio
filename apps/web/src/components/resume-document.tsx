@@ -19,21 +19,22 @@ import {
 type Props = {
   resume: ResolvedResume;
   projects: Project[];
+  preview?: boolean;
 };
 
 function telHref(phone: string): string {
   return `tel:${phone.replace(/[^+\d]/g, "")}`;
 }
 
-export function ResumeDocument({ resume, projects }: Props) {
+export function ResumeDocument({ resume, projects, preview = false }: Props) {
   const { profile, skills, experience, education, contact } = resume;
   const links = (contact.links ?? []).filter((link) =>
-    isAbsoluteHttpUrl(link.url),
+    isAbsoluteHttpUrl(link.url)
   );
   const publishedProjects = projects;
   const profileImage = profileImageUrl(
     profile.avatar_url,
-    profile.avatar_updated_at,
+    profile.avatar_updated_at
   );
 
   return (
@@ -99,7 +100,10 @@ export function ResumeDocument({ resume, projects }: Props) {
       <div className="resume-doc-columns">
         <div className="resume-doc-main">
           <section aria-labelledby="resume-experience-heading">
-            <h2 id="resume-experience-heading" className="resume-doc-section-title">
+            <h2
+              id="resume-experience-heading"
+              className="resume-doc-section-title"
+            >
               Experience
             </h2>
             {experience.length === 0 ? (
@@ -139,17 +143,22 @@ export function ResumeDocument({ resume, projects }: Props) {
             className="resume-doc-projects"
             aria-labelledby="resume-projects-heading"
           >
-            <h2 id="resume-projects-heading" className="resume-doc-section-title">
+            <h2
+              id="resume-projects-heading"
+              className="resume-doc-section-title"
+            >
               Selected projects
             </h2>
             {publishedProjects.length === 0 ? (
-              <p className="resume-doc-empty">No projects published yet.</p>
+              <p className="resume-doc-empty">No projects added yet.</p>
             ) : (
               <ul className="resume-doc-list">
                 {publishedProjects.map((project) => (
                   <li key={project.id} className="resume-doc-entry">
                     <div className="resume-doc-entry-head">
-                      <h3 className="resume-doc-entry-title">{project.title}</h3>
+                      <h3 className="resume-doc-entry-title">
+                        {project.title}
+                      </h3>
                       {project.is_sample && (
                         <span className="resume-doc-badge">Sample</span>
                       )}
@@ -250,14 +259,18 @@ export function ResumeDocument({ resume, projects }: Props) {
             )}
           </section>
 
-          <section className="resume-doc-aside-note" aria-labelledby="resume-note-heading">
+          <section
+            className="resume-doc-aside-note"
+            aria-labelledby="resume-note-heading"
+          >
             <h2 id="resume-note-heading" className="resume-doc-section-title">
               About this document
             </h2>
             <p className="resume-doc-note-text">
               <Sparkles size={14} aria-hidden="true" />
-              Generated from the same data that powers the live portfolio, so
-              the content here always matches the site.
+              {preview
+                ? "This is your saved private draft. Publish when you’re ready to share these changes."
+                : "This document shows the portfolio version its owner chose to share."}
             </p>
           </section>
         </aside>

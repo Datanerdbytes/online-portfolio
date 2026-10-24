@@ -10,20 +10,20 @@ The project root is `/Users/roelsomido/python-project/online-resume`. Inspect ex
 
 ## Agreed technology stack
 
-| Area | Required technology | Role |
-| --- | --- | --- |
-| Repository | Monorepo | Keep frontend, backend, and development documentation together |
-| Frontend | Next.js App Router | Application shell, routing, and rendering |
-| Frontend language | TypeScript | Typed components, configuration, and API consumers |
-| Styling | Tailwind CSS | Responsive styling and shared visual tokens |
-| UI components | shadcn/ui | Accessible, locally owned component primitives |
-| Backend | FastAPI | Versioned HTTP API and generated OpenAPI documentation |
-| Backend language | Python | Backend application and tests |
-| ORM | SQLAlchemy 2 | Typed models, sessions, and database access |
-| Migrations | Alembic | Version-controlled database schema changes |
-| Database | PostgreSQL | Local and eventual deployed persistence |
-| Local database runtime | Docker Compose | Reproducible local PostgreSQL service |
-| Backend testing | pytest | Health, configuration, and database-related checks |
+| Area                   | Required technology | Role                                                           |
+| ---------------------- | ------------------- | -------------------------------------------------------------- |
+| Repository             | Monorepo            | Keep frontend, backend, and development documentation together |
+| Frontend               | Next.js App Router  | Application shell, routing, and rendering                      |
+| Frontend language      | TypeScript          | Typed components, configuration, and API consumers             |
+| Styling                | Tailwind CSS        | Responsive styling and shared visual tokens                    |
+| UI components          | shadcn/ui           | Accessible, locally owned component primitives                 |
+| Backend                | FastAPI             | Versioned HTTP API and generated OpenAPI documentation         |
+| Backend language       | Python              | Backend application and tests                                  |
+| ORM                    | SQLAlchemy 2        | Typed models, sessions, and database access                    |
+| Migrations             | Alembic             | Version-controlled database schema changes                     |
+| Database               | PostgreSQL          | Local and eventual deployed persistence                        |
+| Local database runtime | Docker Compose      | Reproducible local PostgreSQL service                          |
+| Backend testing        | pytest              | Health, configuration, and database-related checks             |
 
 Supporting tools, package managers, exact versions, and deployment targets are not yet agreed. Choose compatible maintained versions when implementation starts, record runtime requirements, and commit the resulting dependency lockfiles. Do not substitute a different framework or database without user approval.
 
@@ -192,12 +192,12 @@ The user controls delegation. This guide does not automatically instruct any age
 
 Suggested task boundaries once assigned:
 
-| Workstream | Primary ownership | Coordination required |
-| --- | --- | --- |
-| Foundation | Root configuration, Compose, repository commands | Agree package-manager and environment conventions first |
-| Backend | `apps/api/` | Publish health contract and database configuration |
-| Frontend | `apps/web/` | Consume the agreed health contract; coordinate workspace dependencies |
-| Integration/review | README, cross-stack verification, review findings | Wait for implementation handoffs and preserve unfinished work |
+| Workstream         | Primary ownership                                 | Coordination required                                                 |
+| ------------------ | ------------------------------------------------- | --------------------------------------------------------------------- |
+| Foundation         | Root configuration, Compose, repository commands  | Agree package-manager and environment conventions first               |
+| Backend            | `apps/api/`                                       | Publish health contract and database configuration                    |
+| Frontend           | `apps/web/`                                       | Consume the agreed health contract; coordinate workspace dependencies |
+| Integration/review | README, cross-stack verification, review findings | Wait for implementation handoffs and preserve unfinished work         |
 
 - Inspect current changes before editing; do not overwrite, reset, clean, or remove another agent's work.
 - Assign one owner to shared manifests, lockfiles, Compose, and the README at a time.
@@ -207,6 +207,15 @@ Suggested task boundaries once assigned:
 - Communicate changes to API contracts and environment variables before dependent work proceeds.
 - Every handoff should list changed files, commands run, results, limitations, and work remaining.
 - A review assignment is read-only unless fixes are also authorized. Report actionable findings with file and line references; distinguish defects from optional suggestions.
+
+## GitHub Actions CI/CD and deployments
+
+- Use the repository's GitHub Actions workflows in `.github/workflows/` for CI and application deployments. Inspect the applicable triggers, required jobs, and environment approvals before a release.
+- Release committed GitHub revisions through the repository's branch/PR process and configured workflow triggers. Requests to deploy, publish, or fix the live app must follow this process too.
+- Never bypass these workflows by deploying uncommitted working files or invoking deployment, promotion, or rollback directly through a local CLI, hosting API, or hosting dashboard. Deployment commands belong inside the authorized GitHub Actions workflow.
+- Local checks support CI; they do not replace required GitHub Actions checks. Preserve required checks, release gates, and environment approvals; do not skip, disable, or weaken them to ship a change.
+- If a workflow fails, credentials are unavailable, or a needed release operation is unsupported, diagnose and report the blocker or propose a workflow change. Do not fall back to a manual deployment.
+- Before reporting a release complete, verify the workflow ran against the intended commit, its required jobs succeeded, and its deployment verification passed. Include the workflow run URL and deployed commit in the handoff.
 
 ## Verification and completion checklist
 

@@ -2,7 +2,17 @@ import re
 
 from fastapi import FastAPI
 
-from app.api.v1 import auth, avatar, github, health, project_screenshot, projects, public, resume
+from app.api.v1 import (
+    auth,
+    avatar,
+    github,
+    health,
+    portfolio,
+    project_screenshot,
+    projects,
+    public,
+    resume,
+)
 from app.core.config import settings
 from app.core.middleware import MULTIPART_OVERHEAD_BYTES, RequestBodyLimitMiddleware
 from app.schemas.root import RootResponse
@@ -10,6 +20,7 @@ from app.schemas.root import RootResponse
 app = FastAPI(title="Online Resume API", version="0.0.0")
 
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(portfolio.router, prefix="/api/v1")
 app.include_router(public.router, prefix="/api/v1/public")
 app.include_router(public.router, prefix="/api/v1/public/users/{user_id}")
 app.include_router(avatar.router, prefix="/api/v1")

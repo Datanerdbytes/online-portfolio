@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AuthFeedback, AuthPanel } from "@/components/auth-panel";
 
@@ -42,7 +43,7 @@ function useRecoveryRequest() {
           response.status === 429
             ? "Too many attempts. Please wait and try again."
             : response.status >= 500
-              ? "The email service is temporarily unavailable. Please try again."
+              ? "The account service is temporarily unavailable. Please try again."
               : failure
         );
       }
@@ -110,6 +111,7 @@ export function ForgotPasswordForm() {
 
 export function VerifyEmailForm() {
   const request = useRecoveryRequest();
+  const router = useRouter();
   const emailInput = useRef<HTMLInputElement>(null);
   const [verified, setVerified] = useState(false);
   useEffect(() => {
@@ -126,10 +128,10 @@ export function VerifyEmailForm() {
       <AuthPanel
         status
         title="Email verified"
-        description="Your email is confirmed. You can now sign in to edit your portfolio."
+        description="Your email is confirmed. Continue to your portfolio workspace. If a sign-in is needed, we’ll take you there."
       >
         <Button asChild size="lg" className="w-full">
-          <Link href="/auth/signin">Continue to sign in</Link>
+          <Link href="/admin">Continue to your workspace</Link>
         </Button>
       </AuthPanel>
     );
@@ -158,6 +160,8 @@ export function VerifyEmailForm() {
                 sessionStorage.removeItem("portfolio-verification-email");
               } catch {}
               setVerified(true);
+              router.replace("/admin");
+              router.refresh();
             }
           );
         }}

@@ -17,7 +17,8 @@ manual runs on other branches cannot deploy.
 5. Build both Vercel projects with production settings, then upload those exact
    build outputs using `--prebuilt --prod --skip-domain`. Neither live domain
    changes during staging.
-6. Check staged API health, real database readiness, resume and project reads.
+6. Apply committed production migrations through the guarded workflow step. Then
+   check staged API health, real database readiness, resume and project reads.
    Check the staged frontend homepage and its health, resume and project proxies.
    Protected deployment checks use `vercel curl`; no protection settings are
    disabled. Requests are read-only.
@@ -71,11 +72,11 @@ should go through this workflow rather than a direct local CLI deployment.
 
 ## Database changes and recovery
 
-The pipeline tests migrations against disposable PostgreSQL, but does not apply
-migrations to production or seed production data. Before merging a schema change,
-review and apply any required backward-compatible migration separately using
-Neon's direct connection. Keep old and new application versions compatible
-during the rollout.
+The pipeline tests migrations against disposable PostgreSQL, then applies committed
+migrations to the production application database through its guarded deployment
+step after environment approval. Review schema changes and arrange a backup before
+approving that job. Keep old and new application versions compatible during the
+rollout; production data is never seeded automatically.
 
 These are two independent Vercel projects; promotion is not atomic. Staging
 failures leave the live domains unchanged. If promotion or the final live checks
@@ -83,11 +84,11 @@ fail, inspect both projects before retrying. The Actions summary lists staged
 URLs and the exact Git commit. The staged frontend uses the configured stable
 backend origin, so its new-backend integration is checked after promotion.
 
-For a bad release, inspect deployment history and promote the previously known
-good **production** deployment for each affected project. Run the read-only smoke
-checks after recovery. Never undo a database migration automatically to roll
-back application code. Direct CLI recovery is an emergency operation and should
-be recorded against the failed workflow run.
+For a bad release, inspect the failed workflow run and prepare a reviewed forward
+fix through GitHub Actions. Any needed rollback must be implemented as an authorized
+workflow operation with an exact known production revision. Preserve schema and data;
+never downgrade automatically. Direct CLI/API/dashboard deployment recovery is not
+an alternative to the workflow. Report missing workflow support before proceeding.
 
 ## Verification commands
 
@@ -100,3 +101,21 @@ node scripts/deployment-smoke.mjs web https://online-portfolio-datanerdbytes-412
 The last two commands require a Vercel-authenticated CLI and make no data writes.
 These smoke checks cover public reads, not a full browser or owner-editing test.
 Workflow runs and their results are available in the repository's Actions tab.
+
+## Publication schema rollout
+
+The GitHub Actions production job applies committed Alembic migrations after
+building both applications and before staged smoke checks and promotion.
+`scripts/migrate-production.py` accepts only the API project's pulled production
+`DATABASE_URL`, requires GitHub Actions on `main`, and checks that it targets
+`onlineportfoliodb` on Neon. Credentials and raw driver errors are never printed.
+
+Migration `84ac7d2e19f0` snapshots existing public portfolios while preserving the
+original editable rows and media. It briefly locks content tables against writes
+so the backfill is consistent; public readers can continue. Back up production
+before approving a release that changes schema. If migration or staged checks
+fail, the job stops before promotion. The previous API can keep serving during
+the additive schema backfill. After the new flow accepts private draft edits,
+reverting to the pre-publication API would expose those drafts through its old
+anonymous read behavior. Use a reviewed forward fix; the migration deliberately
+rejects an automatic downgrade that would expose private drafts.

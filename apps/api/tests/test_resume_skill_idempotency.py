@@ -11,6 +11,7 @@ from app.core.auth import TokenClaims
 from app.db.tenant import TenantSession
 from app.db.tenant import get_content_db as get_db
 from app.main import app
+from app.models.owner import PortfolioPublication
 from app.models.resume import SkillGroup, SkillItem
 
 OWNER_CLAIMS = TokenClaims(
@@ -30,7 +31,7 @@ def db_session() -> Generator[Session, None, None]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    tables = [SkillGroup.__table__, SkillItem.__table__]
+    tables = [PortfolioPublication.__table__, SkillGroup.__table__, SkillItem.__table__]
     SkillGroup.metadata.create_all(engine, tables=tables)
     try:
         with TenantSession(engine, user_id="test-owner") as session:
