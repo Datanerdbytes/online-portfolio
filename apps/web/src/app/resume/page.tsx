@@ -4,7 +4,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PrintResumeButton } from "@/components/print-resume-button";
-import { ShareLinkButton } from "@/components/share-link-button";
 import { ResumeDocument } from "@/components/resume-document";
 import { Button } from "@/components/ui/button";
 import { fetchProjects } from "@/lib/api";
@@ -53,7 +52,6 @@ export default async function ResumePage() {
             </Link>
           </Button>
           <PrintResumeButton />
-          <ShareLinkButton path="/resume" label="Share resume" compact />
         </div>
       </div>
 
