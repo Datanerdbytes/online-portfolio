@@ -32,6 +32,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Audit npm dependencies
+        run: npm audit --audit-level=low
       - run: npm run lint:web
       - run: npm run typecheck:web
       - run: npm run test:web
@@ -68,6 +70,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: apps/api/uv.lock
       - run: uv sync --project apps/api --locked
+      - name: Audit Python dependencies
+        run: uv audit --locked
+        working-directory: apps/api
       - run: uv run ruff check .
         working-directory: apps/api
       - run: uv run mypy --explicit-package-bases app

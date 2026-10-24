@@ -15,6 +15,7 @@ from pydantic import (
 SLUG_PATTERN = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 MAX_DISPLAY_ORDER = 2147483647
 MAX_URL_LENGTH = 1024
+MAX_PROJECTS_PER_PORTFOLIO = 50
 
 ProjectSlug = Annotated[str, Field(min_length=1, max_length=100, pattern=SLUG_PATTERN)]
 ProjectTitle = Annotated[str, Field(min_length=1, max_length=200)]

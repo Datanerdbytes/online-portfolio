@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { initialsFromName } from "@/lib/avatar";
 
@@ -18,6 +19,13 @@ const sizeClasses = {
   md: "h-[140px] w-[140px]",
   lg: "h-[168px] w-[168px]",
   resume: "h-[78px] w-[78px]",
+};
+
+const sizePixels = {
+  sm: 116,
+  md: 140,
+  lg: 168,
+  resume: 78,
 };
 
 const textSizes = {
@@ -39,9 +47,12 @@ export function ProfileAvatar({
   const initials = initialsFromName(name);
   if (src && !errored) {
     return (
-      <img
+      <Image
         src={src}
         alt={alt}
+        width={sizePixels[size]}
+        height={sizePixels[size]}
+        unoptimized
         aria-hidden={alt === "" ? true : undefined}
         className={cn("profile-avatar", sizeClasses[size], className)}
         loading={lazy ? "lazy" : "eager"}
@@ -56,7 +67,7 @@ export function ProfileAvatar({
         "profile-avatar profile-avatar-fallback",
         sizeClasses[size],
         textSizes[size],
-        className,
+        className
       )}
       aria-hidden={alt === "" ? true : undefined}
     >

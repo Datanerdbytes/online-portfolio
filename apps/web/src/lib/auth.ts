@@ -211,7 +211,12 @@ export function authJsonResponse(body: unknown) {
   return NextResponse.json(body, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function boundedAuthJson(request: Request): Promise<unknown> {
+export class RequestBodyTooLarge extends Error {}
+
+export async function boundedRequestBytes(
+  request: Request,
+  maxBytes: number
+): Promise<Uint8Array> {
   const reader = request.body?.getReader();
   if (!reader) throw new Error("Missing body");
   const parts: Uint8Array[] = [];
@@ -220,9 +225,9 @@ export async function boundedAuthJson(request: Request): Promise<unknown> {
     const { done, value } = await reader.read();
     if (done) break;
     total += value.byteLength;
-    if (total > 8192) {
-      await reader.cancel();
-      throw new Error("Request too large");
+    if (total > maxBytes) {
+      await reader.cancel().catch(() => undefined);
+      throw new RequestBodyTooLarge();
     }
     parts.push(value);
   }
@@ -232,5 +237,21 @@ export async function boundedAuthJson(request: Request): Promise<unknown> {
     buffer.set(part, offset);
     offset += part.byteLength;
   }
-  return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(buffer));
+  return buffer;
+}
+
+export async function boundedRequestText(
+  request: Request,
+  maxBytes: number
+): Promise<string> {
+  return new TextDecoder("utf-8", { fatal: true }).decode(
+    await boundedRequestBytes(request, maxBytes)
+  );
+}
+
+export async function boundedAuthJson(
+  request: Request,
+  maxBytes = 8192
+): Promise<unknown> {
+  return JSON.parse(await boundedRequestText(request, maxBytes));
 }

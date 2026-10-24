@@ -6,6 +6,7 @@ owner through FastAPI, never cookies or supplied owner headers.
 """
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,7 @@ from app.core.storage import ProfileImageStore, get_image_store
 from app.db.tenant import get_content_db as get_db
 from app.models.project import Project
 from app.schemas.project import (
+    MAX_PROJECTS_PER_PORTFOLIO,
     ProjectCreate,
     ProjectPatch,
     ProjectReplace,
@@ -97,6 +99,11 @@ def create_project(
     current_owner: TokenClaims = Depends(get_current_owner),  # noqa: B008  # FastAPI idiom
     db: Session = Depends(get_db),  # noqa: B008  # FastAPI idiom
 ):
+    if db.query(func.count()).select_from(Project).scalar() >= MAX_PROJECTS_PER_PORTFOLIO:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A portfolio can contain at most {MAX_PROJECTS_PER_PORTFOLIO} projects.",
+        )
     project = Project(
         slug=body.slug,
         title=body.title,
