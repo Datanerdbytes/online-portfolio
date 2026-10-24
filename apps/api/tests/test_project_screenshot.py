@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.exc import SQLAlchemyError
@@ -256,3 +257,11 @@ def test_upload_rejects_forged_image_signature_before_storage():
     assert response.status_code == 400
     assert response.json() == {"detail": "Invalid request"}
     assert not store.saved
+
+
+@pytest.fixture(autouse=True)
+def stub_published_media_lookup(monkeypatch):
+    """Storage route unit tests stub the cross-owner DB lookup; integration covers it."""
+    monkeypatch.setattr(
+        "app.api.v1.project_screenshot.image_is_referenced", lambda db, filename: False
+    )

@@ -16,7 +16,12 @@ export function createProfileImageHandlers(
     try {
       const headers = new Headers();
       const token = await readAdminToken();
-      if (token) headers.set("Authorization", `Bearer ${token}`);
+      if (!token)
+        return NextResponse.json(
+          { detail: "Not authenticated" },
+          { status: 401, headers: { "Cache-Control": "no-store" } }
+        );
+      headers.set("Authorization", `Bearer ${token}`);
       const ifNoneMatch = req.headers.get("if-none-match");
       if (ifNoneMatch) headers.set("if-none-match", ifNoneMatch);
 

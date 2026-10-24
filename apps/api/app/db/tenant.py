@@ -1,14 +1,14 @@
 """Scoped application sessions; public reads and owner-only writes."""
 
 from fastapi import Depends, Header, HTTPException, Request
-from sqlalchemy import event, select
+from sqlalchemy import event, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, with_loader_criteria
 
 from app.core.auth import verify_owner_token
 from app.core.config import settings
 from app.db.session import engine, get_db
-from app.models.owner import LEGACY_OWNER_ID, OwnedContent, PortfolioOwner
+from app.models.owner import LEGACY_OWNER_ID, OwnedContent, PortfolioOwner, PortfolioPublication
 from app.models.resume import Contact, Profile
 
 
@@ -39,6 +39,13 @@ def restrict_writes(db, context, instances):
             row.user_id = db.info["user_id"]
         if row.user_id != db.info["user_id"]:
             raise HTTPException(403, "Not authorized")
+    if db.new or db.deleted or any(db.is_modified(row) for row in db.dirty):
+        table = PortfolioPublication.__table__
+        db.connection().execute(
+            update(table)
+            .where(table.c.owner_id == db.info["user_id"])
+            .values(draft_revision=table.c.draft_revision + 1)
+        )
 
 
 def provision_owner(db: Session, neon_user_id: str) -> str:
@@ -66,6 +73,7 @@ def provision_owner(db: Session, neon_user_id: str) -> str:
     db.execute(
         insert(Contact).values(user_id=owner.id).on_conflict_do_nothing(index_elements=["user_id"])
     )
+    db.execute(insert(PortfolioPublication).values(owner_id=owner.id).on_conflict_do_nothing())
     db.commit()
     return owner.id
 
@@ -77,6 +85,16 @@ def get_public_db(user_id: str | None = None):
         read_only=True,
         autoflush=False,
     ) as db:
+        selected = user_id or settings.PUBLIC_PORTFOLIO_USER_ID
+        table = PortfolioPublication.__table__
+        snapshot = db.connection().scalar(
+            select(table.c.snapshot_owner_id)
+            .where(table.c.owner_id == selected, table.c.is_published.is_(True))
+            .with_for_update(read=True)
+        )
+        if not snapshot:
+            raise HTTPException(404, "Portfolio not published")
+        db.info.update(user_id=snapshot, public_user_id=selected)
         yield db
 
 
@@ -93,4 +111,9 @@ def get_content_db(
     claims = verify_owner_token(authorization)
     owner_id = provision_owner(account_db, claims.sub)
     with TenantSession(engine, user_id=owner_id, autoflush=False) as db:
+        if request.method not in {"GET", "HEAD"}:
+            table = PortfolioPublication.__table__
+            db.connection().execute(
+                select(table.c.owner_id).where(table.c.owner_id == owner_id).with_for_update()
+            )
         yield db

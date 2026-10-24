@@ -847,3 +847,11 @@ def test_every_mutation_enforces_owner_before_database(
     assert not session.rolled_back  # No persistence operation started.
     if expected == 401:
         assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+@pytest.fixture(autouse=True)
+def stub_published_media_lookup(monkeypatch):
+    """Storage route unit tests stub the cross-owner DB lookup; integration covers it."""
+    monkeypatch.setattr(
+        "app.api.v1.project_screenshot.image_is_referenced", lambda db, filename: False
+    )

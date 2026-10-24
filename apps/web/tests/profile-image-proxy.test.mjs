@@ -8,7 +8,7 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 const { NextResponse } = require("next/server");
 
-function imageProxy(path, fetch) {
+function imageProxy(path, fetch, token = "test-owner-token") {
   const source = readFileSync(
     new URL("../src/lib/profile-image-proxy.ts", import.meta.url),
     "utf8"
@@ -25,7 +25,7 @@ function imageProxy(path, fetch) {
     exports: compiled.exports,
     require: (id) => {
       if (id === "next/server") return { NextResponse };
-      if (id === "@/lib/auth") return { readAdminToken: async () => null };
+      if (id === "@/lib/auth") return { readAdminToken: async () => token };
       if (id === "@/lib/api") return { API_BASE_URL: "https://api.test" };
       if (id === "@/lib/avatar") return { AVATAR_UPLOAD_MAX_BYTES: 2162688 };
       throw new Error(`Unexpected import: ${id}`);
@@ -80,4 +80,17 @@ test("unversioned image URLs retain the original upstream path", async () => {
     (await proxy.GET(new Request("https://site.test/image"))).status,
     200
   );
+});
+
+test("draft image reads require a session instead of falling back to public content", async () => {
+  const proxy = imageProxy(
+    "/api/v1/resume/profile/avatar",
+    async () => {
+      assert.fail("An absent session must not fetch another portfolio's image");
+    },
+    null
+  );
+  const response = await proxy.GET(new Request("https://site.test/image"));
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get("cache-control"), "no-store");
 });

@@ -180,3 +180,24 @@ or as part of a deployment build.
 strict claims, absolute expiry/key rotation, rate limits and credential-free
 validation errors. PostgreSQL integration tests still require their existing
 explicit opt-in. Managed-auth ownership is added by revision `6e0a9b12c345`.
+
+## Drafts and publication
+
+New accounts start unpublished. Authenticated content reads and writes use the
+owner's draft. Anonymous reads and `/api/v1/public/...` use only the published
+copy and return 404 when unpublished. Existing public content is preserved by
+migration `84ac7d2e19f0`; nested row IDs in public copies differ from draft IDs.
+Media files remain immutable and are retained while either version references
+them. Editor changes and publication serialize on the publication row.
+
+- `GET /api/v1/portfolio`: owner-only publication state, current draft revision,
+  and onboarding completion flags.
+- `POST /api/v1/portfolio/publish`: owner bearer token and JSON `{"revision": N}`;
+  validates profile basics, checks the revision, and atomically copies saved data.
+- `POST /api/v1/portfolio/unpublish`: same authentication and revision contract;
+  hides public routes and retains the draft.
+
+The browser uses same-origin `/api/portfolio` proxies with origin and CSRF checks.
+`409` means the draft changed; reload the preview before retrying. No owner ID in
+a request body selects the portfolio being published. Preview is private and
+never accepts another owner's ID.

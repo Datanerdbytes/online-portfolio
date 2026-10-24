@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { resume } from "@/content/resume";
+import { notFound } from "next/navigation";
 import { FileText, MapPin } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { getResumeCached } from "@/lib/resume-server";
-import { resolveResume, staticResumeProjects } from "@/lib/resume";
+import { getPublicResumeState } from "@/lib/resume-server";
+import { resolveAccountResume } from "@/lib/resume";
 import { Button } from "@/components/ui/button";
 import { ContactSection } from "@/components/contact-section";
 import { EducationSection } from "@/components/education-section";
@@ -15,15 +15,28 @@ import { ProjectsClient } from "@/components/projects";
 import { SkillsSection } from "@/components/skills-section";
 import { profileImageUrl, BANNER_PATH } from "@/lib/avatar";
 
-export const metadata: Metadata = {
-  title: `${resume.profile.name} | Resume & Portfolio`,
-  description: `${resume.profile.headline}. ${resume.profile.introduction}`,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const state = await getPublicResumeState();
+  return state.status === "ok" && state.data.profile
+    ? {
+        title: `${state.data.profile.name} | Resume & Portfolio`,
+        description: state.data.profile.headline,
+      }
+    : { title: "Resume & Portfolio" };
+}
 
 export default async function Home() {
-  const apiResume = await getResumeCached();
-  const { profile, skills, experience, education, contact } =
-    resolveResume(apiResume);
+  const state = await getPublicResumeState();
+  if (state.status === "missing") notFound();
+  if (state.status !== "ok")
+    return (
+      <p className="content-width py-12" role="alert">
+        This portfolio is temporarily unavailable. Please try again in a moment.
+      </p>
+    );
+  const data = resolveAccountResume(state.data);
+  if (!data) notFound();
+  const { profile, skills, experience, education, contact } = data;
   const bannerSrc = profileImageUrl(
     profile.banner_url,
     profile.banner_updated_at,
@@ -98,7 +111,7 @@ export default async function Home() {
           <p className="section-description">
             A closer look at the projects, tools, and ideas behind my work.
           </p>
-          <ProjectsClient fallbackItems={staticResumeProjects()} />
+          <ProjectsClient />
         </div>
       </section>
       <ExperienceSection experience={experience} />

@@ -83,6 +83,7 @@ function harness(options = {}) {
                 },
             };
           if (id === "@/lib/auth") return load("lib/auth");
+          if (id === "@/lib/portfolio") return load("lib/portfolio");
           if (id === "@/lib/auth/recovery") return load("lib/auth/recovery");
           if (id === "@/lib/projects") return load("lib/projects");
           if (id === "@/lib/project-management")
@@ -1339,4 +1340,97 @@ test("recovery provider outages remain generic service failures", async () => {
     .POST(mutation({ email: "user@example.com" }));
   assert.equal(response.status, 503);
   assert.ok(!(await response.text()).includes("private upstream detail"));
+});
+
+const publicationState = {
+  owner_id: "account-a",
+  is_published: true,
+  has_unpublished_changes: false,
+  revision: 3,
+  published_at: "2026-10-24T00:00:00Z",
+  profile_complete: true,
+  has_work: false,
+};
+
+test("publication proxy requires a session and never trusts supplied owner fields", async () => {
+  let called = 0;
+  const h = harness({
+    fetch: async () => {
+      called++;
+      return Response.json(publicationState);
+    },
+  });
+  assert.equal((await h.load("app/api/portfolio/route").GET()).status, 401);
+  assert.equal(called, 0);
+  h.jar.set("portfolio-admin", { value: "account-token" });
+  const handler = h.load("app/api/portfolio/[action]/route");
+  const context = { params: Promise.resolve({ action: "publish" }) };
+  assert.equal(
+    (
+      await handler.POST(
+        mutation({ revision: 3, owner_id: "another-account" }),
+        context
+      )
+    ).status,
+    400
+  );
+  assert.equal(
+    (
+      await handler.POST(
+        mutation({ revision: 3 }, { Origin: "https://evil.example" }),
+        context
+      )
+    ).status,
+    403
+  );
+  assert.equal(
+    (await handler.POST(mutation({ revision: -1 }), context)).status,
+    400
+  );
+  assert.equal(
+    (
+      await handler.POST(mutation({ revision: 3 }), {
+        params: Promise.resolve({ action: "../auth" }),
+      })
+    ).status,
+    404
+  );
+  assert.equal(called, 0);
+});
+
+test("publication forwards only the saved revision with the managed bearer token", async () => {
+  const h = harness({
+    fetch: async (url, init) => {
+      assert.equal(url, "http://localhost:8000/api/v1/portfolio/publish");
+      assert.equal(init.headers.Authorization, "Bearer account-token");
+      assert.deepEqual(JSON.parse(init.body), { revision: 3 });
+      return Response.json(publicationState);
+    },
+  });
+  h.jar.set("portfolio-admin", { value: "account-token" });
+  const result = await h
+    .load("app/api/portfolio/[action]/route")
+    .POST(mutation({ revision: 3 }), {
+      params: Promise.resolve({ action: "publish" }),
+    });
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), publicationState);
+  assert.equal(result.headers.get("cache-control"), "no-store");
+});
+
+test("stale publication conflicts preserve their retryable status and hide upstream details", async () => {
+  const h = harness({
+    fetch: async () =>
+      Response.json({ detail: "private upstream message" }, { status: 409 }),
+  });
+  h.jar.set("portfolio-admin", { value: "account-token" });
+  const result = await h
+    .load("app/api/portfolio/[action]/route")
+    .POST(mutation({ revision: 3 }), {
+      params: Promise.resolve({ action: "publish" }),
+    });
+  assert.equal(result.status, 409);
+  const body = await result.text();
+  assert.ok(body.includes("Refresh the preview"));
+  assert.ok(!body.includes("private upstream"));
 });

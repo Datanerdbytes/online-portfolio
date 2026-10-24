@@ -23,7 +23,7 @@ def public_resume(db: Session = Depends(get_public_db)):  # noqa: B008
                 setattr(
                     data.profile,
                     field,
-                    value.replace("/api/v1/", f"/api/v1/public/users/{db.info['user_id']}/"),
+                    value.replace("/api/v1/", f"/api/v1/public/users/{db.info['public_user_id']}/"),
                 )
     return data
 
@@ -34,7 +34,7 @@ def public_projects(db: Session = Depends(get_public_db)):  # noqa: B008
     for row in data.items:
         if row.screenshot_url:
             row.screenshot_url = row.screenshot_url.replace(
-                "/api/v1/", f"/api/v1/public/users/{db.info['user_id']}/"
+                "/api/v1/", f"/api/v1/public/users/{db.info['public_user_id']}/"
             )
     return data
 
@@ -62,7 +62,7 @@ def public_project(slug: str, db: Session = Depends(get_public_db)):  # noqa: B0
     data = ProjectResponse.model_validate(projects.get_project(slug, db))
     if data.screenshot_url:
         data.screenshot_url = data.screenshot_url.replace(
-            "/api/v1/", f"/api/v1/public/users/{db.info['user_id']}/"
+            "/api/v1/", f"/api/v1/public/users/{db.info['public_user_id']}/"
         )
     return data
 

@@ -109,7 +109,7 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
         name: file.name,
         updatedAt: updated.screenshot_updated_at,
       });
-      setMessage("Screenshot uploaded and saved successfully.");
+      setMessage("Screenshot saved to your draft.");
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -384,7 +384,7 @@ export function ProjectManager({
           onSuccess: () => {
             setMode("list");
             setEditing(null);
-            setSuccess("Project saved.");
+            setSuccess("Project draft saved.");
           },
           onError: (err) => {
             const error = err as ApiError;
@@ -429,7 +429,7 @@ export function ProjectManager({
           )
         );
         setSuccess(
-          "Project order saved. The public portfolio now uses this order."
+          "Draft order saved. Publish to update your public portfolio."
         );
       },
       onError: (err) => {
@@ -698,7 +698,7 @@ export function ProjectManager({
           </div>
           <p className="text-sm text-muted-foreground">
             Move projects up or down, or choose a position. Preview the order,
-            then select Save order to publish it.
+            then select Save order to save your draft.
           </p>
           {listStatus === "unavailable" ? (
             <p role="status" className="text-sm text-destructive">

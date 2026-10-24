@@ -747,3 +747,9 @@ class TestMiddlewareWiring:
         assert response.json() == {"detail": "Avatar too large"}
         assert store.saved == []
         assert session.committed is False
+
+
+@pytest.fixture(autouse=True)
+def stub_published_media_lookup(monkeypatch):
+    """Storage route unit tests stub the cross-owner DB lookup; integration covers it."""
+    monkeypatch.setattr("app.api.v1.avatar.image_is_referenced", lambda db, filename: False)

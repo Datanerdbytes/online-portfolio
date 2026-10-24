@@ -4,7 +4,7 @@ import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { Header } from "@/components/header";
-import { isAbsoluteHttpUrl, resolveResume } from "@/lib/resume";
+import { isAbsoluteHttpUrl, resolveAccountResume } from "@/lib/resume";
 import { getResumeCached } from "@/lib/resume-server";
 import "./globals.css";
 
@@ -29,9 +29,14 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const apiResume = await getResumeCached();
-  const resolved = resolveResume(apiResume);
-  const profile = resolved.profile;
-  const contact = resolved.contact;
+  const resolved = apiResume ? resolveAccountResume(apiResume) : null;
+  const profile = resolved?.profile ?? {
+    name: "Resume & Portfolio",
+    headline: "Build and share your portfolio",
+    avatar_url: null,
+    avatar_updated_at: null,
+  };
+  const contact = resolved?.contact ?? { email: null, links: [] };
   const links = (contact.links ?? []).filter((link) =>
     isAbsoluteHttpUrl(link.url)
   );
@@ -57,7 +62,7 @@ export default async function RootLayout({
             <Header
               name={profile.name}
               headline={profile.headline}
-              isSample={resolved.isSample}
+              isSample={resolved?.isSample ?? false}
               email={contact.email ?? undefined}
               links={links}
               avatarUrl={profile.avatar_url}
@@ -68,9 +73,11 @@ export default async function RootLayout({
             <footer className="site-footer">
               <div className="content-width footer-inner">
                 <p>
-                  {resolved.isSample
+                  {resolved?.isSample
                     ? "Illustrative sample resume. Example entries are labeled as samples."
-                    : `${profile.name} · Personal portfolio`}
+                    : resolved
+                      ? `${profile.name} · Personal portfolio`
+                      : "Resume & Portfolio"}
                 </p>
                 <nav
                   aria-label="Portfolio links"

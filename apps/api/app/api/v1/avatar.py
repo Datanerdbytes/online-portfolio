@@ -46,6 +46,7 @@ from app.core.storage import (
     ProfileImageStore,
     get_image_store,
 )
+from app.db.publishing import image_is_referenced
 from app.db.tenant import get_content_db as get_db
 from app.models.resume import Profile
 from app.schemas.resume import ProfileResponse
@@ -141,15 +142,19 @@ def _matches_etag(header: str | None, etag: str) -> bool:
     return etag in candidates or "*" in candidates
 
 
-def _remove_quietly(store: ProfileImageStore, filename: str | None) -> None:
+def _remove_quietly(
+    store: ProfileImageStore, filename: str | None, db: Session | None = None
+) -> None:
     """Best-effort cleanup of a stored file."""
     if not filename:
         return
     try:
+        if db is not None and image_is_referenced(db, filename):
+            return
         store.delete(filename)
     except ProfileImageNotFound:
         pass
-    except ProfileImageError:
+    except (ProfileImageError, SQLAlchemyError):
         logger.warning("Could not remove stored avatar %s", filename)
 
 
@@ -271,7 +276,7 @@ def _upload_profile_image(
         raise HTTPException(status_code=400, detail="Avatar upload failed") from None
 
     if previous_filename and previous_filename != filename:
-        _remove_quietly(store, previous_filename)
+        _remove_quietly(store, previous_filename, db)
     return profile
 
 
@@ -316,7 +321,7 @@ def _delete_profile_image(image_kind: ImageKind, db: Session, store: ProfileImag
         db.rollback()
         raise HTTPException(status_code=400, detail="Avatar removal failed") from None
 
-    _remove_quietly(store, filename)
+    _remove_quietly(store, filename, db)
 
 
 @router.delete("/resume/profile/avatar", status_code=204)

@@ -17,16 +17,16 @@ export function SiteFrame({
 }) {
   const pathname = usePathname();
   const builderPage = pathname === "/build-your-portfolio";
-  const editorPage = pathname.startsWith("/admin/");
-  const accountPage = ["/auth/", "/admin/", "/u/"].some((prefix) =>
-    pathname.startsWith(prefix)
-  );
+  const editorPage = pathname === "/admin" || pathname.startsWith("/admin/");
+  const accountPage =
+    editorPage ||
+    ["/auth/", "/admin/", "/u/"].some((prefix) => pathname.startsWith(prefix));
   return (
     <>
       {accountPage || builderPage ? (
         <header className="app-topbar">
           <Link
-            href={editorPage ? "/admin/resume" : "/build-your-portfolio"}
+            href={editorPage ? "/admin" : "/build-your-portfolio"}
             className="app-topbar-brand"
           >
             {editorPage ? "Portfolio editor" : "Resume & Portfolio"}
@@ -35,12 +35,18 @@ export function SiteFrame({
             {editorPage ? (
               <>
                 <Link
+                  href="/admin"
+                  aria-current={pathname === "/admin" ? "page" : undefined}
+                >
+                  Overview
+                </Link>
+                <Link
                   href="/admin/resume"
                   aria-current={
                     pathname === "/admin/resume" ? "page" : undefined
                   }
                 >
-                  My resume
+                  Resume
                 </Link>
                 <Link
                   href="/admin/projects"
@@ -48,7 +54,23 @@ export function SiteFrame({
                     pathname === "/admin/projects" ? "page" : undefined
                   }
                 >
-                  My projects
+                  Projects
+                </Link>
+                <Link
+                  href="/admin/preview"
+                  aria-current={
+                    pathname === "/admin/preview" ? "page" : undefined
+                  }
+                >
+                  Preview
+                </Link>
+                <Link
+                  href="/admin/account"
+                  aria-current={
+                    pathname === "/admin/account" ? "page" : undefined
+                  }
+                >
+                  Account
                 </Link>
               </>
             ) : (

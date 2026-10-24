@@ -1,26 +1,37 @@
+import { notFound } from "next/navigation";
+import { getPublicResumeState } from "@/lib/resume-server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { resume as staticResume } from "@/content/resume";
 import { PrintResumeButton } from "@/components/print-resume-button";
 import { ShareLinkButton } from "@/components/share-link-button";
 import { ResumeDocument } from "@/components/resume-document";
 import { Button } from "@/components/ui/button";
-import { fetchProjectsSafe, fetchResume } from "@/lib/api";
-import { resolveProjects, resolveResume } from "@/lib/resume";
+import { fetchProjects } from "@/lib/api";
+import { resolveAccountResume } from "@/lib/resume";
 
 export const metadata: Metadata = {
-  title: `Resume | ${staticResume.profile.name}`,
-  description: `Printable resume for ${staticResume.profile.name}: experience, selected projects, skills, and education.`,
+  title: "Printable resume",
+  description: "Published resume and selected projects.",
 };
 
 export default async function ResumePage() {
   const [apiResume, apiProjects] = await Promise.all([
-    fetchResume(),
-    fetchProjectsSafe(),
+    getPublicResumeState(),
+    fetchProjects().catch(() => null),
   ]);
-  const resume = resolveResume(apiResume);
-  const projects = resolveProjects(apiProjects);
+  if (apiResume.status === "missing") notFound();
+  if (apiResume.status !== "ok")
+    return (
+      <p role="alert">This resume is temporarily unavailable. Please retry.</p>
+    );
+  const resume = resolveAccountResume(apiResume.data);
+  if (!resume) notFound();
+  if (!apiProjects)
+    return (
+      <p role="alert">Projects are temporarily unavailable. Please retry.</p>
+    );
+  const projects = apiProjects.items;
 
   return (
     <section className="resume-page" aria-labelledby="resume-page-heading">
@@ -45,14 +56,6 @@ export default async function ResumePage() {
           <ShareLinkButton path="/resume" label="Share resume" compact />
         </div>
       </div>
-
-      {resume.source === "static" && (
-        <p className="content-width resume-notice" role="status">
-          Live resume data is unavailable right now, so this document shows the
-          copy stored in the repository. The layout and content are identical to
-          what the API serves.
-        </p>
-      )}
 
       {resume.isSample && resume.sampleNotice && (
         <p className="content-width resume-notice" role="status">
