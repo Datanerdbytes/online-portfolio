@@ -91,7 +91,9 @@ class RequestBodyLimitMiddleware:
         async def replay() -> Message:
             nonlocal delivered
             if delivered:
-                return {"type": "http.request", "body": b"", "more_body": False}
+                # Streaming responses must wait for the real disconnect here.
+                # Repeated empty messages otherwise starve the response task.
+                return await receive()
             delivered = True
             return {"type": "http.request", "body": body, "more_body": False}
 

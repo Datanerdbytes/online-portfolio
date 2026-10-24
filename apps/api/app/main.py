@@ -12,6 +12,7 @@ from app.api.v1 import (
     projects,
     public,
     resume,
+    resume_import,
 )
 from app.core.config import settings
 from app.core.middleware import MULTIPART_OVERHEAD_BYTES, RequestBodyLimitMiddleware
@@ -21,6 +22,7 @@ app = FastAPI(title="Online Resume API", version="0.0.0")
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(portfolio.router, prefix="/api/v1")
+app.include_router(resume_import.router, prefix="/api/v1")
 app.include_router(public.router, prefix="/api/v1/public")
 app.include_router(public.router, prefix="/api/v1/public/users/{user_id}")
 app.include_router(avatar.router, prefix="/api/v1")
@@ -29,6 +31,22 @@ app.include_router(projects.router, prefix="/api/v1")
 app.include_router(project_screenshot.router, prefix="/api/v1")
 app.include_router(resume.router, prefix="/api/v1")
 app.include_router(github.router, prefix="/api/v1")
+
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_bytes=3 * 1024 * 1024 + MULTIPART_OVERHEAD_BYTES,
+    method="POST",
+    path_pattern=re.compile(r"/api/v1/resume-import/(analyze|read)"),
+    too_large_detail="Resume too large. Choose a file no larger than 3 MiB.",
+)
+
+app.add_middleware(
+    RequestBodyLimitMiddleware,
+    max_bytes=512000,
+    method="POST",
+    path="/api/v1/resume-import/apply",
+    too_large_detail="Selected import changes are too large.",
+)
 
 # The portrait upload is bounded before the multipart parser runs, so an
 # oversized file never reaches the disk spool of the request handler.

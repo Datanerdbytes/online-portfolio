@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { workspaceSession } from "@/lib/workspace";
 import { fetchResume } from "@/lib/api";
 import { ResumeManager } from "@/components/resume-manager";
@@ -16,6 +17,11 @@ export default async function AdminResumePage() {
           ready.
         </p>
       </div>
+      <p>
+        <Link className="underline underline-offset-4" href="/admin/import">
+          Import resume
+        </Link>
+      </p>
       {resume ? (
         <ProjectsQueryProvider>
           <ResumeManager

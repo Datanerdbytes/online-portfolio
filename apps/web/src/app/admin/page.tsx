@@ -67,6 +67,11 @@ export default async function WorkspacePage() {
           <ShareLinkButton path={`/u/${status.owner_id}`} />
         )}
       </div>
+      <p>
+        <Link className="underline underline-offset-4" href="/admin/import">
+          Already have a resume? Import it into your draft
+        </Link>
+      </p>
       <ol className="grid gap-4 sm:grid-cols-3">
         {steps.map((step, index) => (
           <li
