@@ -1,6 +1,6 @@
 const TEST_PASSWORD = "fixture-password"; // pragma: allowlist secret
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import vm from "node:vm";
@@ -32,14 +32,18 @@ function harness(options = {}) {
     });
   function load(relative) {
     if (cache.has(relative)) return cache.get(relative);
+    const tsPath = new URL(`../src/${relative}.ts`, import.meta.url);
     const source = readFileSync(
-      new URL(`../src/${relative}.ts`, import.meta.url),
+      existsSync(tsPath)
+        ? tsPath
+        : new URL(`../src/${relative}.tsx`, import.meta.url),
       "utf8"
     );
     const code = ts.transpileModule(source, {
       compilerOptions: {
         target: ts.ScriptTarget.ES2022,
         module: ts.ModuleKind.CommonJS,
+        jsx: ts.JsxEmit.ReactJSX,
       },
     }).outputText;
     const compiledModule = { exports: {} };
@@ -55,6 +59,8 @@ function harness(options = {}) {
             return { cookies: async () => ({ get: (name) => jar.get(name) }) };
           if (id === "next/server") return { NextResponse };
           if (id === "react") return { cache: (callback) => callback };
+          if (id === "react/jsx-runtime")
+            return { jsx: () => null, jsxs: () => null };
           if (id === "next/navigation")
             return {
               redirect: (path) => {
@@ -65,8 +71,8 @@ function harness(options = {}) {
             return load("app/api/projects/[slug]/route");
           if (id === "@/lib/auth/server")
             return {
-              getNeonAuth: () =>
-                options.neon ?? {
+              getNeonAuth: () => {
+                const defaults = {
                   token: async () => ({
                     data: { token: jar.get("portfolio-admin")?.value },
                     error: null,
@@ -87,9 +93,19 @@ function harness(options = {}) {
                     jar.clear();
                     return { data: null, error: null };
                   },
-                },
+                };
+                return options.neon
+                  ? {
+                      ...defaults,
+                      ...options.neon,
+                      signIn: { ...defaults.signIn, ...options.neon.signIn },
+                      signUp: { ...defaults.signUp, ...options.neon.signUp },
+                    }
+                  : defaults;
+              },
             };
           if (id === "@/lib/auth") return load("lib/auth");
+          if (id === "./signin-form") return () => null;
           if (id === "@/lib/portfolio") return load("lib/portfolio");
           if (id === "@/lib/auth/recovery") return load("lib/auth/recovery");
           if (id === "@/lib/projects") return load("lib/projects");
@@ -1067,6 +1083,84 @@ test("login delegates credentials to Neon and never returns provider tokens", as
   assert.equal(seen.email, "user@example.com");
   assert.deepEqual(await response.json(), { authenticated: true });
   assert.equal(response.headers.get("set-cookie"), null);
+});
+
+test("an existing valid session short-circuits another sign-in", async () => {
+  let signInCalls = 0;
+  const h = harness({
+    neon: {
+      token: async () => ({ data: { token: "existing-session-token" } }),
+      signIn: {
+        email: async () => {
+          signInCalls++;
+          return { data: { user: { id: "user" } }, error: null };
+        },
+      },
+    },
+    fetch: async (_url, init) => {
+      assert.equal(
+        new Headers(init.headers).get("authorization"),
+        "Bearer existing-session-token"
+      );
+      return Response.json({
+        owner_id: "owner",
+        authenticated: true,
+        expires_at: expires(),
+      });
+    },
+  });
+
+  const response = await h
+    .load("app/api/auth/login/route")
+    .POST(mutation({ username: "user@example.com", password: TEST_PASSWORD }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { authenticated: true });
+  assert.equal(signInCalls, 0);
+});
+
+test("an existing session is not duplicated while identity verification is unavailable", async () => {
+  let signInCalls = 0;
+  const h = harness({
+    neon: {
+      token: async () => ({ data: { token: "existing-session-token" } }),
+      signIn: {
+        email: async () => {
+          signInCalls++;
+          return { data: { user: { id: "user" } }, error: null };
+        },
+      },
+    },
+    fetch: async () => new Response("unavailable", { status: 503 }),
+  });
+
+  const response = await h
+    .load("app/api/auth/login/route")
+    .POST(mutation({ username: "user@example.com", password: TEST_PASSWORD }));
+
+  assert.equal(response.status, 503);
+  assert.equal(signInCalls, 0);
+});
+
+test("sign-in page redirects an already authenticated owner to the requested admin page", async () => {
+  const h = harness({
+    neon: {
+      token: async () => ({ data: { token: "existing-session-token" } }),
+    },
+    fetch: async () =>
+      Response.json({
+        owner_id: "owner",
+        authenticated: true,
+        expires_at: expires(),
+      }),
+  });
+
+  await assert.rejects(
+    h.load("app/auth/signin/page").default({
+      searchParams: Promise.resolve({ next: "/admin/projects" }),
+    }),
+    /redirect:\/admin\/projects/
+  );
 });
 
 test("registration uses Neon and does not publish login email as profile data", async () => {

@@ -5,6 +5,7 @@ import {
   boundedAuthJson,
   validateMutation,
   validLoginBody,
+  verifyIdentityViaBackend,
 } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,17 @@ export async function POST(request: Request) {
   }
   if (!validLoginBody(body)) return authErrorResponse(400, "Invalid request");
   try {
+    const session = await getNeonAuth().token();
+    if (session.error) {
+      if (![401, 403].includes(session.error.status))
+        return authErrorResponse(503, "Authentication service unavailable");
+    } else if (session.data?.token) {
+      const identity = await verifyIdentityViaBackend(session.data.token);
+      if (identity.identity) return authJsonResponse({ authenticated: true });
+      if (![401, 403].includes(identity.error.status))
+        return authErrorResponse(503, "Authentication service unavailable");
+    }
+
     const result = await getNeonAuth().signIn.email({
       email: body.username.trim().toLowerCase(),
       password: body.password,
