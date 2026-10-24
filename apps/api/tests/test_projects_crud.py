@@ -58,6 +58,12 @@ class StubQuery:
     def all(self):
         return list(self.all_value)
 
+    def select_from(self, *_entities):
+        return self
+
+    def scalar(self):
+        return len(self.all_value)
+
 
 class StubSession:
     def __init__(self, first=None, all=None, fail_commit=False, fail_query=False, commit_exc=None):

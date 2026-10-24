@@ -39,6 +39,8 @@ function loadProxy(fetch) {
           return {
             validateMutation: () => null,
             readAdminToken: async () => "test-bearer-token",
+            boundedRequestText: async (request) => request.text(),
+            RequestBodyTooLarge: class RequestBodyTooLarge extends Error {},
           };
         }
         if (id === "@/lib/api") return { API_BASE_URL: "http://api.test" };

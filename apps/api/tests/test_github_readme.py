@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -32,6 +33,16 @@ class StubResponse:
     def json(self):
         return self.json_body
 
+    def iter_bytes(self, chunk_size=None):
+        yield self.text.encode()
+
+
+@pytest.fixture(autouse=True)
+def clear_readme_cache():
+    from app.api.v1 import github
+
+    github._readme_cache.clear()
+
 
 def _project(repository_url="https://github.com/portfolio-owner/my-awesome-app"):
     return SimpleNamespace(
@@ -53,21 +64,27 @@ def test_readme_returns_rendered_html_for_public_portfolio_project(monkeypatch):
     ]
     requests = []
 
-    class StubAsyncClient:
-        def __init__(self, *, timeout):
+    class StubClient:
+        def __init__(self, *, timeout, follow_redirects):
             assert timeout > 0
+            assert follow_redirects is False
 
-        async def __aenter__(self):
+        def __enter__(self):
             return self
 
-        async def __aexit__(self, *_):
+        def __exit__(self, *_):
             return False
 
-        async def get(self, url, *, headers):
+        def get(self, url, *, headers):
             requests.append((url, headers))
             return responses.pop(0)
 
-    monkeypatch.setattr(httpx, "AsyncClient", StubAsyncClient)
+        @contextmanager
+        def stream(self, method, url, *, headers):
+            requests.append((url, headers))
+            yield responses.pop(0)
+
+    monkeypatch.setattr(httpx, "Client", StubClient)
     with _client_with_project(_project()) as client:
         response = client.get("/api/v1/github/projects/my-awesome-app/readme")
 
@@ -84,21 +101,21 @@ def test_readme_is_not_fetched_for_a_private_repository(monkeypatch):
     _configure_github(monkeypatch)
     requests = []
 
-    class StubAsyncClient:
-        def __init__(self, *, timeout):
+    class StubClient:
+        def __init__(self, *, timeout, follow_redirects):
             pass
 
-        async def __aenter__(self):
+        def __enter__(self):
             return self
 
-        async def __aexit__(self, *_):
+        def __exit__(self, *_):
             return False
 
-        async def get(self, url, *, headers):
+        def get(self, url, *, headers):
             requests.append(url)
             return StubResponse(200, json_body={"private": True})
 
-    monkeypatch.setattr(httpx, "AsyncClient", StubAsyncClient)
+    monkeypatch.setattr(httpx, "Client", StubClient)
     with _client_with_project(_project()) as client:
         response = client.get("/api/v1/github/projects/my-awesome-app/readme")
 
@@ -109,11 +126,11 @@ def test_readme_is_not_fetched_for_a_private_repository(monkeypatch):
 def test_readme_is_not_fetched_for_an_unpublished_or_unapproved_repository(monkeypatch):
     _configure_github(monkeypatch)
 
-    class UnexpectedAsyncClient:
+    class UnexpectedClient:
         def __init__(self, **_):
             raise AssertionError("GitHub must not be contacted for an unapproved project")
 
-    monkeypatch.setattr(httpx, "AsyncClient", UnexpectedAsyncClient)
+    monkeypatch.setattr(httpx, "Client", UnexpectedClient)
     with _client_with_project(_project("https://github.com/someone-else/private-repo")) as client:
         response = client.get("/api/v1/github/projects/my-awesome-app/readme")
 
@@ -123,11 +140,11 @@ def test_readme_is_not_fetched_for_an_unpublished_or_unapproved_repository(monke
 def test_readme_returns_404_for_unknown_project(monkeypatch):
     _configure_github(monkeypatch)
 
-    class UnexpectedAsyncClient:
+    class UnexpectedClient:
         def __init__(self, **_):
             raise AssertionError("GitHub must not be contacted for an unknown project")
 
-    monkeypatch.setattr(httpx, "AsyncClient", UnexpectedAsyncClient)
+    monkeypatch.setattr(httpx, "Client", UnexpectedClient)
     with _client_with_project(None) as client:
         response = client.get("/api/v1/github/projects/not-published/readme")
 
@@ -137,20 +154,20 @@ def test_readme_returns_404_for_unknown_project(monkeypatch):
 def test_readme_returns_503_when_github_times_out(monkeypatch):
     _configure_github(monkeypatch)
 
-    class TimeoutAsyncClient:
-        def __init__(self, *, timeout):
+    class TimeoutClient:
+        def __init__(self, *, timeout, follow_redirects):
             pass
 
-        async def __aenter__(self):
+        def __enter__(self):
             return self
 
-        async def __aexit__(self, *_):
+        def __exit__(self, *_):
             return False
 
-        async def get(self, *_args, **_kwargs):
+        def get(self, *_args, **_kwargs):
             raise httpx.ReadTimeout("private upstream details")
 
-    monkeypatch.setattr(httpx, "AsyncClient", TimeoutAsyncClient)
+    monkeypatch.setattr(httpx, "Client", TimeoutClient)
     with _client_with_project(_project()) as client:
         response = client.get("/api/v1/github/projects/my-awesome-app/readme")
 

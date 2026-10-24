@@ -7,6 +7,7 @@ bearer token pattern as the projects router.
 import re
 
 from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -24,6 +25,12 @@ from app.models.resume import (
     SkillItem,
 )
 from app.schemas.resume import (
+    MAX_CONTACT_LINKS,
+    MAX_EDUCATION_ENTRIES,
+    MAX_EXPERIENCE_ENTRIES,
+    MAX_HIGHLIGHTS_PER_EXPERIENCE,
+    MAX_SKILL_GROUPS,
+    MAX_SKILL_ITEMS_PER_GROUP,
     ContactLinkCreate,
     ContactLinkPatch,
     ContactLinkResponse,
@@ -50,6 +57,14 @@ from app.schemas.resume import (
 )
 
 router = APIRouter(route_class=AuthRoute, tags=["resume"])
+
+
+def _ensure_capacity(db: Session, model, limit: int, detail: str, *filters) -> None:
+    query = db.query(func.count()).select_from(model)
+    if filters:
+        query = query.filter(*filters)
+    if query.scalar() >= limit:
+        raise HTTPException(status_code=409, detail=detail)
 
 
 def get_current_owner(authorization: str | None = Header(None)) -> TokenClaims:  # noqa: B008
@@ -140,6 +155,12 @@ def create_skill_group(
     db: Session = Depends(get_db),  # noqa: B008
     _owner: TokenClaims = Depends(get_current_owner),  # noqa: B008
 ):
+    _ensure_capacity(
+        db,
+        SkillGroup,
+        MAX_SKILL_GROUPS,
+        f"A portfolio can contain at most {MAX_SKILL_GROUPS} skill groups.",
+    )
     group = SkillGroup(label=body.label, display_order=body.display_order)
     db.add(group)
     db.flush()
@@ -210,6 +231,13 @@ def add_skill_item(
     group = db.get(SkillGroup, group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Skill group not found")
+    _ensure_capacity(
+        db,
+        SkillItem,
+        MAX_SKILL_ITEMS_PER_GROUP,
+        f"A skill group can contain at most {MAX_SKILL_ITEMS_PER_GROUP} items.",
+        SkillItem.group_id == group_id,
+    )
     item = SkillItem(
         group_id=group_id,
         item=body.item,
@@ -294,6 +322,12 @@ def create_experience(
     db: Session = Depends(get_db),  # noqa: B008
     _owner: TokenClaims = Depends(get_current_owner),  # noqa: B008
 ):
+    _ensure_capacity(
+        db,
+        Experience,
+        MAX_EXPERIENCE_ENTRIES,
+        f"A portfolio can contain at most {MAX_EXPERIENCE_ENTRIES} experience entries.",
+    )
     highlights = body.highlights
     exp_data = body.model_dump(exclude={"highlights"})
     exp = Experience(**exp_data)
@@ -348,6 +382,13 @@ def add_highlight(
     exp = db.get(Experience, exp_id)
     if not exp:
         raise HTTPException(status_code=404, detail="Experience not found")
+    _ensure_capacity(
+        db,
+        ExperienceHighlight,
+        MAX_HIGHLIGHTS_PER_EXPERIENCE,
+        f"An experience entry can contain at most {MAX_HIGHLIGHTS_PER_EXPERIENCE} highlights.",
+        ExperienceHighlight.experience_id == exp_id,
+    )
     h = ExperienceHighlight(experience_id=exp_id, text=body.text, display_order=body.display_order)
     db.add(h)
     db.commit()
@@ -401,6 +442,12 @@ def create_education(
     db: Session = Depends(get_db),  # noqa: B008
     _owner: TokenClaims = Depends(get_current_owner),  # noqa: B008
 ):
+    _ensure_capacity(
+        db,
+        Education,
+        MAX_EDUCATION_ENTRIES,
+        "A portfolio can contain at most 50 education entries.",
+    )
     edu = Education(**body.model_dump())
     db.add(edu)
     db.commit()
@@ -476,6 +523,12 @@ def add_contact_link(
     contact = db.query(Contact).first()
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
+    _ensure_capacity(
+        db,
+        ContactLink,
+        MAX_CONTACT_LINKS,
+        "A portfolio can contain at most 30 contact links.",
+    )
     link = ContactLink(contact_id=contact.id, **body.model_dump())
     db.add(link)
     db.commit()

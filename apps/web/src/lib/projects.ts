@@ -2,9 +2,20 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
-import { isProject, isSlug, isStrictOrder, projectResponse } from "@/lib/project-management";
+import {
+  isProject,
+  isSlug,
+  isStrictOrder,
+  projectResponse,
+} from "@/lib/project-management";
 export { isProject, isSlug } from "@/lib/project-management";
-import { authErrorResponse, readAdminToken, validateMutation } from "@/lib/auth";
+import {
+  authErrorResponse,
+  boundedAuthJson,
+  RequestBodyTooLarge,
+  readAdminToken,
+  validateMutation,
+} from "@/lib/auth";
 
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -30,12 +41,22 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 export function isReorderRequest(value: unknown): value is ReorderRequest {
-  if (!isPlainObject(value) || Object.keys(value).length !== 1 || !Array.isArray(value.orders)) return false;
+  if (
+    !isPlainObject(value) ||
+    Object.keys(value).length !== 1 ||
+    !Array.isArray(value.orders)
+  )
+    return false;
   const { orders } = value;
   if (orders.length < 1 || orders.length > MAX_ORDERS) return false;
   const slugs = new Set<string>();
   for (const entry of orders) {
-    if (!isPlainObject(entry) || Object.keys(entry).length !== 2 || !isSlug(entry.slug) || !isStrictOrder(entry.display_order)) {
+    if (
+      !isPlainObject(entry) ||
+      Object.keys(entry).length !== 2 ||
+      !isSlug(entry.slug) ||
+      !isStrictOrder(entry.display_order)
+    ) {
       return false;
     }
     if (slugs.has(entry.slug)) return false;
@@ -45,34 +66,56 @@ export function isReorderRequest(value: unknown): value is ReorderRequest {
 }
 
 export function isUpdatedBody(value: unknown): value is ReorderResponse {
-  return isPlainObject(value) && typeof value.updated === "number" && Number.isInteger(value.updated) && value.updated >= 1 && value.updated <= MAX_ORDERS;
+  return (
+    isPlainObject(value) &&
+    typeof value.updated === "number" &&
+    Number.isInteger(value.updated) &&
+    value.updated >= 1 &&
+    value.updated <= MAX_ORDERS
+  );
 }
 
 type BackendResult =
   | { body: unknown; error: null }
-  | { body: null; error: { status: number; detail: string }; retryAfter?: string };
+  | {
+      body: null;
+      error: { status: number; detail: string };
+      retryAfter?: string;
+    };
 
 export async function fetchProjectBackend(
   path: string,
   init: RequestInit = {},
-  { parseJson = true, expectedStatus = 200 }: { parseJson?: boolean; expectedStatus?: number } = {}
+  {
+    parseJson = true,
+    expectedStatus = 200,
+  }: { parseJson?: boolean; expectedStatus?: number } = {}
 ): Promise<BackendResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const base = process.env.API_BASE_URL || "http://localhost:8000";
     const response = await fetch(`${base}${path}`, {
-      ...init, signal: controller.signal, cache: "no-store",
+      ...init,
+      signal: controller.signal,
+      cache: "no-store",
     });
     if (!response.ok) {
       const detail: Record<number, string> = {
-        400: "Invalid request", 401: "Not authenticated", 403: "Not authorized",
-        404: "Project not found", 409: "Project already exists",
-        429: "Too many requests", 503: "Administration unavailable",
+        400: "Invalid request",
+        401: "Not authenticated",
+        403: "Not authorized",
+        404: "Project not found",
+        409: "Project already exists",
+        429: "Too many requests",
+        503: "Administration unavailable",
       };
       const status = response.status;
       if (!(status in detail)) {
-        return { body: null, error: { status: 502, detail: "Projects service unavailable" } };
+        return {
+          body: null,
+          error: { status: 502, detail: "Projects service unavailable" },
+        };
       }
       const retry = response.headers.get("retry-after");
       return {
@@ -82,11 +125,17 @@ export async function fetchProjectBackend(
       };
     }
     if (response.status !== expectedStatus) {
-      return { body: null, error: { status: 502, detail: "Projects service unavailable" } };
+      return {
+        body: null,
+        error: { status: 502, detail: "Projects service unavailable" },
+      };
     }
     return { body: parseJson ? await response.json() : null, error: null };
   } catch {
-    return { body: null, error: { status: 502, detail: "Projects service unavailable" } };
+    return {
+      body: null,
+      error: { status: 502, detail: "Projects service unavailable" },
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -106,7 +155,9 @@ export type ProjectRouteOptions = {
   successBody?: (value: unknown) => unknown;
 };
 
-function readOnlyFieldsFor(method: "POST" | "PUT" | "PATCH"): readonly string[] {
+function readOnlyFieldsFor(
+  method: "POST" | "PUT" | "PATCH"
+): readonly string[] {
   return [
     ...READ_ONLY_FIELDS,
     ...(method === "PUT" || method === "PATCH" ? ["slug"] : []),
@@ -121,7 +172,11 @@ export async function handleProjectMutation(
   if (csrf) return authErrorResponse(csrf.status, csrf.detail);
 
   if (options.method !== "DELETE") {
-    const mediaType = request.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+    const mediaType = request.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      .trim()
+      .toLowerCase();
     if (mediaType !== "application/json") {
       return authErrorResponse(400, "Invalid request");
     }
@@ -129,13 +184,17 @@ export async function handleProjectMutation(
 
   const token = await readAdminToken();
   if (!token) return authErrorResponse(401, "Not authenticated");
-  if (options.slug !== undefined && !isSlug(options.slug)) return authErrorResponse(400, "Invalid request");
+  if (options.slug !== undefined && !isSlug(options.slug))
+    return authErrorResponse(400, "Invalid request");
 
   let body: unknown = null;
   if (options.method !== "DELETE") {
     try {
-      body = await request.json();
-    } catch {
+      body = await boundedAuthJson(request, 512 * 1024);
+    } catch (error) {
+      if (error instanceof RequestBodyTooLarge) {
+        return authErrorResponse(413, "Request body too large.");
+      }
       return authErrorResponse(400, "Invalid request");
     }
     if (!isPlainObject(body)) return authErrorResponse(400, "Invalid request");
@@ -146,7 +205,8 @@ export async function handleProjectMutation(
     }
     if (options.allowedFields) {
       for (const field of Object.keys(body)) {
-        if (!options.allowedFields.includes(field)) return authErrorResponse(400, "Invalid request");
+        if (!options.allowedFields.includes(field))
+          return authErrorResponse(400, "Invalid request");
       }
     }
     if (options.requireNonEmptyBody && Object.keys(body).length === 0) {
@@ -162,11 +222,21 @@ export async function handleProjectMutation(
     }
   }
 
-  const result = await fetchProjectBackend(options.path, {
-    method: options.method,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    ...(body !== null ? { body: JSON.stringify(body) } : {}),
-  }, { parseJson: options.method !== "DELETE", expectedStatus: options.successStatus });
+  const result = await fetchProjectBackend(
+    options.path,
+    {
+      method: options.method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      ...(body !== null ? { body: JSON.stringify(body) } : {}),
+    },
+    {
+      parseJson: options.method !== "DELETE",
+      expectedStatus: options.successStatus,
+    }
+  );
 
   if (result.error) {
     const headers: Record<string, string> = {};
@@ -178,9 +248,19 @@ export async function handleProjectMutation(
   if (options.validateSuccess && !options.validateSuccess(result.body, body)) {
     return authErrorResponse(502, "Projects service unavailable");
   }
-  const out = options.successBody ? options.successBody(result.body) : isProject(result.body) ? projectResponse(result.body) : result.body;
+  const out = options.successBody
+    ? options.successBody(result.body)
+    : isProject(result.body)
+      ? projectResponse(result.body)
+      : result.body;
   if (options.method === "DELETE") {
-    return new NextResponse(null, { status: 204, headers: { "Cache-Control": "no-store" } });
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
-  return NextResponse.json(out, { status: options.successStatus, headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(out, {
+    status: options.successStatus,
+    headers: { "Cache-Control": "no-store" },
+  });
 }
