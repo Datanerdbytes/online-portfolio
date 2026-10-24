@@ -217,3 +217,33 @@ export function candidateValid(value: unknown): value is Candidate {
     c.warnings.every((v) => typeof v === "string")
   );
 }
+
+/** Use original evidence, not other AI suggestions or private contact data. */
+export function factsForWriting(
+  candidates: Candidate[],
+  selected: Candidate
+): string {
+  const scoped = selected.section === "profile" ? candidates : [selected];
+  return JSON.stringify(
+    scoped
+      .filter((c) => !["contact", "links"].includes(c.section))
+      .map((c) => ({
+        section: c.section,
+        evidence: Object.fromEntries(
+          Object.entries(c.evidence).filter(
+            ([field]) =>
+              ![
+                "email",
+                "phone",
+                "url",
+                "repository_url",
+                "demo_url",
+                "location",
+                "name",
+              ].includes(field)
+          )
+        ),
+      }))
+      .filter((c) => Object.keys(c.evidence).length > 0)
+  );
+}

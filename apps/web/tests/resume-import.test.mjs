@@ -178,3 +178,77 @@ test("candidate validation accepts individually quoted list evidence", () => {
     false
   );
 });
+
+test("AI writing proxy preserves authentication and returns only a separate draft", async () => {
+  const h = harness({
+    response: Response.json({ text: "Data engineering candidate" }),
+  });
+  const result = await h.route.POST(
+    new Request("http://web.test/api/resume-import/write", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        consent: true,
+        expected_owner_id: "owner",
+        section: "profile",
+        field: "headline",
+        facts: "Python pipelines",
+      }),
+    }),
+    context("write")
+  );
+  assert.equal(result.status, 200);
+  assert.deepEqual(await result.json(), { text: "Data engineering candidate" });
+  assert.equal(h.calls[0].url, "http://api.test/api/v1/resume-import/write");
+  assert.equal(h.calls[0].init.headers.Authorization, "Bearer owner-token");
+});
+
+test("writing context is scoped and excludes contacts and previous AI prose", () => {
+  const profile = {
+    section: "profile",
+    values: { name: "Private Name" },
+    evidence: { name: "Private Name", headline: "Engineering candidate" },
+    generated: [],
+    warnings: [],
+  };
+  const contact = {
+    section: "contact",
+    values: { email: "private@example.invalid" },
+    evidence: { email: "private@example.invalid" },
+    generated: [],
+    warnings: [],
+  };
+  const project = {
+    section: "projects",
+    values: { title: "Project" },
+    evidence: { title: "Project", repository_url: "https://example.invalid" },
+    generated: [],
+    warnings: [],
+  };
+  const global = mapping.factsForWriting([profile, contact, project], profile);
+  assert.doesNotMatch(global, /Private Name|private@example|https:/);
+  const scoped = mapping.factsForWriting([profile, contact, project], project);
+  assert.doesNotMatch(scoped, /Engineering candidate/);
+  assert.match(scoped, /Project/);
+});
+
+test("writing errors preserve only known content-free explanations", async () => {
+  for (const detail of [
+    "The AI draft added an unsupported number. Retry or write manually.",
+    "private upstream resume contents",
+  ]) {
+    const h = harness({ response: Response.json({ detail }, { status: 503 }) });
+    const result = await h.route.POST(
+      new Request("http://web.test/api/resume-import/write", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      }),
+      context("write")
+    );
+    const body = await result.json();
+    assert.equal(result.status, 503);
+    if (detail.startsWith("The AI draft")) assert.equal(body.detail, detail);
+    else assert.doesNotMatch(body.detail, /private upstream/);
+  }
+});

@@ -129,3 +129,35 @@ browser → authenticated API → NVIDIA → validated review flow: 18 review en
 experience entries, and education). The review was left unsaved; neither private
 draft fields nor the published snapshot were changed by that browser test. No
 real resume text, proposals, or provider key is included in the repository.
+
+## Write or improve individual fields with AI
+
+The import review offers **Write with AI** (empty text) or **Improve with AI**
+for profile headline, introduction, about, experience description, and project
+summary. Optional tone/focus guidance is supported. Factual identity fields,
+roles, employers, institutions, dates, and contact details are not AI-writing
+fields.
+
+Each request shows a separate editable suggestion with **Use suggestion** and
+**Discard suggestion**. Only explicit acceptance updates and selects the proposed
+field, marked as AI writing. The owner must still use **Save selected changes**;
+writing never changes the database draft, revision, or published portfolio.
+
+`POST /api/v1/resume-import/write` requires the verified owner, CSRF-protected
+same-origin proxy, explicit consent, expected owner, allowed section/field,
+bounded facts/current text, and optional guidance. The browser discloses the
+NVIDIA transfer before the user generates text. Profile writing uses the review's
+source evidence; experience/project writing uses that entry's source evidence to
+avoid mixing achievements. Contact details, owner IDs, and unrelated links are
+excluded from the facts sent to the model.
+
+The same selected model is used with schema-constrained output, no tools or
+retries, a 30-second deadline, and a 1200-token output ceiling. Field limits are
+headline 300, introduction/experience description 2000, about 3000, and project
+summary 1000 characters. Generated numbers absent from supplied facts/current
+text are rejected; semantic accuracy still requires the owner's review.
+
+Writing uses separate database-backed rolling quotas: 20 requests/hour, 50/day
+per owner and 500/day globally. One active request per owner is shared across
+analysis and writing. Metadata migration `b63e52ca7801` classifies existing attempts
+as analysis. No writing input or output is stored in operational metadata.

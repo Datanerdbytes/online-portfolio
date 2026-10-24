@@ -176,3 +176,30 @@ class ApplyImport(StrictModel):
     def validate_key(self):
         UUID(self.idempotency_key)
         return self
+
+
+WRITING_FIELDS = {
+    ("profile", "headline"): 300,
+    ("profile", "introduction"): 2000,
+    ("profile", "about"): 3000,
+    ("experience", "description"): 2000,
+    ("projects", "summary"): 1000,
+}
+
+
+class WritingRequest(StrictModel):
+    consent: bool
+    expected_owner_id: str = Field(min_length=1, max_length=128)
+    section: Section
+    field: str = Field(min_length=1, max_length=30)
+    facts: str = Field(min_length=1, max_length=32000)
+    current_text: str = Field(default="", max_length=10000)
+    guidance: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def writable_field(self):
+        if not self.consent:
+            raise ValueError("Consent is required before AI writing")
+        if (self.section, self.field) not in WRITING_FIELDS:
+            raise ValueError("AI writing is only available for narrative fields")
+        return self

@@ -16,6 +16,7 @@ class ImportAttempt(Base):
         ForeignKey("portfolio_owners.id", ondelete="CASCADE"), index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    operation: Mapped[str] = mapped_column(String(16), default="analyze", server_default="analyze")
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

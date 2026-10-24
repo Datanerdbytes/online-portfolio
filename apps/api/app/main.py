@@ -44,7 +44,7 @@ app.add_middleware(
     RequestBodyLimitMiddleware,
     max_bytes=512000,
     method="POST",
-    path="/api/v1/resume-import/apply",
+    path_pattern=re.compile(r"/api/v1/resume-import/(apply|write)"),
     too_large_detail="Selected import changes are too large.",
 )
 

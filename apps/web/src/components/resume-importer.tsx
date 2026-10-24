@@ -3,9 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AiWritingAssistant,
+  writingLimits,
+} from "@/components/ai-writing-assistant";
 import { Button } from "@/components/ui/button";
 import {
   candidateValid,
+  factsForWriting,
   display,
   entries,
   IMPORT_MAX_BYTES,
@@ -527,9 +532,9 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
             />
             <span>
               I agree to send the extracted resume text to NVIDIA for mapping
-              and optional headline/introduction suggestions. This app discards
-              the uploaded file after processing. NVIDIA’s own data policies
-              apply. Nothing is saved to my resume until I confirm.
+              and optional writing suggestions for narrative fields. This app
+              discards the uploaded file after processing. NVIDIA’s own data
+              policies apply. Nothing is saved to my resume until I confirm.
             </span>
           </label>
           {context.can_read_locally && !reviews.length && (
@@ -786,6 +791,29 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
                         )}
                       </label>
                     </div>
+                    {writingLimits[c.section]?.[key] && (
+                      <AiWritingAssistant
+                        section={c.section}
+                        field={key}
+                        ownerId={context.status.owner_id}
+                        currentText={display(review.values[key])}
+                        disabled={busy || !review.active}
+                        facts={factsForWriting(
+                          reviews.map((r) => r.candidate),
+                          c
+                        )}
+                        onUse={(text) =>
+                          update(index, {
+                            values: { ...review.values, [key]: text },
+                            selected: { ...review.selected, [key]: true },
+                            candidate: {
+                              ...c,
+                              generated: [...new Set([...c.generated, key])],
+                            },
+                          })
+                        }
+                      />
+                    )}
                     {c.evidence[key] ? (
                       <details className="text-sm">
                         <summary className="min-h-8 cursor-pointer underline">

@@ -274,3 +274,54 @@ def test_daily_and_global_limits_share_database_state(accounts):
         with pytest.raises(Exception) as error:
             reserve_attempt(db, ids[0])
         assert error.value.status_code == 429
+
+
+def test_field_writing_is_private_owner_bound_and_never_saved(accounts, enabled, monkeypatch):
+    from app.services import resume_writing
+    from app.services.resume_writing import WritingResult
+
+    client, engine, ids, (a, b) = accounts
+    monkeypatch.setattr(
+        resume_writing, "write_field", lambda _: WritingResult(text="Data engineering candidate")
+    )
+    payload = {
+        "consent": True,
+        "expected_owner_id": ids[0],
+        "section": "profile",
+        "field": "headline",
+        "facts": "Builds Python pipelines",
+    }
+    assert client.post("/api/v1/resume-import/write", json=payload).status_code == 401
+    assert client.post("/api/v1/resume-import/write", headers=b, json=payload).status_code == 409
+    before = client.get("/api/v1/portfolio", headers=a).json()["revision"]
+    response = client.post("/api/v1/resume-import/write", headers=a, json=payload)
+    assert response.status_code == 200, response.text
+    assert response.json()["text"] == "Data engineering candidate"
+    assert client.get("/api/v1/resume", headers=a).json()["profile"]["headline"] == ""
+    assert client.get("/api/v1/portfolio", headers=a).json()["revision"] == before
+    with Session(engine) as db:
+        row = db.scalar(select(ImportAttempt).where(ImportAttempt.owner_id == ids[0]))
+        assert row.operation == "write" and row.completed_at is not None
+
+
+def test_writing_has_separate_quota_from_document_analysis(accounts):
+    _, engine, ids, _ = accounts
+    now = datetime.now(timezone.utc)
+    with Session(engine) as db:
+        for _ in range(5):
+            db.add(
+                ImportAttempt(
+                    id=str(uuid4()),
+                    owner_id=ids[0],
+                    operation="analyze",
+                    created_at=now,
+                    completed_at=now,
+                )
+            )
+        db.commit()
+        with pytest.raises(Exception) as error:
+            reserve_attempt(db, ids[0])
+        assert error.value.status_code == 429
+        db.rollback()
+        key = reserve_attempt(db, ids[0], "write")
+        assert db.get(ImportAttempt, key).operation == "write"

@@ -83,6 +83,31 @@ async function proxy(request: Request, action: string) {
         429: "Import limit reached. Retry later or use the manual editor.",
         503: "Import is unavailable. Your manual editor is still available.",
       };
+      if (action === "write") {
+        errors[429] =
+          "AI writing limit reached or another request is still running. Retry later; your text is unchanged.";
+        errors[503] =
+          "AI writing is temporarily unavailable. Your text is unchanged; retry or write manually.";
+        errors[409] =
+          "Your signed-in account changed. Refresh your workspace before using AI writing.";
+      }
+      if (action === "write" && response.status === 503) {
+        const safeWritingErrors = new Set([
+          "AI writing is temporarily unavailable. Your text is unchanged.",
+          "The AI draft was too large. Your text is unchanged.",
+          "The AI draft was incomplete. Your text is unchanged.",
+          "The AI draft did not fit this field. Your text is unchanged.",
+          "The AI draft added an unsupported number. Retry or write manually.",
+          "AI writing could not finish. Your text is unchanged; retry later.",
+        ]);
+        try {
+          const payload = await response.json();
+          if (safeWritingErrors.has(payload.detail))
+            return authErrorResponse(503, payload.detail);
+        } catch {
+          /* Preserve only known content-free errors. */
+        }
+      }
       if (action === "read" && response.status === 400) {
         const safeMessages = new Set([
           "Choose a PDF or DOCX file no larger than 3 MiB.",
@@ -153,7 +178,7 @@ export async function POST(
   context: { params: Promise<{ action: string }> }
 ) {
   const { action } = await context.params;
-  if (!["analyze", "read", "apply"].includes(action))
+  if (!["analyze", "read", "apply", "write"].includes(action))
     return authErrorResponse(404, "Not found");
   return proxy(request, action);
 }

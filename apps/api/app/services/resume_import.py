@@ -44,7 +44,12 @@ def expire_metadata(db: Session):
     db.execute(delete(ImportReceipt).where(ImportReceipt.created_at < cutoff))
 
 
-def reserve_attempt(db: Session, owner: str) -> str:
+def reserve_attempt(db: Session, owner: str, operation: str = "analyze") -> str:
+    if operation not in {"analyze", "write"}:
+        raise ValueError("Unknown operation")
+    hourly_limit, daily_limit, global_limit = (
+        (20, 50, 500) if operation == "write" else (5, 20, 200)
+    )
     # A single short transaction serializes the global quota across instances.
     db.execute(text("SELECT pg_advisory_xact_lock(735281904)"))
     expire_metadata(db)
@@ -61,20 +66,33 @@ def reserve_attempt(db: Session, owner: str) -> str:
     hour = db.scalar(
         select(func.count())
         .select_from(ImportAttempt)
-        .where(ImportAttempt.owner_id == owner, ImportAttempt.created_at > now - timedelta(hours=1))
+        .where(
+            ImportAttempt.owner_id == owner,
+            ImportAttempt.operation == operation,
+            ImportAttempt.created_at > now - timedelta(hours=1),
+        )
     )
     day = db.scalar(
-        select(func.count()).select_from(ImportAttempt).where(ImportAttempt.owner_id == owner)
+        select(func.count())
+        .select_from(ImportAttempt)
+        .where(ImportAttempt.owner_id == owner, ImportAttempt.operation == operation)
     )
-    total = db.scalar(select(func.count()).select_from(ImportAttempt))
-    if active or (hour or 0) >= 5 or (day or 0) >= 20 or (total or 0) >= 200:
+    total = db.scalar(
+        select(func.count()).select_from(ImportAttempt).where(ImportAttempt.operation == operation)
+    )
+    if (
+        active
+        or (hour or 0) >= hourly_limit
+        or (day or 0) >= daily_limit
+        or (total or 0) >= global_limit
+    ):
         raise HTTPException(
             429,
             "Import limit reached. Retry later or use the manual editor.",
             headers={"Retry-After": "300"},
         )
     key = str(uuid4())
-    db.add(ImportAttempt(id=key, owner_id=owner, created_at=now))
+    db.add(ImportAttempt(id=key, owner_id=owner, created_at=now, operation=operation))
     db.commit()
     return key
 

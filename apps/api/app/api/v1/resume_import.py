@@ -16,7 +16,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.models.owner import PortfolioPublication
 from app.models.resume_import import ImportAttempt
-from app.schemas.resume_import import ApplyImport
+from app.schemas.resume_import import ApplyImport, WritingRequest
 from app.services.resume_extraction import (
     MAX_FILE_BYTES,
     ImportProblem,
@@ -162,6 +162,29 @@ def read_locally(
         return {"text": document, "characters": len(document)}
     except ImportProblem as exc:
         raise HTTPException(400, str(exc)) from None
+    finally:
+        row = db.get(ImportAttempt, attempt)
+        if row:
+            row.completed_at = datetime.now(timezone.utc)
+            db.commit()
+
+
+@router.post("/resume-import/write")
+def write(
+    body: WritingRequest,
+    owner: str = Depends(owner_id),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+):
+    from app.services.resume_writing import write_field
+
+    require_import()
+    if body.expected_owner_id != owner:
+        raise HTTPException(409, "Your signed-in account changed. Refresh your workspace.")
+    attempt = reserve_attempt(db, owner, "write")
+    try:
+        return write_field(body)
+    except ImportProblem as exc:
+        raise HTTPException(503, str(exc)) from None
     finally:
         row = db.get(ImportAttempt, attempt)
         if row:
