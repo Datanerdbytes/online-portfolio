@@ -283,25 +283,50 @@ h3 {
   font-size: 12px;
 }
 .sidebar-socials {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   margin-top: 18px;
 }
-.sidebar-socials a {
+.sidebar-social-link {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  min-height: 35px;
-  font-size: 10px;
-  font-weight: 600;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
   border: 1px solid hsl(var(--primary-foreground) / 0.35);
-  border-radius: 4px;
-  padding: 3px 9px;
+  border-radius: 7px;
+  color: hsl(var(--primary-foreground));
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    opacity 140ms ease;
 }
 .sidebar-socials a:hover {
   background: hsl(var(--primary-foreground) / 0.1);
+  border-color: hsl(var(--primary-foreground) / 0.6);
+}
+.sidebar-socials a:active {
+  background: hsl(var(--primary-foreground) / 0.16);
+}
+.sidebar-social-link.is-placeholder {
+  border-style: dashed;
+  background: hsl(var(--primary-foreground) / 0.05);
+  opacity: 0.82;
+}
+.sidebar-social-mark {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.sidebar-social-tableau {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 .sidebar-nav {
   display: grid;
