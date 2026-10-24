@@ -17,7 +17,7 @@ Implementation checklist:
 - [x] Continue directly to the workspace after successful email verification.
 - [x] Update editor/public messaging and distinguish unavailable from unpublished.
 - [x] Verify owner isolation, publication lifecycle, media, migrations, and UI.
-- [ ] Prepare a PR and use GitHub Actions checks; deploy only through workflows.
+- [x] Prepare a PR and use GitHub Actions checks; deploy only through workflows.
 
 The shared Neon sender and optional verification recovery link remain in use.
 Custom email delivery, custom public slugs, and new authentication providers are
@@ -40,7 +40,7 @@ Implementation details:
   preexisting public portfolios; accounts created after migration start private.
 
 Verification results (local): 284 backend tests including PostgreSQL integration,
-73 frontend tests, five release-smoke unit tests, TypeScript, Ruff, and mypy pass.
+75 frontend tests, five release-smoke unit tests, TypeScript, Ruff, and mypy pass.
 ESLint has only the existing avatar `<img>` warning. The workspace, preview, and
 account pages were checked using the existing session. At 375px the workspace
 had no horizontal overflow; the unpublish modal focused Keep published, and
@@ -51,3 +51,9 @@ exercised with a new live provider account.
 A pre-publication API rollback after private editing begins could expose draft
 content through its old anonymous endpoints. Release recovery must use a reviewed
 forward fix through GitHub Actions, rather than reverting to that API version.
+
+Review: [PR #6](https://github.com/Datanerdbytes/online-portfolio/pull/6).
+GitHub Actions checks run on the feature branch; production rollout requires
+merging the PR and approving the protected production environment. The new
+workspace error-state tests distinguish authentication expiry from provider and
+backend outages so infrastructure failures do not appear as password rejection.

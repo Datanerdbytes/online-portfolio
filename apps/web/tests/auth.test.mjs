@@ -54,6 +54,13 @@ function harness(options = {}) {
           if (id === "next/headers")
             return { cookies: async () => ({ get: (name) => jar.get(name) }) };
           if (id === "next/server") return { NextResponse };
+          if (id === "react") return { cache: (callback) => callback };
+          if (id === "next/navigation")
+            return {
+              redirect: (path) => {
+                throw new Error(`redirect:${path}`);
+              },
+            };
           if (id === "@/app/api/projects/[slug]/route")
             return load("app/api/projects/[slug]/route");
           if (id === "@/lib/auth/server")
@@ -1433,4 +1440,45 @@ test("stale publication conflicts preserve their retryable status and hide upstr
   const body = await result.text();
   assert.ok(body.includes("Refresh the preview"));
   assert.ok(!body.includes("private upstream"));
+});
+
+test("workspace distinguishes provider outages from missing and expired sessions", async () => {
+  for (const token of [
+    async () => {
+      throw new Error("private provider detail");
+    },
+    async () => ({ data: null, error: { status: 503 } }),
+  ]) {
+    const h = harness({ neon: { token } });
+    assert.equal(await h.load("lib/workspace").workspaceSession(), null);
+  }
+  const absent = harness({
+    neon: { token: async () => ({ data: null, error: null }) },
+  });
+  await assert.rejects(
+    absent.load("lib/workspace").workspaceSession(),
+    /redirect:\/auth\/signin/
+  );
+  const expired = harness({
+    neon: { token: async () => ({ data: null, error: { status: 401 } }) },
+  });
+  await assert.rejects(
+    expired.load("lib/workspace").workspaceSession(),
+    /redirect:\/auth\/signin/
+  );
+});
+
+test("workspace backend outages retain the service state while rejected tokens request sign-in", async () => {
+  for (const status of [502, 503, 401]) {
+    const h = harness({
+      neon: {
+        token: async () => ({ data: { token: "managed-token" }, error: null }),
+      },
+      fetch: async () => new Response("{}", { status }),
+    });
+    const pending = h.load("lib/workspace").workspaceSession();
+    if (status === 401)
+      await assert.rejects(pending, /redirect:\/auth\/signin/);
+    else assert.equal(await pending, null);
+  }
 });
