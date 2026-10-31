@@ -237,19 +237,11 @@ button {
   min-height: 60vh;
 }
 
-.section-page-bar {
-  border-bottom: 1px solid hsl(var(--border) / 0.8);
-  background: hsl(var(--muted) / 0.35);
-}
-
-.section-page-nav {
+.section-page-back-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px 28px;
-  min-height: 58px;
-  padding-block: 8px;
+  min-height: 44px;
+  padding-top: 12px;
   color: hsl(var(--muted-foreground));
   font-family: var(--font-mono);
   font-size: 10.5px;
@@ -258,7 +250,7 @@ button {
   text-transform: uppercase;
 }
 
-.section-page-nav a {
+.section-page-back {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -266,19 +258,8 @@ button {
   transition: color 0.18s ease;
 }
 
-.section-page-nav a:hover {
+.section-page-back:hover {
   color: hsl(var(--foreground));
-}
-
-.section-page-nav a[aria-current] {
-  color: hsl(var(--copper));
-}
-
-.section-page-links {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 22px;
 }
 
 .section-page .portfolio-section {
@@ -316,30 +297,6 @@ button {
   font-size: 15.5px;
   line-height: 1.85;
   white-space: pre-line;
-}
-
-.public-portfolio-nav {
-  max-width: 940px;
-  margin-inline: auto;
-  margin-top: -10px;
-  margin-bottom: 32px;
-}
-
-.public-portfolio-nav .section-page-links {
-  gap: 8px 20px;
-}
-
-.public-portfolio-nav a {
-  color: hsl(var(--muted-foreground));
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.public-portfolio-nav a:hover {
-  color: hsl(var(--foreground));
 }
 
 .profile-avatar {
