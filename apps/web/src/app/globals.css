@@ -1565,12 +1565,6 @@ button {
   color: hsl(var(--copper));
 }
 
-.footer-tagline {
-  max-width: 36ch;
-  font-size: 12.5px;
-  line-height: 1.7;
-}
-
 .footer-links {
   display: flex;
   flex-wrap: wrap;

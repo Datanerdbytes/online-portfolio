@@ -90,11 +90,6 @@ export default async function RootLayout({
                     {profile.name}
                     <span>.</span>
                   </p>
-                  <p className="footer-tagline">
-                    {about.status === "ok"
-                      ? profile.headline
-                      : "A resume and portfolio, thoughtfully built."}
-                  </p>
                 </div>
                 <nav aria-label="Portfolio links" className="footer-links">
                   <Link href="/resume">Resume</Link>
