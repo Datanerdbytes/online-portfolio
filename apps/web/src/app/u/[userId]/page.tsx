@@ -39,12 +39,35 @@ export default async function PublicPortfolio({
   const { userId } = await params;
   if (!/^[a-zA-Z0-9-]{1,128}$/.test(userId)) notFound();
   const data = await loadPortfolio(userId);
-  if (!data) return <p>Portfolio is temporarily unavailable. Please retry.</p>;
+  if (!data)
+    return (
+      <section className="public-portfolio">
+        <div className="content-width">
+          <p role="alert" className="resume-notice">
+            Portfolio is temporarily unavailable. Please retry.
+          </p>
+        </div>
+      </section>
+    );
   if ("missing" in data) notFound();
-  if (!data.resume) return <p>This portfolio has no resume yet.</p>;
+  if (!data.resume)
+    return (
+      <section className="public-portfolio">
+        <div className="content-width">
+          <p role="status" className="resume-notice">
+            This portfolio has no resume yet.
+          </p>
+        </div>
+      </section>
+    );
   return (
-    <section className="mx-auto max-w-4xl px-4 py-8">
-      <ResumeDocument resume={data.resume} projects={data.projects.items} />
+    <section className="public-portfolio" aria-label="Shared portfolio">
+      <div className="content-width">
+        <p className="eyebrow public-portfolio-label">Shared portfolio</p>
+        <div className="resume-shell">
+          <ResumeDocument resume={data.resume} projects={data.projects.items} />
+        </div>
+      </div>
     </section>
   );
 }

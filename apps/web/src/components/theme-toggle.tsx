@@ -8,7 +8,7 @@ function subscribe(callback: () => void) {
     if (event.key !== "portfolio-theme" && event.key !== null) return;
     document.documentElement.classList.toggle(
       "dark",
-      event.newValue === "dark",
+      event.newValue === "dark"
     );
     callback();
   }
@@ -24,7 +24,7 @@ export function ThemeToggle() {
   const dark = useSyncExternalStore(
     subscribe,
     () => document.documentElement.classList.contains("dark"),
-    () => false,
+    () => false
   );
 
   function toggle() {
@@ -41,19 +41,16 @@ export function ThemeToggle() {
     <button
       type="button"
       className="theme-toggle"
-      aria-label="Dark mode"
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      title={dark ? "Switch to light mode" : "Switch to dark mode"}
       aria-pressed={dark}
       onClick={toggle}
     >
       {dark ? (
-        <Moon size={17} aria-hidden="true" />
+        <Sun size={16} aria-hidden="true" />
       ) : (
-        <Sun size={17} aria-hidden="true" />
+        <Moon size={16} aria-hidden="true" />
       )}
-      <span>Dark mode</span>
-      <span className="theme-track" aria-hidden="true">
-        <span />
-      </span>
     </button>
   );
 }

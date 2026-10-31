@@ -3,75 +3,46 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import {
-  BriefcaseBusiness,
-  ChartNoAxesCombined,
-  CodeXml,
-  FileText,
-  GraduationCap,
-  Mail,
-  Menu,
-  UserRound,
-  X,
-} from "lucide-react";
+import { ArrowUpRight, Menu, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import { profileImageUrl } from "@/lib/avatar";
 
 const navigation = [
-  { id: "about", label: "About me", icon: UserRound, href: "/#about" },
-  { id: "skills", label: "Skills & tools", icon: CodeXml, href: "/#skills" },
-  {
-    id: "projects",
-    label: "Portfolio",
-    icon: ChartNoAxesCombined,
-    href: "/#projects",
-  },
-  {
-    id: "experience",
-    label: "Experience",
-    icon: BriefcaseBusiness,
-    href: "/#experience",
-  },
-  {
-    id: "education",
-    label: "Education",
-    icon: GraduationCap,
-    href: "/#education",
-  },
-  { id: "resume", label: "Resume", icon: FileText, href: "/resume" },
-  { id: "contact", label: "Contact", icon: Mail, href: "/#contact" },
+  { id: "about", label: "About", href: "/#about" },
+  { id: "skills", label: "Skills", href: "/#skills" },
+  { id: "projects", label: "Work", href: "/#projects" },
+  { id: "experience", label: "Experience", href: "/#experience" },
+  { id: "education", label: "Education", href: "/#education" },
+  { id: "resume", label: "Resume", href: "/resume" },
+  { id: "contact", label: "Contact", href: "/#contact" },
 ];
 
 type HeaderProps = {
   name: string;
-  headline: string;
-  isSample: boolean;
   email?: string;
-  links: { label: string; url: string }[];
   avatarUrl?: string | null;
   avatarUpdatedAt?: string | null;
 };
 
 export function Header({
   name,
-  headline,
-  isSample,
   email,
-  links,
   avatarUrl,
   avatarUpdatedAt,
 }: HeaderProps) {
-  const [open, setOpen] = useState(false);
+  const [openPath, setOpenPath] = useState<string | null>(null);
   const [active, setActive] = useState("about");
   const menuButton = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
+  const open = openPath === pathname;
   const avatarSrc = profileImageUrl(avatarUrl, avatarUpdatedAt);
+  const contactHref = email ? `mailto:${email}` : "/#contact";
 
   useEffect(() => {
     function escape(event: KeyboardEvent) {
       if (event.key === "Escape" && open) {
-        setOpen(false);
+        setOpenPath(null);
         menuButton.current?.focus();
       }
     }
@@ -95,100 +66,95 @@ export function Header({
     return () => observer.disconnect();
   }, [pathname]);
 
+  function isCurrent(id: string) {
+    if (id === "resume") return pathname === "/resume";
+    return pathname === "/" && active === id;
+  }
+
+  const contactLabel = email ? "Email me" : "Get in touch";
+
   return (
-    <header className="sidebar">
-      <div className="sidebar-top">
+    <header className="masthead">
+      <div className="content-width masthead-inner">
         <Link
           href="/#about"
-          className="sidebar-name"
-          onClick={() => setOpen(false)}
+          className="wordmark"
+          onClick={() => setOpenPath(null)}
         >
-          {name}
-          <span className="sidebar-name-dot">.</span>
+          <ProfileAvatar
+            src={avatarSrc}
+            alt=""
+            name={name}
+            size="xs"
+            lazy={false}
+          />
+          <span className="wordmark-name">
+            {name}
+            <span className="wordmark-dot">.</span>
+          </span>
         </Link>
-        <button
-          ref={menuButton}
-          type="button"
-          className="mobile-menu"
-          aria-label={open ? "Close main menu" : "Open main menu"}
-          aria-expanded={open}
-          aria-controls="sidebar-content"
-          onClick={() => setOpen(!open)}
-        >
-          {open ? (
-            <X size={22} aria-hidden="true" />
-          ) : (
-            <Menu size={22} aria-hidden="true" />
-          )}
-        </button>
-      </div>
-      <div
-        id="sidebar-content"
-        className={`sidebar-content ${open ? "is-open" : ""}`}
-      >
-        <div className="sidebar-profile">
-          <div className="sidebar-profile-top">
-            <ProfileAvatar
-              src={avatarSrc}
-              alt=""
-              name={name}
-              size="sm"
-              lazy={false}
-            />
-          </div>
-          <p className="sidebar-headline">{headline}</p>
-          {isSample && <p className="sidebar-sample">Placeholder profile</p>}
-          <div className="sidebar-socials">
-            {links.map((link) => (
-              <a
-                key={link.url}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
-        </div>
-        <nav aria-label="Main" className="sidebar-nav">
-          {navigation.map(({ id, label, icon: Icon, href }) => (
+
+        <nav aria-label="Main" className="masthead-nav">
+          {navigation.map(({ id, label, href }) => (
             <Link
               key={id}
               href={href}
-              aria-current={
-                id === "resume"
-                  ? pathname === "/resume"
-                    ? "location"
-                    : undefined
-                  : pathname === "/" && active === id
-                    ? "location"
-                    : undefined
-              }
-              onClick={() => {
-                setOpen(false);
-                setActive(id);
-              }}
+              aria-current={isCurrent(id) ? "location" : undefined}
+              onClick={() => setActive(id)}
             >
-              <Icon size={18} strokeWidth={1.8} aria-hidden="true" />
               {label}
             </Link>
           ))}
         </nav>
-        {email && (
-          <a className="sidebar-contact" href={`mailto:${email}`}>
-            <Mail size={17} aria-hidden="true" />
-            Get in touch
-          </a>
-        )}
-        <div className="sidebar-bottom">
+
+        <div className="masthead-actions">
           <ThemeToggle />
-          <p>
-            Thoughtfully built with
-            <br />
-            Next.js & FastAPI
-          </p>
+          <a className="masthead-cta" href={contactHref}>
+            {contactLabel}
+            <ArrowUpRight size={13} aria-hidden="true" />
+          </a>
+          <button
+            ref={menuButton}
+            type="button"
+            className="masthead-menu-button"
+            aria-label={open ? "Close main menu" : "Open main menu"}
+            aria-expanded={open}
+            aria-controls="masthead-panel"
+            onClick={() => setOpenPath(open ? null : pathname)}
+          >
+            {open ? (
+              <X size={20} aria-hidden="true" />
+            ) : (
+              <Menu size={20} aria-hidden="true" />
+            )}
+          </button>
         </div>
+      </div>
+
+      <div
+        id="masthead-panel"
+        className={`content-width masthead-panel ${open ? "is-open" : ""}`}
+      >
+        <nav aria-label="Main menu">
+          {navigation.map(({ id, label, href }) => (
+            <Link
+              key={id}
+              href={href}
+              aria-current={isCurrent(id) ? "location" : undefined}
+              onClick={() => {
+                setOpenPath(null);
+                setActive(id);
+              }}
+            >
+              {label}
+              <ArrowUpRight size={15} aria-hidden="true" />
+            </Link>
+          ))}
+        </nav>
+        <a className="masthead-cta" href={contactHref}>
+          {contactLabel}
+          <ArrowUpRight size={13} aria-hidden="true" />
+        </a>
       </div>
     </header>
   );

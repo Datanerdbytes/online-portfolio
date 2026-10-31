@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { MermaidReadme } from "@/components/mermaid-readme";
 import { API_BASE_URL, isProject, type Project } from "@/lib/api";
 import { staticResumeProjects } from "@/lib/resume";
@@ -54,12 +55,12 @@ function ReadmeSkeleton() {
       role="status"
       aria-label="Loading project README"
       aria-busy="true"
-      className="mt-4 animate-pulse space-y-4 motion-reduce:animate-none"
+      className="animate-pulse space-y-4 motion-reduce:animate-none"
     >
-      <div className="h-6 w-1/4 rounded bg-slate-200 dark:bg-slate-800" />
-      <div className="h-4 w-full rounded bg-slate-200 dark:bg-slate-800" />
-      <div className="h-4 w-5/6 rounded bg-slate-200 dark:bg-slate-800" />
-      <div className="h-4 w-4/5 rounded bg-slate-200 dark:bg-slate-800" />
+      <div className="h-6 w-1/4 bg-muted" />
+      <div className="h-4 w-full bg-muted" />
+      <div className="h-4 w-5/6 bg-muted" />
+      <div className="h-4 w-4/5 bg-muted" />
     </div>
   );
 }
@@ -70,21 +71,12 @@ function ReadmeUnavailable({
   repositoryUrl: string | null;
 }) {
   return (
-    <div
-      role="status"
-      className="rounded-xl border border-border bg-muted/40 p-6 text-center"
-    >
-      <p className="mb-4 text-sm text-muted-foreground">
-        The project README is unavailable right now.
-      </p>
+    <div role="status" className="readme-unavailable">
+      <p>The project README is unavailable right now.</p>
       {repositoryUrl ? (
-        <a
-          href={repositoryUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center rounded-lg border border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <a href={repositoryUrl} target="_blank" rel="noopener noreferrer">
           View README on GitHub
+          <ArrowUpRight size={13} aria-hidden="true" />
         </a>
       ) : null}
     </div>
@@ -114,19 +106,7 @@ async function ProjectReadme({
   }
 
   return (
-    <div
-      className="project-readme
-        prose max-w-none break-words dark:prose-invert
-        [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:border-b [&_h1]:border-border [&_h1]:pb-2 [&_h1]:text-2xl [&_h1]:font-bold
-        [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:text-xl [&_h2]:font-semibold
-        [&_p]:mb-4 [&_p]:leading-relaxed
-        [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6
-        [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6
-        [&_pre]:overflow-x-auto [&_pre]:rounded-xl [&_pre]:p-4
-        [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto
-        [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-4
-      "
-    >
+    <div className="project-readme">
       <MermaidReadme html={htmlContent} />
     </div>
   );
@@ -134,9 +114,12 @@ async function ProjectReadme({
 
 function ProjectMetadataSkeleton() {
   return (
-    <div aria-hidden="true" className="space-y-3">
-      <div className="h-4 w-4/5 rounded bg-muted" />
-      <div className="h-4 w-1/3 rounded bg-muted" />
+    <div
+      aria-hidden="true"
+      className="mt-6 animate-pulse space-y-3 motion-reduce:animate-none"
+    >
+      <div className="h-4 w-4/5 bg-muted" />
+      <div className="h-4 w-1/3 bg-muted" />
     </div>
   );
 }
@@ -156,7 +139,7 @@ async function ProjectMetadata({
 
   if (!details) {
     return (
-      <p role="status" className="text-sm text-muted-foreground">
+      <p role="status" className="detail-missing">
         Project details could not be loaded. The README may still be available
         below.
       </p>
@@ -165,45 +148,34 @@ async function ProjectMetadata({
 
   return (
     <>
-      <p className="mb-5 max-w-3xl break-words text-muted-foreground">
-        {details.summary}
-      </p>
-      <section
-        aria-labelledby="project-technologies-heading"
-        className="border-b border-border pb-6"
-      >
-        <h2
-          id="project-technologies-heading"
-          className="mb-3 text-sm font-semibold text-foreground"
-        >
-          Technologies Explored
+      <p className="detail-summary">{details.summary}</p>
+      <section aria-labelledby="project-technologies-heading">
+        <h2 id="project-technologies-heading" className="sr-only">
+          Technologies explored
         </h2>
         {details.technologies.length > 0 ? (
-          <ul className="flex flex-wrap gap-2">
+          <ul className="detail-tags">
             {details.technologies.map((technology) => (
-              <li
-                key={technology}
-                className="max-w-full break-words rounded-full border border-border bg-muted px-3 py-1 text-sm text-foreground"
-              >
-                {technology}
-              </li>
+              <li key={technology}>{technology}</li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">
+          <p className="detail-missing mt-6">
             No technologies have been listed for this project yet.
           </p>
         )}
       </section>
       {details.repository_url ? (
-        <a
-          href={details.repository_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 inline-flex min-h-11 items-center rounded-sm text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          View Repository Source Code
-        </a>
+        <div className="detail-actions">
+          <a
+            href={details.repository_url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            View source code
+            <ArrowUpRight size={13} aria-hidden="true" />
+          </a>
+        </div>
       ) : null}
     </>
   );
@@ -229,7 +201,7 @@ async function ProjectTitle({
   );
 
   return (
-    <h1 className="mb-4 break-words text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+    <h1 className="detail-title">
       {project?.title ?? fallbackProject?.title ?? titleFromSlug(projectSlug)}
     </h1>
   );
@@ -241,7 +213,7 @@ function ProjectTitleSkeleton({ slug }: { slug: string }) {
   );
 
   return (
-    <h1 className="mb-4 break-words text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+    <h1 className="detail-title">
       {fallbackProject?.title ?? titleFromSlug(slug)}
     </h1>
   );
@@ -252,19 +224,14 @@ export default async function ProjectDetailPage({ params }: Props) {
   const projectPromise = getProject(slug);
 
   return (
-    <main className="min-h-screen min-w-0 bg-background px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <article className="mx-auto min-w-0 max-w-4xl rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-8 lg:p-10">
-        <header className="mb-8 min-w-0">
-          <Link
-            href="/#projects"
-            className="mb-6 inline-flex min-h-11 items-center rounded-sm text-sm font-medium text-muted-foreground transition hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span aria-hidden="true" className="mr-2">
-              ←
-            </span>
-            Back to Projects
+    <div className="project-detail">
+      <div className="content-width">
+        <header className="project-detail-head">
+          <Link href="/#projects" className="detail-back">
+            <ArrowLeft size={14} aria-hidden="true" />
+            Back to selected work
           </Link>
-
+          <p className="detail-eyebrow">Case study</p>
           <Suspense fallback={<ProjectTitleSkeleton slug={slug} />}>
             <ProjectTitle projectSlug={slug} projectPromise={projectPromise} />
           </Suspense>
@@ -276,21 +243,20 @@ export default async function ProjectDetailPage({ params }: Props) {
           </Suspense>
         </header>
 
-        <section
-          aria-labelledby="project-readme-heading"
-          className="min-w-0 pt-2"
-        >
-          <h2
-            id="project-readme-heading"
-            className="mb-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-          >
-            Project Case Study &amp; Documentation
-          </h2>
-          <Suspense fallback={<ReadmeSkeleton />}>
-            <ProjectReadme projectSlug={slug} projectPromise={projectPromise} />
-          </Suspense>
+        <section aria-labelledby="project-readme-heading">
+          <div className="readme-card">
+            <h2 id="project-readme-heading" className="readme-label">
+              README &amp; documentation
+            </h2>
+            <Suspense fallback={<ReadmeSkeleton />}>
+              <ProjectReadme
+                projectSlug={slug}
+                projectPromise={projectPromise}
+              />
+            </Suspense>
+          </div>
         </section>
-      </article>
-    </main>
+      </div>
+    </div>
   );
 }

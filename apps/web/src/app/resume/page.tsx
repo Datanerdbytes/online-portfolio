@@ -36,16 +36,13 @@ export default async function ResumePage() {
     <section className="resume-page" aria-labelledby="resume-page-heading">
       <div className="content-width resume-toolbar">
         <div>
+          <p className="eyebrow">Document</p>
           <h1 id="resume-page-heading" className="resume-toolbar-title">
             Online Resume
           </h1>
         </div>
         <div className="resume-toolbar-actions">
-          <Button
-            asChild
-            variant="outline"
-            className="h-11 px-2 text-xs sm:h-8"
-          >
+          <Button asChild variant="outline" className="resume-toolbar-button">
             <Link href="/#about">
               <ArrowLeft size={14} aria-hidden="true" />
               Back to portfolio

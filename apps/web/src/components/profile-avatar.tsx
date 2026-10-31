@@ -10,11 +10,12 @@ type ProfileAvatarProps = {
   alt?: string;
   name: string;
   className?: string;
-  size?: "sm" | "md" | "lg" | "resume";
+  size?: "xs" | "sm" | "md" | "lg" | "resume";
   lazy?: boolean;
 };
 
 const sizeClasses = {
+  xs: "h-[36px] w-[36px]",
   sm: "h-[116px] w-[116px]",
   md: "h-[140px] w-[140px]",
   lg: "h-[168px] w-[168px]",
@@ -22,6 +23,7 @@ const sizeClasses = {
 };
 
 const sizePixels = {
+  xs: 36,
   sm: 116,
   md: 140,
   lg: 168,
@@ -29,6 +31,7 @@ const sizePixels = {
 };
 
 const textSizes = {
+  xs: "text-[13px]",
   sm: "text-[39px]",
   md: "text-[46px]",
   lg: "text-[54px]",
