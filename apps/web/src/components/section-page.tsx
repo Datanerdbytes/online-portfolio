@@ -53,49 +53,6 @@ function sectionHref(ownerId: string | null, section: SectionId): string {
     : `/${section}`;
 }
 
-export function SectionLinks({
-  ownerId,
-  current,
-}: {
-  ownerId: string | null;
-  current?: SectionId;
-}) {
-  return (
-    <div className="section-page-links">
-      {SECTION_IDS.map((section) => (
-        <Link
-          key={section}
-          href={sectionHref(ownerId, section)}
-          aria-current={section === current ? "page" : undefined}
-        >
-          {SECTION_LABELS[section]}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function SectionPageNav({
-  ownerId,
-  current,
-}: {
-  ownerId: string | null;
-  current: SectionId;
-}) {
-  return (
-    <nav
-      aria-label="Portfolio sections"
-      className="content-width section-page-nav"
-    >
-      <Link href={homeHref(ownerId)} className="section-page-back">
-        <ArrowLeft size={13} aria-hidden="true" />
-        {ownerId ? "Shared portfolio" : "Portfolio home"}
-      </Link>
-      <SectionLinks ownerId={ownerId} current={current} />
-    </nav>
-  );
-}
-
 function SectionPageFrame({
   ownerId,
   current,
@@ -107,8 +64,11 @@ function SectionPageFrame({
 }) {
   return (
     <div className="section-page">
-      <div className="section-page-bar">
-        <SectionPageNav ownerId={ownerId} current={current} />
+      <div className="content-width section-page-back-row">
+        <Link href={homeHref(ownerId)} className="section-page-back">
+          <ArrowLeft size={13} aria-hidden="true" />
+          {ownerId ? "Shared portfolio" : "Portfolio home"}
+        </Link>
       </div>
       {current !== "about" && (
         <h1 className="sr-only">{SECTION_LABELS[current]}</h1>

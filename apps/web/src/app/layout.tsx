@@ -90,11 +90,6 @@ export default async function RootLayout({
                     {profile.name}
                     <span>.</span>
                   </p>
-                  <p className="footer-tagline">
-                    {about.status === "ok"
-                      ? profile.headline
-                      : "A resume and portfolio, thoughtfully built."}
-                  </p>
                 </div>
                 <nav aria-label="Portfolio links" className="footer-links">
                   <Link href="/resume">Resume</Link>
@@ -115,9 +110,7 @@ export default async function RootLayout({
                   <Link href="/">Portfolio home</Link>
                 </nav>
                 <p className="footer-meta">
-                  Built with Next.js &amp; FastAPI
-                  <br />
-                  {year}
+                  Built with Next.js &amp; FastAPI · {year}
                 </p>
               </div>
             </footer>
