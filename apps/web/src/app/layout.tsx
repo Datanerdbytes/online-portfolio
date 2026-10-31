@@ -110,9 +110,7 @@ export default async function RootLayout({
                   <Link href="/">Portfolio home</Link>
                 </nav>
                 <p className="footer-meta">
-                  Built with Next.js &amp; FastAPI
-                  <br />
-                  {year}
+                  Built with Next.js &amp; FastAPI · {year}
                 </p>
               </div>
             </footer>
