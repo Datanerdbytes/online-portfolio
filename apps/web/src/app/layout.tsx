@@ -77,6 +77,7 @@ export default async function RootLayout({
             <Header
               name={profile.name}
               email={contactData?.email ?? undefined}
+              links={links}
               avatarUrl={profile.avatar_url}
               avatarUpdatedAt={profile.avatar_updated_at}
             />

@@ -461,6 +461,53 @@ button {
   flex-shrink: 0;
 }
 
+.masthead-socials {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.masthead-social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  color: hsl(var(--muted-foreground));
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.masthead-socials a.masthead-social-link:hover {
+  border-color: hsl(var(--foreground) / 0.45);
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.masthead-social-link.is-placeholder {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+.masthead-social-mark {
+  display: block;
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+}
+
+.masthead-social-tableau {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
 .masthead-cta {
   display: inline-flex;
   align-items: center;
@@ -554,6 +601,10 @@ button {
   margin-top: 20px;
   width: 100%;
   justify-content: center;
+}
+
+.masthead-panel .masthead-socials {
+  margin-top: 20px;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2701,23 +2752,9 @@ button {
 /* ------------------------------------------------------------------ */
 
 @media (max-width: 1199px) {
-  .masthead-nav {
-    gap: 18px;
-  }
-
-  .section-layout {
-    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
-    gap: 44px;
-  }
-
-  .job-entry {
-    grid-template-columns: minmax(0, 145px) minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 1023px) {
   .masthead-nav,
-  .masthead-actions .masthead-cta {
+  .masthead-actions .masthead-cta,
+  .masthead-actions .masthead-socials {
     display: none;
   }
 
@@ -2733,6 +2770,17 @@ button {
     margin-left: auto;
   }
 
+  .section-layout {
+    grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+    gap: 44px;
+  }
+
+  .job-entry {
+    grid-template-columns: minmax(0, 145px) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1023px) {
   .hero-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 56px;
