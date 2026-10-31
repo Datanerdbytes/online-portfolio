@@ -5,6 +5,7 @@ A full-stack online resume and portfolio built with Next.js, TypeScript, FastAPI
 ## What it includes
 
 - Responsive portfolio homepage with profile, skills, experience, education, contact details, and featured projects.
+- A page per section (`/about`, `/skills`, `/projects`, `/experience`, `/education`, `/contact`), also available for shared portfolios under `/u/<account-id>/<section>`.
 - A print-friendly resume page.
 - Project detail pages with GitHub-rendered README content and Mermaid diagrams when configured.
 - FastAPI endpoints for resume and project content, backed by PostgreSQL and managed with Alembic.
@@ -185,7 +186,11 @@ it no longer issues login tokens or verifies passwords itself.
 Only published resumes/projects are public. New accounts receive a private, empty draft on first
 verified editor access. Each edit is restricted to that user's portfolio through
 scoped database sessions and ownership constraints. Share `/u/<account-id>` to
-view a portfolio without signing in.
+view a portfolio without signing in. The homepage, `/resume`, the section pages
+(`/about`, `/skills`, `/projects`, `/experience`, `/education`, `/contact`), and
+their `/u/<account-id>/<section>` counterparts read each published section
+(about, skills, experience, education, contact) from its own public endpoint
+instead of one aggregate response.
 
 Enable **Managed Better Auth** on the intended branch of the `online-portfolio`
 Neon project. Configure its localhost/trusted-domain settings, then copy its Auth

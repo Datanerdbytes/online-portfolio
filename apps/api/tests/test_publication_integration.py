@@ -38,6 +38,11 @@ def test_new_drafts_are_private_on_all_public_paths(accounts):
     for path in (
         f"/api/v1/public/users/{ids[0]}/resume",
         f"/api/v1/public/users/{ids[0]}/projects",
+        f"/api/v1/public/users/{ids[0]}/about",
+        f"/api/v1/public/users/{ids[0]}/skills",
+        f"/api/v1/public/users/{ids[0]}/experience",
+        f"/api/v1/public/users/{ids[0]}/education",
+        f"/api/v1/public/users/{ids[0]}/contact",
         f"/api/v1/resume?user_id={ids[0]}",
         f"/api/v1/projects?user_id={ids[0]}",
     ):
@@ -101,6 +106,98 @@ def test_publish_update_conflict_unpublish_and_owner_isolation(accounts):
     assert client.get(f"/api/v1/public/users/{snapshot}/resume").status_code == 404
 
 
+def test_published_section_endpoints_match_aggregate(accounts):
+    client, _, ids, (a, _) = accounts
+    prepare(client, a)
+    client.patch(
+        "/api/v1/resume/profile",
+        headers=a,
+        json={"about": "About me", "location": "Remote"},
+    )
+    group = client.post(
+        "/api/v1/resume/skills", headers=a, json={"label": "Languages", "items": ["Python"]}
+    ).json()
+    assert (
+        client.post(
+            "/api/v1/resume/experience",
+            headers=a,
+            json={
+                "slug": "engineer",
+                "role": "Data Engineer",
+                "organization": "Acme",
+                "started": "2020-01",
+                "current": True,
+                "highlights": ["Built pipelines"],
+            },
+        ).status_code
+        == 201
+    )
+    assert (
+        client.post(
+            "/api/v1/resume/education",
+            headers=a,
+            json={
+                "slug": "degree",
+                "qualification": "BSc",
+                "institution": "University",
+                "started": "2015",
+                "ended": "2019",
+            },
+        ).status_code
+        == 201
+    )
+    client.patch(
+        "/api/v1/resume/contact",
+        headers=a,
+        json={"email": "ada@example.com", "phone": "+15555550100"},
+    )
+    assert (
+        client.post(
+            "/api/v1/resume/contact/links",
+            headers=a,
+            json={"label": "GitHub", "url": "https://github.com/example"},
+        ).status_code
+        == 201
+    )
+    assert publish(client, a).status_code == 200
+
+    public = f"/api/v1/public/users/{ids[0]}"
+    aggregate = client.get(public + "/resume").json()
+    assert client.get(public + "/about").json() == aggregate["profile"]
+    assert client.get(public + "/skills").json() == {"items": aggregate["skills"]}
+    assert client.get(public + "/experience").json() == {"items": aggregate["experience"]}
+    assert client.get(public + "/education").json() == {"items": aggregate["education"]}
+    assert client.get(public + "/contact").json() == aggregate["contact"]
+    assert client.get(public + "/skills").json()["items"][0]["id"] != group["id"]
+
+
+def test_section_endpoints_isolate_owners(accounts):
+    client, _, ids, (a, b) = accounts
+    prepare(client, a)
+    assert publish(client, a).status_code == 200
+    prepare(client, b)
+    client.patch("/api/v1/resume/profile", headers=b, json={"name": "Second owner"})
+    assert publish(client, b).status_code == 200
+
+    assert client.get(f"/api/v1/public/users/{ids[0]}/about").json()["name"] == "Original"
+    assert client.get(f"/api/v1/public/users/{ids[1]}/about").json()["name"] == "Second owner"
+    assert client.get(f"/api/v1/public/users/{ids[0]}/skills").json() == {"items": []}
+    assert client.get(f"/api/v1/public/users/{ids[1]}/skills").json() == {"items": []}
+
+
+def test_section_endpoints_serve_the_configured_default_owner(accounts, monkeypatch):
+    from app.db import tenant
+
+    client, _, ids, (a, _) = accounts
+    prepare(client, a)
+    assert publish(client, a).status_code == 200
+    monkeypatch.setattr(tenant.settings, "PUBLIC_PORTFOLIO_USER_ID", ids[0])
+
+    assert client.get("/api/v1/public/about").json()["name"] == "Original"
+    assert client.get("/api/v1/public/skills").json() == {"items": []}
+    assert client.get("/api/v1/public/contact").status_code == 200
+
+
 def test_published_images_survive_draft_replacement_and_removal(accounts, tmp_path):
     client, _, ids, (a, _) = accounts
     store = LocalProfileImageStore(tmp_path)
@@ -139,6 +236,11 @@ def test_published_images_survive_draft_replacement_and_removal(accounts, tmp_pa
             == 200
         )
         assert publish(client, a).status_code == 200
+        about = client.get(f"/api/v1/public/users/{ids[0]}/about")
+        assert about.status_code == 200
+        assert about.json()["avatar_url"] == (
+            f"/api/v1/public/users/{ids[0]}/resume/profile/avatar"
+        )
         screenshot_url = f"/api/v1/public/users/{ids[0]}/projects/with-image/screenshot"
         screenshot = client.get(screenshot_url).content
         assert client.delete("/api/v1/projects/with-image", headers=a).status_code == 204

@@ -227,9 +227,9 @@ export default async function ProjectDetailPage({ params }: Props) {
     <div className="project-detail">
       <div className="content-width">
         <header className="project-detail-head">
-          <Link href="/#projects" className="detail-back">
+          <Link href="/projects" className="detail-back">
             <ArrowLeft size={14} aria-hidden="true" />
-            Back to selected work
+            Back to projects
           </Link>
           <p className="detail-eyebrow">Case study</p>
           <Suspense fallback={<ProjectTitleSkeleton slug={slug} />}>

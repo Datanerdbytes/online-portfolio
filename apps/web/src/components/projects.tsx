@@ -1,13 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, FolderOpen } from "lucide-react";
-import Link from "next/link";
+import { FolderOpen } from "lucide-react";
+import { ProjectCard } from "@/components/project-cards";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isProjectsResponse, type Project } from "@/lib/api";
-import { profileImageUrl } from "@/lib/avatar";
 
 const PROJECTS_TIMEOUT_MS = 8000;
 const SKELETON_COUNT = 3;
@@ -17,16 +15,6 @@ type ProjectsState =
   | { status: "ok"; items: Project[]; source: "api" | "fallback" }
   | { status: "empty" }
   | { status: "unavailable" };
-
-function isAbsoluteHttpUrl(value: string | null): value is string {
-  if (!value) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 function ProjectSkeleton() {
   return (
@@ -47,129 +35,6 @@ function ProjectSkeleton() {
         ))}
       </div>
     </div>
-  );
-}
-
-function ProjectLinks({ project }: { project: Project }) {
-  const links = [
-    { label: "Repository", url: project.repository_url },
-    { label: "Live demo", url: project.demo_url },
-  ] as { label: string; url: string | null }[];
-
-  const validLinks = links.filter(
-    (link): link is { label: string; url: string } =>
-      isAbsoluteHttpUrl(link.url)
-  );
-
-  if (validLinks.length === 0) return null;
-
-  return (
-    <div className="project-external">
-      {validLinks.map((link) => (
-        <a
-          key={link.label}
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {link.label}
-          <ArrowUpRight size={12} aria-hidden="true" />
-        </a>
-      ))}
-    </div>
-  );
-}
-
-const COVER_PATHS = [
-  { d: "M0 78 L34 64 L68 70 L102 46 L136 54 L170 24 L204 32 L240 16", y: 16 },
-  { d: "M0 82 L30 74 L60 52 L90 60 L120 38 L150 44 L180 20 L240 28", y: 28 },
-  { d: "M0 70 L40 72 L80 44 L110 50 L150 30 L190 36 L240 14", y: 14 },
-];
-
-function ProjectCoverArt({ number, index }: { number: string; index: number }) {
-  const path = COVER_PATHS[index % COVER_PATHS.length];
-  return (
-    <div className="project-cover-art" aria-hidden="true">
-      <span className="project-cover-index">{number}</span>
-      <svg
-        className="project-cover-graph"
-        viewBox="0 0 240 96"
-        fill="none"
-        aria-hidden="true"
-      >
-        <path d={`${path.d} V96 H0 Z`} fill="currentColor" opacity="0.09" />
-        <path
-          d={path.d}
-          stroke="currentColor"
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-        <circle cx="240" cy={path.y} r="3" fill="currentColor" />
-      </svg>
-    </div>
-  );
-}
-
-function ProjectCard({ project, index }: { project: Project; index: number }) {
-  const screenshotSrc = profileImageUrl(
-    project.screenshot_url,
-    project.screenshot_updated_at,
-    project.screenshot_url?.startsWith("/api/v1/public/")
-      ? project.screenshot_url.replace("/api/v1/", "/api/")
-      : `/api/public/projects/${encodeURIComponent(project.slug)}/screenshot`
-  );
-  const detailHref = `/projects/${encodeURIComponent(project.slug)}`;
-  const number = String(index + 1).padStart(2, "0");
-
-  return (
-    <article className="project-card">
-      <Link
-        href={detailHref}
-        className="project-cover"
-        aria-label={`Open case study: ${project.title}`}
-      >
-        {screenshotSrc ? (
-          <Image
-            src={screenshotSrc}
-            alt={`${project.title} screenshot`}
-            fill
-            sizes="(max-width: 767px) calc(100vw - 40px), 560px"
-            className="project-cover-image"
-            unoptimized
-          />
-        ) : (
-          <ProjectCoverArt number={number} index={index} />
-        )}
-      </Link>
-
-      <div className="project-topline">
-        <span>Project {number}</span>
-        {project.is_sample ? (
-          <span className="project-badge">Sample</span>
-        ) : null}
-      </div>
-
-      <h3 className="project-title">
-        <Link href={detailHref}>{project.title}</Link>
-      </h3>
-      <p className="project-summary">{project.summary}</p>
-
-      {project.technologies.length > 0 && (
-        <ul className="project-technologies">
-          {project.technologies.map((tech) => (
-            <li key={tech}>{tech}</li>
-          ))}
-        </ul>
-      )}
-
-      <div className="project-footer">
-        <Link href={detailHref} className="project-link">
-          View case study
-          <ArrowRight size={14} aria-hidden="true" />
-        </Link>
-        <ProjectLinks project={project} />
-      </div>
-    </article>
   );
 }
 

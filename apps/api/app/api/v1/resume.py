@@ -9,7 +9,7 @@ import re
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.api.v1.auth import AuthRoute
 from app.core.auth import TokenClaims, verify_owner_token
@@ -55,6 +55,13 @@ from app.schemas.resume import (
     SkillItemPatch,
     SkillItemResponse,
 )
+from app.services.resume_reads import (
+    read_contact,
+    read_education,
+    read_experience,
+    read_profile,
+    read_skill_groups,
+)
 
 router = APIRouter(route_class=AuthRoute, tags=["resume"])
 
@@ -78,29 +85,13 @@ def get_current_owner(authorization: str | None = Header(None)) -> TokenClaims: 
 
 @router.get("/resume", response_model=ResumeResponse)
 def get_resume(db: Session = Depends(get_db)):  # noqa: B008
-    profile = db.query(Profile).first()
-    skills = (
-        db.query(SkillGroup)
-        .options(selectinload(SkillGroup.items))
-        .order_by(SkillGroup.display_order)
-        .all()
-    )
-    experience = (
-        db.query(Experience)
-        .options(selectinload(Experience.highlights))
-        .order_by(Experience.display_order)
-        .all()
-    )
-    education = db.query(Education).order_by(Education.display_order).all()
-    contact = db.query(Contact).options(selectinload(Contact.links)).first()
-
     return ResumeResponse.model_validate(
         {
-            "profile": profile,
-            "skills": skills,
-            "experience": experience,
-            "education": education,
-            "contact": contact,
+            "profile": read_profile(db),
+            "skills": read_skill_groups(db),
+            "experience": read_experience(db),
+            "education": read_education(db),
+            "contact": read_contact(db),
         }
     )
 
@@ -112,7 +103,7 @@ def get_resume(db: Session = Depends(get_db)):  # noqa: B008
 
 @router.get("/resume/profile", response_model=ProfileResponse)
 def get_profile(db: Session = Depends(get_db)):  # noqa: B008
-    profile = db.query(Profile).first()
+    profile = read_profile(db)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile
@@ -141,12 +132,7 @@ def patch_profile(
 
 @router.get("/resume/skills", response_model=list[SkillGroupResponse])
 def get_skills(db: Session = Depends(get_db)):  # noqa: B008
-    return (
-        db.query(SkillGroup)
-        .options(selectinload(SkillGroup.items))
-        .order_by(SkillGroup.display_order)
-        .all()
-    )
+    return read_skill_groups(db)
 
 
 @router.post("/resume/skills", response_model=SkillGroupResponse, status_code=201)
@@ -308,12 +294,7 @@ def delete_skill_item(
 
 @router.get("/resume/experience", response_model=list[ExperienceResponse])
 def get_experience(db: Session = Depends(get_db)):  # noqa: B008
-    return (
-        db.query(Experience)
-        .options(selectinload(Experience.highlights))
-        .order_by(Experience.display_order)
-        .all()
-    )
+    return read_experience(db)
 
 
 @router.post("/resume/experience", response_model=ExperienceResponse, status_code=201)
@@ -433,7 +414,7 @@ def delete_highlight(
 
 @router.get("/resume/education", response_model=list[EducationResponse])
 def get_education(db: Session = Depends(get_db)):  # noqa: B008
-    return db.query(Education).order_by(Education.display_order).all()
+    return read_education(db)
 
 
 @router.post("/resume/education", response_model=EducationResponse, status_code=201)
@@ -492,7 +473,7 @@ def delete_education(
 
 @router.get("/resume/contact", response_model=ContactResponse)
 def get_contact(db: Session = Depends(get_db)):  # noqa: B008
-    contact = db.query(Contact).options(selectinload(Contact.links)).first()
+    contact = read_contact(db)
     if not contact:
         raise HTTPException(status_code=404, detail="Contact not found")
     return contact

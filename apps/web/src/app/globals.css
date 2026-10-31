@@ -229,6 +229,119 @@ button {
   opacity: 0.7;
 }
 
+/* ------------------------------------------------------------------ */
+/* Section pages                                                       */
+/* ------------------------------------------------------------------ */
+
+.section-page {
+  min-height: 60vh;
+}
+
+.section-page-bar {
+  border-bottom: 1px solid hsl(var(--border) / 0.8);
+  background: hsl(var(--muted) / 0.35);
+}
+
+.section-page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 28px;
+  min-height: 58px;
+  padding-block: 8px;
+  color: hsl(var(--muted-foreground));
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.section-page-nav a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  transition: color 0.18s ease;
+}
+
+.section-page-nav a:hover {
+  color: hsl(var(--foreground));
+}
+
+.section-page-nav a[aria-current] {
+  color: hsl(var(--copper));
+}
+
+.section-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 22px;
+}
+
+.section-page .portfolio-section {
+  border-top: none;
+}
+
+.section-page-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 20px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid hsl(var(--copper) / 0.35);
+  color: hsl(var(--copper));
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transition: border-color 0.18s ease;
+}
+
+.section-page-link:hover {
+  border-color: hsl(var(--copper));
+}
+
+.about-body {
+  max-width: 68ch;
+  margin-inline: auto;
+  padding-block: clamp(40px, 6vw, 72px);
+}
+
+.about-body p {
+  color: hsl(var(--muted-foreground));
+  font-size: 15.5px;
+  line-height: 1.85;
+  white-space: pre-line;
+}
+
+.public-portfolio-nav {
+  max-width: 940px;
+  margin-inline: auto;
+  margin-top: -10px;
+  margin-bottom: 32px;
+}
+
+.public-portfolio-nav .section-page-links {
+  gap: 8px 20px;
+}
+
+.public-portfolio-nav a {
+  color: hsl(var(--muted-foreground));
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.public-portfolio-nav a:hover {
+  color: hsl(var(--foreground));
+}
+
 .profile-avatar {
   display: flex;
   align-items: center;

@@ -252,3 +252,15 @@ class ResumeResponse(BaseModel):
     experience: list[ExperienceResponse] = []
     education: list[EducationResponse] = []
     contact: ContactResponse | None = None
+
+
+class SkillsResponse(BaseModel):
+    items: list[SkillGroupResponse]
+
+
+class ExperienceListResponse(BaseModel):
+    items: list[ExperienceResponse]
+
+
+class EducationListResponse(BaseModel):
+    items: list[EducationResponse]

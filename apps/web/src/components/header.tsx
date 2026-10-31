@@ -9,13 +9,13 @@ import { ProfileAvatar } from "@/components/profile-avatar";
 import { profileImageUrl } from "@/lib/avatar";
 
 const navigation = [
-  { id: "about", label: "About", href: "/#about" },
-  { id: "skills", label: "Skills", href: "/#skills" },
-  { id: "projects", label: "Work", href: "/#projects" },
-  { id: "experience", label: "Experience", href: "/#experience" },
-  { id: "education", label: "Education", href: "/#education" },
+  { id: "about", label: "About", href: "/about" },
+  { id: "skills", label: "Skills", href: "/skills" },
+  { id: "projects", label: "Work", href: "/projects" },
+  { id: "experience", label: "Experience", href: "/experience" },
+  { id: "education", label: "Education", href: "/education" },
   { id: "resume", label: "Resume", href: "/resume" },
-  { id: "contact", label: "Contact", href: "/#contact" },
+  { id: "contact", label: "Contact", href: "/contact" },
 ];
 
 type HeaderProps = {
@@ -37,7 +37,7 @@ export function Header({
   const pathname = usePathname();
   const open = openPath === pathname;
   const avatarSrc = profileImageUrl(avatarUrl, avatarUpdatedAt);
-  const contactHref = email ? `mailto:${email}` : "/#contact";
+  const contactHref = email ? `mailto:${email}` : "/contact";
 
   useEffect(() => {
     function escape(event: KeyboardEvent) {
@@ -68,7 +68,8 @@ export function Header({
 
   function isCurrent(id: string) {
     if (id === "resume") return pathname === "/resume";
-    return pathname === "/" && active === id;
+    if (pathname === "/") return active === id;
+    return pathname === `/${id}`;
   }
 
   const contactLabel = email ? "Email me" : "Get in touch";
@@ -76,11 +77,7 @@ export function Header({
   return (
     <header className="masthead">
       <div className="content-width masthead-inner">
-        <Link
-          href="/#about"
-          className="wordmark"
-          onClick={() => setOpenPath(null)}
-        >
+        <Link href="/" className="wordmark" onClick={() => setOpenPath(null)}>
           <ProfileAvatar
             src={avatarSrc}
             alt=""

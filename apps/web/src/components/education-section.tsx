@@ -1,12 +1,22 @@
+import Link from "next/link";
+import { ArrowUpRight } from "lucide-react";
 import type { ApiEducation } from "@/lib/api";
 import { formatEducationPeriod } from "@/lib/resume";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Props = {
   education: ApiEducation[];
   index?: string;
+  status?: "ready" | "loading" | "unavailable";
+  pageHref?: string;
 };
 
-export function EducationSection({ education, index = "04" }: Props) {
+export function EducationSection({
+  education,
+  index = "04",
+  status = "ready",
+  pageHref,
+}: Props) {
   return (
     <section
       id="education"
@@ -22,9 +32,35 @@ export function EducationSection({ education, index = "04" }: Props) {
           <p className="section-description">
             The academic foundation behind the work.
           </p>
+          {pageHref && (
+            <Link href={pageHref} className="section-page-link">
+              Open education page
+              <ArrowUpRight size={13} aria-hidden="true" />
+            </Link>
+          )}
         </div>
         <div className="section-body">
-          {education.length === 0 ? (
+          {status === "loading" ? (
+            <div className="education-list" aria-busy="true">
+              {[0, 1].map((entry) => (
+                <article
+                  className="education-entry"
+                  key={entry}
+                  aria-hidden="true"
+                >
+                  <div>
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="mt-2 h-3 w-32" />
+                  </div>
+                  <Skeleton className="h-3 w-24" />
+                </article>
+              ))}
+            </div>
+          ) : status === "unavailable" ? (
+            <p className="section-description" role="alert">
+              Education is temporarily unavailable.
+            </p>
+          ) : education.length === 0 ? (
             <p className="section-description">No education entries defined.</p>
           ) : (
             <div className="education-list">

@@ -4,8 +4,8 @@ import Script from "next/script";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { Header } from "@/components/header";
-import { isAbsoluteHttpUrl, resolveAccountResume } from "@/lib/resume";
-import { getResumeCached } from "@/lib/resume-server";
+import { isAbsoluteHttpUrl } from "@/lib/resume";
+import { getAboutState, getContactState } from "@/lib/resume-server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,16 +36,21 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const apiResume = await getResumeCached();
-  const resolved = apiResume ? resolveAccountResume(apiResume) : null;
-  const profile = resolved?.profile ?? {
-    name: "Resume & Portfolio",
-    headline: "Build and share your portfolio",
-    avatar_url: null,
-    avatar_updated_at: null,
-  };
-  const contact = resolved?.contact ?? { email: null, links: [] };
-  const links = (contact.links ?? []).filter((link) =>
+  const [about, contact] = await Promise.all([
+    getAboutState(null),
+    getContactState(null),
+  ]);
+  const profile =
+    about.status === "ok"
+      ? about.data
+      : {
+          name: "Resume & Portfolio",
+          headline: "Build and share your portfolio",
+          avatar_url: null,
+          avatar_updated_at: null,
+        };
+  const contactData = contact.status === "ok" ? contact.data : null;
+  const links = (contactData?.links ?? []).filter((link) =>
     isAbsoluteHttpUrl(link.url)
   );
   const year = new Date().getFullYear();
@@ -71,7 +76,7 @@ export default async function RootLayout({
           defaultHeader={
             <Header
               name={profile.name}
-              email={contact.email ?? undefined}
+              email={contactData?.email ?? undefined}
               avatarUrl={profile.avatar_url}
               avatarUpdatedAt={profile.avatar_updated_at}
             />
@@ -85,11 +90,9 @@ export default async function RootLayout({
                     <span>.</span>
                   </p>
                   <p className="footer-tagline">
-                    {resolved?.isSample
-                      ? "Illustrative sample resume. Example entries are labeled as samples."
-                      : resolved
-                        ? profile.headline
-                        : "A resume and portfolio, thoughtfully built."}
+                    {about.status === "ok"
+                      ? profile.headline
+                      : "A resume and portfolio, thoughtfully built."}
                   </p>
                 </div>
                 <nav aria-label="Portfolio links" className="footer-links">
@@ -108,7 +111,7 @@ export default async function RootLayout({
                     Build your own portfolio
                   </Link>
                   <Link href="/auth/signin">Editor sign in</Link>
-                  <Link href="/#about">Back to top</Link>
+                  <Link href="/">Portfolio home</Link>
                 </nav>
                 <p className="footer-meta">
                   Built with Next.js &amp; FastAPI
