@@ -5,7 +5,6 @@ import {
   loadPublicResumeSections,
 } from "@/lib/resume-server";
 import { ResumeDocument } from "@/components/resume-document";
-import { SectionLinks } from "@/components/section-page";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Public resume and projects" };
@@ -58,9 +57,6 @@ export default async function PublicPortfolio({
     <section className="public-portfolio" aria-label="Shared portfolio">
       <div className="content-width">
         <p className="eyebrow public-portfolio-label">Shared portfolio</p>
-        <nav aria-label="Portfolio sections" className="public-portfolio-nav">
-          <SectionLinks ownerId={userId} />
-        </nav>
         <div className="resume-shell">
           <ResumeDocument resume={data.resume} projects={data.projects} />
         </div>
