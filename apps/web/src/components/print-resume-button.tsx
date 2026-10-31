@@ -8,7 +8,7 @@ export function PrintResumeButton() {
     <Button
       type="button"
       variant="outline"
-      className="h-11 px-2 text-xs sm:h-8"
+      className="resume-toolbar-button"
       onClick={() => window.print()}
       aria-label="Print this resume or save it as a PDF"
     >

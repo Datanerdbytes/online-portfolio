@@ -42,6 +42,20 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 - `GET /api/v1/projects/{slug}/screenshot` — Public read of the project's optional screenshot, returned with an ETag. Missing projects or screenshots return 404.
 - `PUT` and `DELETE /api/v1/projects/{slug}/screenshot` — Owner-only upload, replacement, or removal. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default), reuse the validated profile-image storage, and persist only generated filenames and image metadata. Uploaded screenshots are shown as small thumbnails beside project technology tags.
 
+### Public portfolio sections
+
+Each homepage section is also readable on its own. Every path below exists twice: `/api/v1/public/<section>` serves the configured default portfolio, and `/api/v1/public/users/{owner_id}/<section>` serves a named portfolio. Both return `Cache-Control: no-store` and return 404 `Portfolio not published` until that portfolio is published.
+
+- `GET .../about` — The profile/hero fields (`ProfileResponse`). Avatar and banner URLs are rewritten to `/api/v1/public/users/{owner_id}/...`; a portfolio without a profile returns 404 `Profile not found`.
+- `GET .../skills` — `{"items": [SkillGroupResponse]}` ordered by `display_order`; `{"items": []}` is valid.
+- `GET .../experience` — `{"items": [ExperienceResponse]}` ordered by `display_order`, with highlights loaded.
+- `GET .../education` — `{"items": [EducationResponse]}` ordered by `display_order`; `{"items": []}` is valid.
+- `GET .../contact` — `ContactResponse` with phone, email, and links; a portfolio without contact details returns 404 `Contact not found`.
+
+A database failure on any of these returns HTTP 503 `Portfolio service unavailable` without exposing internals. The aggregate `GET /api/v1/public/resume` and `GET /api/v1/public/projects` remain available.
+
+The website renders each section as its own page (`/about`, `/skills`, `/projects`, `/experience`, `/education`, `/contact`) from these endpoints, and mirrors them for shared portfolios at `/u/{owner_id}/<section>`. The homepage keeps all sections as a single scrolling overview.
+
 ## Protected project management (owner only)
 
 All mutation routes require a valid bearer token issued by Neon Managed Better Auth. Every mutation independently verifies the bearer token and owner; cookies, supplied owner headers, and frontend checks are never used for authorization. Missing/invalid/expired tokens return 401 (`WWW-Authenticate: Bearer`); valid users can edit only their own rows; another owner’s IDs return 404. When administration is unconfigured, mutations return 503.

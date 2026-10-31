@@ -24,7 +24,10 @@
   },
   "overrides": {
     "postcss-selector-parser": "^7.1.6",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "better-auth": "1.7.7",
+    "@react-email/render": "2.2.0",
+    "minimatch": "11.0.3"
   },
   "engines": {
     "node": ">=20.0.0"

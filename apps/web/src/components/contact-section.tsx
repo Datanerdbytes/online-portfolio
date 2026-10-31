@@ -1,13 +1,17 @@
-import { Mail, Phone } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, Mail, Phone } from "lucide-react";
 import type { ApiContact } from "@/lib/api";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Props = {
   contact: ApiContact | null;
+  status?: "ready" | "loading" | "unavailable";
+  pageHref?: string;
 };
 
-export function ContactSection({ contact }: Props) {
+export function ContactSection({ contact, status = "ready", pageHref }: Props) {
   const email = contact?.email ?? null;
   const phone = contact?.phone ?? null;
   const links = (contact?.links ?? []).filter((l) => isAbsoluteHttpUrl(l.url));
@@ -18,55 +22,91 @@ export function ContactSection({ contact }: Props) {
       aria-labelledby="contact-heading"
       className="portfolio-section"
     >
-      <div className="content-width contact-grid">
-        <div>
-          <p className="eyebrow">Have something in mind?</p>
-          <h2 id="contact-heading" className="section-heading">
-            Let&apos;s connect.
-          </h2>
-          <p className="section-description">
-            Start a conversation about data, technology, or an opportunity to
-            work together.
-          </p>
-          {email && (
-            <Button asChild size="lg" className="mt-6">
-              <a href={`mailto:${email}`}>
-                <Mail size={17} aria-hidden="true" />
-                Say hello
-              </a>
-            </Button>
-          )}
-        </div>
-        <div className="contact-details">
-          {email && (
-            <a href={`mailto:${email}`}>
-              <Mail size={18} aria-hidden="true" />
-              <span>{email}</span>
-            </a>
-          )}
-          {phone && (
-            <a href={`tel:${phone.replace(/[^+0-9]/g, "")}`}>
-              <Phone size={18} aria-hidden="true" />
-              <span>{phone}</span>
-            </a>
-          )}
-          <div className="contact-socials">
-            {links.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {link.label}
-              </a>
-            ))}
-          </div>
-          {!email && !phone && !links.length && (
-            <p className="section-description">
-              Contact details will be added here.
+      <div className="content-width">
+        <div className="contact-panel">
+          <div>
+            <p className="contact-eyebrow">05 — Contact</p>
+            <h2 id="contact-heading" className="contact-title">
+              Let&apos;s connect.
+            </h2>
+            <p className="contact-description">
+              Start a conversation about data, technology, or an opportunity to
+              work together.
             </p>
-          )}
+            {status === "ready" && email && (
+              <div className="contact-actions">
+                <Button asChild className="contact-button">
+                  <a href={`mailto:${email}`}>
+                    <Mail size={15} aria-hidden="true" />
+                    Say hello
+                  </a>
+                </Button>
+              </div>
+            )}
+            {pageHref && (
+              <Link href={pageHref} className="section-page-link">
+                Open contact page
+                <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
+            )}
+          </div>
+          <div className="contact-list" aria-busy={status === "loading"}>
+            {status === "loading" ? (
+              <div aria-hidden="true">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="mt-4 h-4 w-56" />
+                <Skeleton className="mt-4 h-4 w-32" />
+              </div>
+            ) : status === "unavailable" ? (
+              <p className="contact-empty" role="alert">
+                Contact details are temporarily unavailable.
+              </p>
+            ) : (
+              <>
+                {email && (
+                  <a className="contact-row" href={`mailto:${email}`}>
+                    <span className="contact-row-label">Email</span>
+                    <span className="contact-row-value">
+                      {email}
+                      <ArrowUpRight size={14} aria-hidden="true" />
+                    </span>
+                  </a>
+                )}
+                {phone && (
+                  <a
+                    className="contact-row"
+                    href={`tel:${phone.replace(/[^+0-9]/g, "")}`}
+                  >
+                    <span className="contact-row-label">Phone</span>
+                    <span className="contact-row-value">
+                      {phone}
+                      <Phone size={14} aria-hidden="true" />
+                    </span>
+                  </a>
+                )}
+                {links.map((link) => (
+                  <a
+                    className="contact-row"
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="contact-row-label">Elsewhere</span>
+                    <span className="contact-row-value">
+                      {link.label}
+                      <ArrowUpRight size={14} aria-hidden="true" />
+                    </span>
+                  </a>
+                ))}
+                {!email && !phone && !links.length && (
+                  <p className="contact-empty">
+                    Contact details will be added here.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </section>

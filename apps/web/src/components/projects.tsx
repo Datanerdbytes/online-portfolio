@@ -1,21 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CodeXml, FolderOpen } from "lucide-react";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
+import { FolderOpen } from "lucide-react";
+import { ProjectCard } from "@/components/project-cards";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isProjectsResponse, type Project } from "@/lib/api";
-import { profileImageUrl } from "@/lib/avatar";
 
 const PROJECTS_TIMEOUT_MS = 8000;
 const SKELETON_COUNT = 3;
@@ -26,176 +16,32 @@ type ProjectsState =
   | { status: "empty" }
   | { status: "unavailable" };
 
-function isAbsoluteHttpUrl(value: string | null): value is string {
-  if (!value) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 function ProjectSkeleton() {
   return (
-    <Card className="project-card">
-      <div className="project-visual" aria-hidden="true">
-        <Skeleton className="h-8 w-12" />
+    <div className="project-card" aria-hidden="true">
+      <div className="project-cover">
+        <Skeleton className="h-full w-full rounded-none" />
       </div>
-      <CardHeader>
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-8 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <div className="mt-2 h-4 w-full">
-            <Skeleton className="h-4 w-full" />
-          </div>
-        </div>
-      </CardHeader>
-      <CardFooter>
-        <div className="flex flex-wrap gap-2">
-          {[1, 2, 3].map((index) => (
-            <Skeleton key={index} className="h-6 w-20" />
-          ))}
-        </div>
-      </CardFooter>
-    </Card>
-  );
-}
-
-function ProjectLinks({ project }: { project: Project }) {
-  const links = [
-    { label: "Repository", url: project.repository_url },
-    { label: "Demo", url: project.demo_url },
-  ] as { label: string; url: string | null }[];
-
-  const validLinks = links.filter(
-    (link): link is { label: string; url: string } =>
-      isAbsoluteHttpUrl(link.url)
-  );
-
-  if (validLinks.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {validLinks.map((link) => (
-        <a
-          key={link.label}
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary underline-offset-4 hover:underline"
-        >
-          {link.label}
-        </a>
-      ))}
+      <div className="project-topline">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-12" />
+      </div>
+      <Skeleton className="mt-3 h-7 w-4/5" />
+      <Skeleton className="mt-3 h-4 w-full" />
+      <Skeleton className="mt-2 h-4 w-11/12" />
+      <div className="mt-5 flex flex-wrap gap-2">
+        {[1, 2, 3].map((index) => (
+          <Skeleton key={index} className="h-6 w-20 rounded-full" />
+        ))}
+      </div>
     </div>
-  );
-}
-
-function ProjectCard({ project }: { project: Project }) {
-  const screenshotSrc = profileImageUrl(
-    project.screenshot_url,
-    project.screenshot_updated_at,
-    project.screenshot_url?.startsWith("/api/v1/public/")
-      ? project.screenshot_url.replace("/api/v1/", "/api/")
-      : `/api/public/projects/${encodeURIComponent(project.slug)}/screenshot`
-  );
-  const demoUrl = isAbsoluteHttpUrl(project.demo_url) ? project.demo_url : null;
-
-  return (
-    <Card key={project.id} className="project-card flex min-w-0 flex-col">
-      <div className="project-visual" aria-hidden="true">
-        <CodeXml size={31} strokeWidth={1.3} />
-        <span>PORTFOLIO / PROJECT</span>
-        <FolderOpen size={24} strokeWidth={1.3} />
-      </div>
-      <CardHeader>
-        <div className="flex flex-col gap-2 min-w-0">
-          <h3 className="min-w-0 break-words">
-            <Link
-              href={`/projects/${encodeURIComponent(project.slug)}`}
-              className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {project.title}
-            </Link>
-          </h3>
-          {project.is_sample && (
-            <Badge variant="outline" className="w-fit">
-              Sample
-            </Badge>
-          )}
-        </div>
-        <CardDescription className="break-words text-[13px] leading-relaxed">
-          {project.summary}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex min-w-0 items-start gap-3">
-          <div className="flex min-w-0 flex-1 flex-wrap gap-2">
-            {project.technologies.map((tech) => (
-              <Badge
-                key={tech}
-                variant="outline"
-                className="min-w-0 max-w-full"
-              >
-                <span className="min-w-0 [overflow-wrap:anywhere]">{tech}</span>
-              </Badge>
-            ))}
-          </div>
-          {screenshotSrc ? (
-            <div
-              className="relative aspect-[4/3] w-28 shrink-0 overflow-hidden rounded-md border border-input bg-muted sm:w-34"
-              aria-label={`${project.title} screenshot thumbnail`}
-            >
-              {demoUrl ? (
-                <a
-                  href={demoUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block h-full"
-                >
-                  <Image
-                    src={screenshotSrc}
-                    alt={`${project.title} screenshot`}
-                    fill
-                    sizes="(max-width: 639px) 112px, 136px"
-                    className="object-cover"
-                    unoptimized
-                  />
-                </a>
-              ) : (
-                <Image
-                  src={screenshotSrc}
-                  alt={`${project.title} screenshot`}
-                  fill
-                  sizes="(max-width: 639px) 112px, 136px"
-                  className="object-cover"
-                  unoptimized
-                />
-              )}
-            </div>
-          ) : null}
-        </div>
-      </CardContent>
-      <CardFooter className="mt-auto pt-0">
-        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <Link
-            href={`/projects/${encodeURIComponent(project.slug)}`}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Read project details
-          </Link>
-          <ProjectLinks project={project} />
-        </div>
-      </CardFooter>
-    </Card>
   );
 }
 
 function EmptyState() {
   return (
     <div className="project-state">
-      <FolderOpen size={25} className="mb-4 text-primary" aria-hidden="true" />
+      <FolderOpen size={24} aria-hidden="true" />
       <h3>Projects are on the way</h3>
       <p>
         There are no published projects to show yet. Check back for updates.
@@ -207,7 +53,7 @@ function EmptyState() {
 function UnavailableState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="project-state">
-      <FolderOpen size={25} className="mb-4 text-primary" aria-hidden="true" />
+      <FolderOpen size={24} aria-hidden="true" />
       <h3>Projects unavailable</h3>
       <p>The project list couldn’t be loaded right now. Please try again.</p>
       <Button variant="outline" onClick={onRetry} className="mt-4">
@@ -307,7 +153,7 @@ export function ProjectsClient({
         {statusMessage}
       </span>
       {state.status === "ok" && state.source === "fallback" ? (
-        <p role="status" className="mb-4 text-sm text-muted-foreground">
+        <p role="status" className="project-loading-note">
           Showing the last synced copy of the project list.
         </p>
       ) : null}
@@ -319,8 +165,8 @@ export function ProjectsClient({
             ))}
           </>
         ) : state.status === "ok" ? (
-          state.items.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+          state.items.map((project, index) => (
+            <ProjectCard key={project.id} project={project} index={index} />
           ))
         ) : state.status === "empty" ? (
           <EmptyState />

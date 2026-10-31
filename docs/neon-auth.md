@@ -104,8 +104,18 @@ Public HTTP contracts:
 - Default portfolio: `/api/v1/public/resume` and `/api/v1/public/projects`.
 - Named portfolio: `/api/v1/public/users/<owner_id>/resume` and
   `/api/v1/public/users/<owner_id>/projects`.
+- Per-section reads use the same two mounts: `/api/v1/public/<section>` and
+  `/api/v1/public/users/<owner_id>/<section>`, where `<section>` is `about`,
+  `skills`, `experience`, `education`, or `contact`. List sections return
+  `{"items": [...]}`; `about` returns the profile and `contact` returns the
+  contact record. All are published-snapshot reads with `Cache-Control: no-store`.
+- The website exposes one page per section: `/about`, `/skills`, `/projects`,
+  `/experience`, `/education`, and `/contact`. Shared portfolios mirror them at
+  `/u/<owner_id>/<section>`. Each page is server-rendered from the matching
+  section endpoint; the homepage remains a single scrolling overview.
 - The Next.js `/api/public/...` proxy forwards those public requests without
-  cookies or bearer tokens. Image URLs include the portfolio owner.
+  cookies or bearer tokens. Image URLs include the portfolio owner. Section
+  reads happen in Next.js server components, so the proxy allowlist is unchanged.
 - Existing mutation paths remain under `/api/v1/resume` and `/api/v1/projects`.
   They require a Neon bearer JWT. `/api/v1/auth/me` returns the application owner
   ID and expiry after verifying the token and provisioning the blank portfolio.

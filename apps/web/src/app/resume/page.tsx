@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getPublicResumeState } from "@/lib/resume-server";
+import { loadPublicResumeSections } from "@/lib/resume-server";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -15,16 +15,16 @@ export const metadata: Metadata = {
 };
 
 export default async function ResumePage() {
-  const [apiResume, apiProjects] = await Promise.all([
-    getPublicResumeState(),
+  const [sections, apiProjects] = await Promise.all([
+    loadPublicResumeSections(null),
     fetchProjects().catch(() => null),
   ]);
-  if (apiResume.status === "missing") notFound();
-  if (apiResume.status !== "ok")
+  if (sections.status === "missing") notFound();
+  if (sections.status !== "ok")
     return (
       <p role="alert">This resume is temporarily unavailable. Please retry.</p>
     );
-  const resume = resolveAccountResume(apiResume.data);
+  const resume = resolveAccountResume(sections.data);
   if (!resume) notFound();
   if (!apiProjects)
     return (
@@ -36,17 +36,14 @@ export default async function ResumePage() {
     <section className="resume-page" aria-labelledby="resume-page-heading">
       <div className="content-width resume-toolbar">
         <div>
+          <p className="eyebrow">Document</p>
           <h1 id="resume-page-heading" className="resume-toolbar-title">
             Online Resume
           </h1>
         </div>
         <div className="resume-toolbar-actions">
-          <Button
-            asChild
-            variant="outline"
-            className="h-11 px-2 text-xs sm:h-8"
-          >
-            <Link href="/#about">
+          <Button asChild variant="outline" className="resume-toolbar-button">
+            <Link href="/">
               <ArrowLeft size={14} aria-hidden="true" />
               Back to portfolio
             </Link>

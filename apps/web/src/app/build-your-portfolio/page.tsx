@@ -51,38 +51,34 @@ const steps = [
 export default function BuildYourPortfolioPage() {
   return (
     <>
-      <section
-        className="hero-section py-16 sm:py-24"
-        aria-labelledby="builder-heading"
-      >
+      <section className="builder-hero" aria-labelledby="builder-heading">
         <div className="content-width">
-          <p className="eyebrow">The app behind this portfolio</p>
-          <h1
-            id="builder-heading"
-            className="mt-5 max-w-2xl text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl"
-          >
-            Your work, in one place.
-          </h1>
-          <p className="mt-6 max-w-xl text-base leading-8 text-muted-foreground">
-            This portfolio was built with Resume &amp; Portfolio. You can use
-            the same app to create a home for your own resume and projects, with
-            your own content and a link to share.
-          </p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild size="lg">
-              <Link href="/auth/register">
-                Create your account
-                <ArrowRight className="ml-2 size-4" aria-hidden="true" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/">View example portfolio</Link>
-            </Button>
+          <div className="builder-hero-inner">
+            <p className="eyebrow">The app behind this portfolio</p>
+            <h1 id="builder-heading" className="builder-title">
+              Your work, <em>in one place.</em>
+            </h1>
+            <p className="builder-lede">
+              This portfolio was built with Resume &amp; Portfolio. You can use
+              the same app to create a home for your own resume and projects,
+              with your own content and a link to share.
+            </p>
+            <div className="hero-actions">
+              <Button asChild className="hero-button">
+                <Link href="/auth/register">
+                  Create your account
+                  <ArrowRight size={14} aria-hidden="true" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="hero-button">
+                <Link href="/">View example portfolio</Link>
+              </Button>
+            </div>
+            <p className="builder-note">
+              Your saved draft is private until you publish. Only you can edit
+              it after signing in.
+            </p>
           </div>
-          <p className="mt-5 max-w-xl text-sm leading-6 text-muted-foreground">
-            Your saved draft is private until you publish. Only you can edit it
-            after signing in.
-          </p>
         </div>
       </section>
 
@@ -92,19 +88,17 @@ export default function BuildYourPortfolioPage() {
           <h2 id="features-heading" className="section-heading">
             A resume. A portfolio. Your space.
           </h2>
-          <div className="mt-9 grid gap-5 lg:grid-cols-3">
+          <div className="builder-grid">
             {features.map(({ icon: Icon, title, description }) => (
-              <article
-                key={title}
-                className="rounded-lg border border-border bg-background p-6"
-              >
-                <Icon className="mb-5 size-6 text-primary" aria-hidden="true" />
-                <h3 className="text-lg font-semibold tracking-tight">
-                  {title}
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                  {description}
-                </p>
+              <article key={title} className="builder-card">
+                <Icon
+                  size={20}
+                  strokeWidth={1.5}
+                  aria-hidden="true"
+                  className="builder-card-icon"
+                />
+                <h3 className="builder-card-title">{title}</h3>
+                <p className="builder-card-text">{description}</p>
               </article>
             ))}
           </div>
@@ -120,31 +114,20 @@ export default function BuildYourPortfolioPage() {
           <h2 id="steps-heading" className="section-heading">
             From blank page to your portfolio.
           </h2>
-          <ol className="mt-9 grid gap-8 lg:grid-cols-3">
+          <ol className="builder-steps">
             {steps.map(({ title, description }, index) => (
-              <li key={title}>
-                <span
-                  className="text-sm font-semibold text-primary"
-                  aria-hidden="true"
-                >
+              <li key={title} className="builder-step">
+                <span className="builder-step-index" aria-hidden="true">
                   0{index + 1}
                 </span>
-                <h3 className="mt-3 text-lg font-semibold">{title}</h3>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                  {description}
-                </p>
+                <h3 className="builder-step-title">{title}</h3>
+                <p className="builder-step-text">{description}</p>
               </li>
             ))}
           </ol>
-          <p className="mt-10 text-sm leading-7 text-muted-foreground">
+          <p className="builder-signin">
             Already have an account?{" "}
-            <Link
-              className="font-medium text-foreground underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4"
-              href="/auth/signin"
-            >
-              Sign in to your editor
-            </Link>
-            .
+            <Link href="/auth/signin">Sign in to your editor</Link>.
           </p>
         </div>
       </section>
