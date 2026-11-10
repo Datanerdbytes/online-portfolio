@@ -30,7 +30,7 @@ class ImportProblem(ValueError):
 
 def extract_document(data: bytes, extension: str) -> str:
     if not data or len(data) > MAX_FILE_BYTES:
-        raise ImportProblem("Choose a PDF or DOCX file no larger than 3 MiB.")
+        raise ImportProblem("Choose a PDF, DOCX, or text file no larger than 3 MiB.")
     try:
         logging.getLogger("pypdf").disabled = True
         with warnings.catch_warnings():
@@ -77,21 +77,37 @@ def extract_document(data: bytes, extension: str) -> str:
                     else:
                         for row in block.rows:
                             parts.append(" | ".join(cell.text for cell in row.cells))
+            elif extension in {".txt", ".text"}:
+                for encoding in ("utf-8-sig", "utf-8", "utf-16", "cp1252", "latin-1"):
+                    try:
+                        parts.append(data.decode(encoding))
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                else:
+                    raise ImportProblem(
+                        "This text file could not be decoded. Save it as UTF-8 text and retry."
+                    )
             else:
-                raise ImportProblem("The file content does not match a supported PDF or DOCX.")
+                raise ImportProblem(
+                    "The file content does not match a supported PDF, DOCX, or text file."
+                )
         result = unicodedata.normalize("NFKC", "\n".join(parts)).strip()
         if len(result) > MAX_TEXT:
             raise ImportProblem("The document exceeds 50,000 characters. Upload a shorter resume.")
-        if len(re.sub(r"\s", "", result)) < 30:
+        compact = re.sub(r"\s", "", result)
+        readable = sum(1 for c in result if c.isalnum())
+        if "\x00" in result or len(compact) < 30 or readable < 15:
             raise ImportProblem(
-                "No readable resume text was found. Export a text-based PDF or DOCX."
+                "No readable resume text was found. Upload a text-based PDF, DOCX, or text file."
             )
         return result
     except ImportProblem:
         raise
     except Exception:
         raise ImportProblem(
-            "We could not read this document. Export a new PDF or DOCX and retry."
+            "We could not read this document. "
+            "Export a text-based PDF, DOCX, or text file and retry."
         ) from None
 
 

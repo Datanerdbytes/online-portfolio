@@ -111,16 +111,17 @@ async function proxy(request: Request, action: string) {
       }
       if (action === "read" && response.status === 400) {
         const safeMessages = new Set([
-          "Choose a PDF or DOCX file no larger than 3 MiB.",
+          "Choose a PDF, DOCX, or text file no larger than 3 MiB.",
           "Password-protected PDFs are unsupported. Export an unlocked copy.",
           "Choose a PDF with 1 to 10 pages.",
           "This PDF page is too complex. Export a simpler document.",
           "A page has no readable text. Scanned or mixed PDFs need a text-based export.",
           "This Word document is too complex or encrypted. Export a simpler DOCX.",
-          "The file content does not match a supported PDF or DOCX.",
+          "The file content does not match a supported PDF, DOCX, or text file.",
           "The document exceeds 50,000 characters. Upload a shorter resume.",
-          "No readable resume text was found. Export a text-based PDF or DOCX.",
-          "We could not read this document. Export a new PDF or DOCX and retry.",
+          "No readable resume text was found. Upload a text-based PDF, DOCX, or text file.",
+          "This text file could not be decoded. Save it as UTF-8 text and retry.",
+          "We could not read this document. Export a text-based PDF, DOCX, or text file and retry.",
           "Document reading timed out. Export a simpler resume and retry.",
           "Document reading failed. Export a simpler resume and retry.",
         ]);

@@ -244,8 +244,10 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
     setLocalText("");
     setStage("Reading document locally");
     try {
-      if (file.size > IMPORT_MAX_BYTES || !/\.(pdf|docx)$/i.test(file.name))
-        throw new Error("Choose a PDF or DOCX no larger than 3 MiB.");
+      if (file.size > IMPORT_MAX_BYTES || !/\.(pdf|docx|txt)$/i.test(file.name))
+        throw new Error(
+          "Choose a PDF, DOCX, or text file no larger than 3 MiB."
+        );
       const body = new FormData();
       body.set("file", file);
       const response = await fetch("/api/resume-import/read", {
@@ -285,8 +287,10 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
     abort.current = controller;
     const timer = setTimeout(() => controller.abort(), 105000);
     try {
-      if (file.size > IMPORT_MAX_BYTES || !/\.(pdf|docx)$/i.test(file.name))
-        throw new Error("Choose a PDF or DOCX no larger than 3 MiB.");
+      if (file.size > IMPORT_MAX_BYTES || !/\.(pdf|docx|txt)$/i.test(file.name))
+        throw new Error(
+          "Choose a PDF, DOCX, or text file no larger than 3 MiB."
+        );
       const latest = await loadContext();
       setContext(latest);
       setStage("Reading document");
@@ -505,12 +509,12 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
           className="space-y-4 rounded-xl border bg-card p-5"
         >
           <label className="block font-medium" htmlFor="resume-file">
-            Resume file (PDF or DOCX, up to 3 MiB)
+            Resume file (PDF, DOCX, or TXT, up to 3 MiB)
           </label>
           <input
             id="resume-file"
             type="file"
-            accept=".pdf,.docx"
+            accept=".pdf,.docx,.txt,text/plain"
             disabled={busy || reviews.length > 0}
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
@@ -519,8 +523,9 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
             className="block max-w-full"
           />
           <p className="text-sm text-muted-foreground">
-            Text-based resumes only; PDFs may contain up to 10 pages. Scans and
-            password-protected files are unsupported.
+            Upload a text-based PDF, DOCX, or plain-text file (up to 10 PDF
+            pages). Scanned/image-only and password-protected PDFs are
+            unsupported; export a text-based file to import.
           </p>
           <label
             htmlFor="resume-import-consent"
