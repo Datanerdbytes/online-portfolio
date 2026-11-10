@@ -7,8 +7,8 @@ function subscribe(callback: () => void) {
   function onStorage(event: StorageEvent) {
     if (event.key !== "portfolio-theme" && event.key !== null) return;
     document.documentElement.classList.toggle(
-      "dark",
-      event.newValue === "dark"
+      "light",
+      event.newValue !== "dark"
     );
     callback();
   }
@@ -23,12 +23,12 @@ function subscribe(callback: () => void) {
 export function ThemeToggle() {
   const dark = useSyncExternalStore(
     subscribe,
-    () => document.documentElement.classList.contains("dark"),
-    () => false
+    () => !document.documentElement.classList.contains("light"),
+    () => true
   );
 
   function toggle() {
-    document.documentElement.classList.toggle("dark", !dark);
+    document.documentElement.classList.toggle("light", dark);
     try {
       localStorage.setItem("portfolio-theme", dark ? "light" : "dark");
     } catch {

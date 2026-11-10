@@ -1,25 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowDownRight, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SocialLinks } from "@/components/social-links";
 import type { ApiProfile } from "@/lib/api";
 import { profileImageUrl, BANNER_PATH, initialsFromName } from "@/lib/avatar";
-
-function splitName(name: string) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length < 2) return { first: name, last: "" };
-  return { first: parts.slice(0, -1).join(" "), last: parts.at(-1) ?? "" };
-}
 
 export function ProfileHero({
   profile,
   email,
-  projectsHref = "/projects",
+  links = [],
   resumeHref = "/resume",
 }: {
   profile: ApiProfile;
   email: string | null;
-  projectsHref?: string;
+  links?: { label: string; url: string }[];
   resumeHref?: string;
 }) {
   const bannerSrc = profileImageUrl(
@@ -32,31 +27,25 @@ export function ProfileHero({
     profile.avatar_updated_at
   );
   const portraitSrc = bannerSrc ?? avatarSrc;
-  const { first, last } = splitName(profile.name);
-  const year = new Date().getFullYear();
+  const contactHref = email ? `mailto:${email}` : "/contact";
 
   return (
     <section id="about" aria-labelledby="intro-heading" className="hero">
       <div className="content-width hero-grid">
         <div className="hero-copy">
-          <p className="hero-kicker">Resume &amp; portfolio</p>
+          <p className="hero-kicker">Hi, I am</p>
           <h1 id="intro-heading" className="hero-name">
-            {first}
-            {last && (
-              <>
-                {" "}
-                <em>{last}</em>
-              </>
-            )}
+            {profile.name}
           </h1>
           <p className="hero-headline">{profile.headline}</p>
+          <SocialLinks links={links} className="hero-socials" />
           <p className="hero-description">{profile.introduction}</p>
           <div className="hero-actions">
             <Button asChild size="lg" className="hero-button">
-              <Link href={projectsHref}>
-                Explore selected work
-                <ArrowDownRight size={16} aria-hidden="true" />
-              </Link>
+              <a href={contactHref}>
+                Get in touch
+                <span aria-hidden="true">→</span>
+              </a>
             </Button>
             <Button asChild variant="outline" size="lg" className="hero-button">
               <Link href={resumeHref}>
@@ -65,24 +54,6 @@ export function ProfileHero({
               </Link>
             </Button>
           </div>
-          {(profile.location || email) && (
-            <div className="hero-facts">
-              {profile.location && (
-                <div className="hero-fact">
-                  <span className="hero-fact-label">Based in</span>
-                  <span className="hero-fact-value">{profile.location}</span>
-                </div>
-              )}
-              {email && (
-                <div className="hero-fact">
-                  <span className="hero-fact-label">Email</span>
-                  <a className="hero-fact-value" href={`mailto:${email}`}>
-                    {email}
-                  </a>
-                </div>
-              )}
-            </div>
-          )}
         </div>
         <div className="hero-visual">
           <div className="portrait-wrap">
@@ -110,11 +81,6 @@ export function ProfileHero({
                 </div>
               )}
             </div>
-            <span className="portrait-chip">Portfolio · {year}</span>
-          </div>
-          <div className="portrait-meta">
-            <span>{profile.name}</span>
-            <span>{profile.location ?? "Resume & portfolio"}</span>
           </div>
         </div>
       </div>

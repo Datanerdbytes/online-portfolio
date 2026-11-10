@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Script from "next/script";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { Header } from "@/components/header";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
@@ -18,10 +18,9 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const instrumentSerif = Instrument_Serif({
-  variable: "--font-instrument-serif",
-  weight: "400",
-  style: ["normal", "italic"],
+const poppins = Poppins({
+  variable: "--font-poppins",
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
 });
 
@@ -59,14 +58,14 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body>
         <Script
           id="theme-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `try{document.documentElement.classList.toggle('dark',localStorage.getItem('portfolio-theme')==='dark')}catch{}`,
+            __html: `try{document.documentElement.classList.toggle('light',localStorage.getItem('portfolio-theme')==='light')}catch{}`,
           }}
         />
         <a className="skip-link" href="#main-content">
@@ -86,10 +85,7 @@ export default async function RootLayout({
             <footer className="site-footer">
               <div className="content-width footer-inner">
                 <div className="footer-brand">
-                  <p className="footer-name">
-                    {profile.name}
-                    <span>.</span>
-                  </p>
+                  <p className="footer-name">{profile.name}</p>
                 </div>
                 <nav aria-label="Portfolio links" className="footer-links">
                   <Link href="/resume">Resume</Link>

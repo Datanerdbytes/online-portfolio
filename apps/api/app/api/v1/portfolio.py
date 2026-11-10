@@ -20,7 +20,7 @@ from app.db.publishing import (
 )
 from app.db.session import get_db
 from app.db.tenant import provision_owner
-from app.models.owner import PortfolioPublication
+from app.models.owner import PortfolioOwner, PortfolioPublication
 from app.models.project import Project
 from app.models.resume import Experience, Profile
 
@@ -117,3 +117,53 @@ def publish(
             logger.warning("Unused publication media could not be cleaned up")
             db.rollback()
     return result
+
+
+@router.delete(
+    "/portfolio/data",
+    status_code=204,
+    summary="Delete all portfolio data",
+    description=(
+        "Permanently delete every draft and published content row, import "
+        "record, and uploaded media file for the authenticated owner. The "
+        "sign-in account itself is not removed. Returns an empty 204."
+    ),
+)
+def delete_portfolio_data(
+    owner: str = Depends(owner_id),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+    store: ProfileImageStore = Depends(get_image_store),  # noqa: B008
+):
+    try:
+        publication = db.scalar(
+            select(PortfolioPublication)
+            .where(PortfolioPublication.owner_id == owner)
+            .with_for_update()
+        )
+        snapshot_owner_id = publication.snapshot_owner_id if publication else None
+        filenames = content_image_filenames(db.connection(), owner)
+        if snapshot_owner_id:
+            filenames |= content_image_filenames(db.connection(), snapshot_owner_id)
+        # The publication row must go first: its snapshot_owner_id FK has no
+        # ON DELETE rule, so the snapshot owner cannot be removed while it exists.
+        if publication is not None:
+            db.delete(publication)
+        if snapshot_owner_id:
+            snapshot = db.get(PortfolioOwner, snapshot_owner_id)
+            if snapshot is not None:
+                db.delete(snapshot)
+        account = db.get(PortfolioOwner, owner)
+        if account is not None:
+            db.delete(account)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(503, "Portfolio service temporarily unavailable.") from None
+    for filename in filenames:
+        try:
+            if not image_is_referenced(db, filename):
+                store.delete(filename)
+        except (ProfileImageError, SQLAlchemyError):
+            logger.warning("Unused media could not be cleaned up")
+            db.rollback()
+    return None

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.db import tenant
 from app.db.session import get_db
 from app.main import app
-from app.models.owner import PortfolioOwner
+from app.models.owner import PortfolioOwner, PortfolioPublication
 from app.models.resume import Profile, SkillItem
 from tests.neon_support import configure_neon, create_access_token
 
@@ -137,3 +137,49 @@ def test_concurrent_first_session_creates_one_profile(accounts):
     assert statuses == [200] * 4
     with Session(engine) as db:
         assert len(db.scalars(select(Profile).where(Profile.user_id == ids[0])).all()) == 1
+
+
+def test_delete_all_data_wipes_drafts_snapshot_and_publication(accounts):
+    client, engine, ids, (a, b) = accounts
+    client.post(
+        "/api/v1/projects",
+        headers=a,
+        json={"slug": "wipe-me", "title": "A", "summary": "Example", "technologies": []},
+    )
+    client.patch(
+        "/api/v1/resume/profile",
+        headers=a,
+        json={"name": "A", "headline": "Headline", "introduction": "Intro"},
+    )
+    state = client.get("/api/v1/portfolio", headers=a).json()
+    assert (
+        client.post(
+            "/api/v1/portfolio/publish", headers=a, json={"revision": state["revision"]}
+        ).status_code
+        == 200
+    )
+    assert client.get(f"/api/v1/public/users/{ids[0]}/resume").status_code == 200
+
+    with Session(engine) as db:
+        snapshot_id = db.scalar(
+            select(PortfolioPublication.snapshot_owner_id).where(
+                PortfolioPublication.owner_id == ids[0]
+            )
+        )
+    assert snapshot_id is not None and snapshot_id.startswith("snapshot-")
+
+    assert client.delete("/api/v1/portfolio/data", headers=a).status_code == 204
+
+    with Session(engine) as db:
+        remaining = set(db.scalars(select(PortfolioOwner.id)).all())
+    assert ids[0] not in remaining
+    assert snapshot_id not in remaining
+    assert ids[1] in remaining
+
+    assert client.get("/api/v1/portfolio", headers=a).json()["is_published"] is False
+    assert client.get("/api/v1/resume", headers=a).json()["profile"]["name"] == ""
+    assert client.get("/api/v1/projects", headers=a).json()["items"] == []
+    assert client.get(f"/api/v1/public/users/{ids[0]}/resume").status_code == 404
+
+    # Another account's workspace is untouched by the wipe.
+    assert client.get("/api/v1/portfolio", headers=b).json()["revision"] >= 0

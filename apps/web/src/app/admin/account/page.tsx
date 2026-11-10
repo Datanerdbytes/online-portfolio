@@ -2,6 +2,7 @@ import Link from "next/link";
 import { workspaceSession } from "@/lib/workspace";
 import { getNeonAuth } from "@/lib/auth/server";
 import { AdminSessionControls } from "@/components/admin-session-controls";
+import { AccountDangerZone } from "@/components/account-danger-zone";
 
 export default async function AccountPage() {
   const session = await workspaceSession();
@@ -57,6 +58,10 @@ export default async function AccountPage() {
           link in your recovery email to choose a new password.
         </p>
         <AdminSessionControls />
+      </div>
+      <div className="space-y-3 rounded-xl border border-destructive/40 bg-card p-5">
+        <h2 className="text-xl font-semibold">Danger zone</h2>
+        <AccountDangerZone />
       </div>
     </section>
   );

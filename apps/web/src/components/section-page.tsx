@@ -10,6 +10,7 @@ import { ProfileHero } from "@/components/profile-hero";
 import { ProjectCard } from "@/components/project-cards";
 import { ProjectsSection } from "@/components/projects-section";
 import { SkillsSection } from "@/components/skills-section";
+import { isAbsoluteHttpUrl } from "@/lib/resume";
 import {
   getAboutState,
   getContactState,
@@ -45,12 +46,6 @@ export function isSectionId(value: string): value is SectionId {
 
 function homeHref(ownerId: string | null): string {
   return ownerId ? `/u/${encodeURIComponent(ownerId)}` : "/";
-}
-
-function sectionHref(ownerId: string | null, section: SectionId): string {
-  return ownerId
-    ? `/u/${encodeURIComponent(ownerId)}/${section}`
-    : `/${section}`;
 }
 
 function SectionPageFrame({
@@ -125,7 +120,11 @@ async function AboutPage({ ownerId }: { ownerId: string | null }) {
       <ProfileHero
         profile={about.data}
         email={contact.status === "ok" ? contact.data.email : null}
-        projectsHref={sectionHref(ownerId, "projects")}
+        links={
+          contact.status === "ok"
+            ? contact.data.links.filter((link) => isAbsoluteHttpUrl(link.url))
+            : []
+        }
         resumeHref={ownerId ? homeHref(ownerId) : "/resume"}
       />
       {about.data.about && (
