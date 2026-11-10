@@ -53,10 +53,29 @@ def extract_document(data: bytes, extension: str) -> str:
                         )
                     value = page.extract_text(extraction_mode="plain") or ""
                     if len(re.sub(r"\s", "", value)) < 15:
-                        raise ImportProblem(
-                            "A page has no readable text. "
-                            "Scanned or mixed PDFs need a text-based export."
-                        )
+                        # Blank/non-text pages are common; only reject pages that likely
+                        # contain scanned/image content with no extractable text.
+                        has_image = False
+                        try:
+                            resources = page.get("/Resources") or {}
+                            xobjects = resources.get("/XObject") or {}
+                            for obj in xobjects.values():
+                                resolved = obj.get_object() if hasattr(obj, "get_object") else obj
+                                if hasattr(resolved, "get"):
+                                    subtype = resolved.get("/Subtype")
+                                else:
+                                    subtype = None
+                                if str(subtype) == "/Image":
+                                    has_image = True
+                                    break
+                        except Exception:
+                            has_image = True
+                        if has_image:
+                            raise ImportProblem(
+                                "A page has no readable text. "
+                                "Scanned or mixed PDFs need a text-based export."
+                            )
+                        continue
                     parts.append(value)
             elif extension == ".docx" and data.startswith(b"PK\x03\x04"):
                 with zipfile.ZipFile(io.BytesIO(data)) as archive:

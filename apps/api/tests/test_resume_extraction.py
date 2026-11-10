@@ -90,8 +90,6 @@ def test_reads_pdf_word_and_text_files():
         (b"fake.pdf", ".pdf", "content"),
         (b"%PDF-corrupt", ".pdf", "could not read"),
         (pdf(encrypted=True), ".pdf", "Password"),
-        (pdf([""]), ".pdf", "readable"),
-        (pdf([TEXT, ""]), ".pdf", "readable"),
         (pdf([TEXT] * 11), ".pdf", "10 pages"),
         (b"x" * (3 * 1024 * 1024 + 1), ".docx", "3 MiB"),
         (b"\x00" * 40, ".txt", "readable"),
