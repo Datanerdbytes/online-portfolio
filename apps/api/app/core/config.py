@@ -37,7 +37,14 @@ class Settings(BaseSettings):
     GITHUB_PAT: str | None = None
     GITHUB_USERNAME: str | None = None
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {
+        "env_file": (
+            Path(__file__).resolve().parents[3] / ".env",
+            Path(__file__).resolve().parents[2] / ".env",
+            ".env",
+        ),
+        "env_file_encoding": "utf-8",
+    }
 
 
 settings = Settings()
