@@ -70,9 +70,18 @@ def proposal():
     }
 
 
-def test_reads_pdf_and_word_tables():
+def txt(text=TEXT, encoding="utf-8", bom=False):
+    data = text.encode(encoding)
+    if bom and encoding == "utf-8":
+        data = b"\xef\xbb\xbf" + data
+    return data
+
+
+def test_reads_pdf_word_and_text_files():
     assert "Alex Example" in extract_document(pdf(), ".pdf")
     assert "Python | SQL" in extract_document(docx(), ".docx")
+    assert "Alex Example" in extract_document(txt(), ".txt")
+    assert "Alex Example" in extract_document(txt(bom=True), ".txt")
 
 
 @pytest.mark.parametrize(
@@ -85,6 +94,9 @@ def test_reads_pdf_and_word_tables():
         (pdf([TEXT, ""]), ".pdf", "readable"),
         (pdf([TEXT] * 11), ".pdf", "10 pages"),
         (b"x" * (3 * 1024 * 1024 + 1), ".docx", "3 MiB"),
+        (b"\x00" * 40, ".txt", "readable"),
+        (b"   \n\t  ", ".txt", "readable"),
+        (b"\xff\xfe\x00\x00bad", ".txt", "readable"),
     ],
 )
 def test_rejects_bad_and_incomplete_documents(data, extension, match):
@@ -170,6 +182,7 @@ def test_provider_receives_only_source_and_mapping_instructions(monkeypatch):
 
 def test_real_isolated_parser_worker():
     assert "Alex Example" in extraction.extract_bounded(docx(), ".docx")
+    assert "Alex Example" in extraction.extract_bounded(txt(), ".txt")
     with pytest.raises(ImportProblem, match="content"):
         extraction.extract_bounded(b"not a pdf", ".pdf")
 

@@ -46,8 +46,10 @@ def analyze(
     if not consent:
         raise HTTPException(400, "Consent is required before sending resume text to NVIDIA.")
     extension = Path(file.filename or "").suffix.lower()
-    if extension not in {".pdf", ".docx"}:
-        raise HTTPException(400, "Choose a PDF or DOCX file.")
+    if extension == ".text":
+        extension = ".txt"
+    if extension not in {".pdf", ".docx", ".txt"}:
+        raise HTTPException(400, "Choose a PDF, DOCX, or text file.")
     try:
         content = file.file.read(MAX_FILE_BYTES + 1)
     finally:
@@ -152,6 +154,8 @@ def read_locally(
     if not settings.RESUME_IMPORT_LOCAL_PREVIEW or os.environ.get("VERCEL"):
         raise HTTPException(404, "Local document preview is unavailable.")
     extension = Path(file.filename or "").suffix.lower()
+    if extension == ".text":
+        extension = ".txt"
     try:
         content = file.file.read(MAX_FILE_BYTES + 1)
     finally:
