@@ -1,5 +1,6 @@
 """Synthetic documents and provider failures; no real personal data or API calls."""
 
+import copy
 import io
 import json
 import zipfile
@@ -183,6 +184,225 @@ def test_real_isolated_parser_worker():
     assert "Alex Example" in extraction.extract_bounded(txt(), ".txt")
     with pytest.raises(ImportProblem, match="content"):
         extraction.extract_bounded(b"not a pdf", ".pdf")
+
+
+@pytest.fixture
+def partial_mapping():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "projects",
+            "values": {"title": "Data Engineer", "summary": "Unsupported project summary"},
+            "evidence": {"title": "Data Engineer", "summary": "Unsupported project summary"},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    return payload
+
+
+def test_partial_mapping_preserves_verified_fields_without_mutating_input(partial_mapping):
+    original = copy.deepcopy(partial_mapping)
+    result = validate_extraction(partial_mapping, TEXT)
+    assert len(result.candidates) == 2
+    assert result.candidates[0].values == {"name": "Alex Example"}
+    project = result.candidates[1]
+    assert project.values == {"title": "Data Engineer"}
+    assert project.evidence == {"title": "Data Engineer"}
+    assert any("summary" in warning and "omitted" in warning for warning in project.warnings)
+    assert partial_mapping == original
+    assert extraction.Extraction.model_validate(result.model_dump()) == result
+
+
+def test_provider_partial_mapping_returns_verified_review(monkeypatch, partial_mapping):
+    original = httpx.AsyncClient
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {"finish_reason": "stop", "message": {"content": json.dumps(partial_mapping)}}
+                ]
+            },
+        )
+
+    monkeypatch.setattr(
+        extraction.httpx,
+        "AsyncClient",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
+    )
+    result = extraction.map_resume(TEXT)
+    assert len(result.candidates) == 2
+    assert result.candidates[1].values == {"title": "Data Engineer"}
+    assert result.candidates[1].warnings
+
+
+@pytest.mark.parametrize("evidence", [None, "", "Unsupported quote", ["Data Engineer", "Wrong"]])
+def test_partial_mapping_omits_unverified_field_with_missing_or_bad_evidence(
+    partial_mapping, evidence
+):
+    partial_mapping["candidates"][1]["evidence"]["summary"] = evidence
+    result = validate_extraction(partial_mapping, TEXT)
+    assert result.candidates[1].values == {"title": "Data Engineer"}
+    assert result.candidates[1].evidence == {"title": "Data Engineer"}
+
+
+def test_partial_mapping_preserves_allowed_generated_suggestions(partial_mapping):
+    profile = partial_mapping["candidates"][0]
+    profile["values"]["headline"] = "Data professional"
+    profile["generated"] = ["headline"]
+    result = validate_extraction(partial_mapping, TEXT)
+    assert result.candidates[0].values["headline"] == "Data professional"
+    assert result.candidates[0].generated == ["headline"]
+    assert "headline" not in result.candidates[0].evidence
+
+
+def test_partial_mapping_drops_empty_candidates_and_reports_omission(partial_mapping):
+    project = partial_mapping["candidates"][1]
+    project["values"]["title"] = "Unsupported title"
+    project["evidence"]["title"] = "Unsupported title"
+    result = validate_extraction(partial_mapping, TEXT)
+    assert len(result.candidates) == 1
+    assert result.candidates[0].section == "profile"
+    assert any("omitted" in note for note in result.not_imported)
+
+
+@pytest.mark.parametrize("values", [{}, {"name": ""}, {"name": None}, {"name": "Unsupported"}])
+def test_mapping_rejects_results_without_usable_fields(values):
+    payload = proposal()
+    payload["candidates"][0]["values"] = values
+    payload["candidates"][0]["evidence"] = {}
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(payload, TEXT)
+
+
+def test_mapping_rejects_lists_with_no_verified_items():
+    payload = {
+        "candidates": [
+            {
+                "section": "skills",
+                "values": {"items": ["Unsupported tool"]},
+                "evidence": {"items": ["Unsupported tool"]},
+            }
+        ]
+    }
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(payload, TEXT)
+
+
+def test_partial_mapping_preserves_verified_false_values(partial_mapping):
+    partial_mapping["candidates"].append(
+        {
+            "section": "experience",
+            "values": {"current": False},
+            "evidence": {"current": "Role ended"},
+        }
+    )
+    result = validate_extraction(partial_mapping, TEXT + "\nRole ended")
+    assert result.candidates[2].values == {"current": False}
+    assert result.candidates[2].evidence == {"current": "Role ended"}
+
+
+def test_partial_mapping_removes_generated_marker_with_unsupported_quote(partial_mapping):
+    profile = partial_mapping["candidates"][0]
+    profile["values"]["headline"] = "Data professional"
+    profile["evidence"]["headline"] = "Unsupported quote"
+    profile["generated"] = ["headline"]
+    result = validate_extraction(partial_mapping, TEXT)
+    assert result.candidates[0].values == {"name": "Alex Example"}
+    assert result.candidates[0].generated == []
+    assert "headline" not in result.candidates[0].evidence
+    assert extraction.Extraction.model_validate(result.model_dump()) == result
+
+
+def test_partial_mapping_keeps_warnings_and_notes_within_schema_limits(partial_mapping):
+    project = partial_mapping["candidates"][1]
+    project["warnings"] = [f"Existing warning {i}" for i in range(20)]
+    result = validate_extraction(partial_mapping, TEXT)
+    assert len(result.candidates[1].warnings) <= 20
+    assert any("summary" in warning for warning in result.candidates[1].warnings)
+    project["values"]["title"] = "Unsupported title"
+    project["evidence"]["title"] = "Unsupported title"
+    partial_mapping["not_imported"] = [f"Existing note {i}" for i in range(30)]
+    result = validate_extraction(partial_mapping, TEXT)
+    assert len(result.not_imported) <= 30
+    assert any("omitted" in note for note in result.not_imported)
+    assert extraction.Extraction.model_validate(result.model_dump()) == result
+
+
+@pytest.mark.parametrize("value", [42, "x" * 1001])
+def test_partial_mapping_does_not_hide_schema_violations(partial_mapping, value):
+    partial_mapping["candidates"][1]["values"]["summary"] = value
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(partial_mapping, TEXT)
+
+
+def test_partial_mapping_combines_verified_singleton_fields(partial_mapping):
+    partial_mapping["candidates"].extend(
+        [
+            {
+                "section": "profile",
+                "values": {"headline": "Data Engineer"},
+                "evidence": {"headline": "Data Engineer"},
+            },
+            {
+                "section": "profile",
+                "values": {"introduction": "Data professional"},
+                "evidence": {},
+                "generated": ["introduction"],
+            },
+        ]
+    )
+    result = validate_extraction(partial_mapping, TEXT)
+    profiles = [c for c in result.candidates if c.section == "profile"]
+    assert len(profiles) == 1
+    assert profiles[0].values == {
+        "name": "Alex Example",
+        "headline": "Data Engineer",
+        "introduction": "Data professional",
+    }
+    assert profiles[0].evidence == {"name": "Alex Example", "headline": "Data Engineer"}
+    assert profiles[0].generated == ["introduction"]
+    assert any("combined" in warning for warning in profiles[0].warnings)
+    assert result.not_imported == []
+    assert extraction.Extraction.model_validate(result.model_dump()) == result
+
+
+@pytest.mark.parametrize("section,key", [("profile", "name"), ("contact", "email")])
+def test_duplicate_singletons_keep_first_verified_value_and_warn_on_conflict(section, key):
+    payload = {
+        "candidates": [
+            {"section": section, "values": {key: value}, "evidence": {key: value}}
+            for value in ["first@example.test", "second@example.test"]
+        ]
+    }
+    result = validate_extraction(payload, "first@example.test second@example.test")
+    assert len(result.candidates) == 1
+    assert result.candidates[0].values == {key: "first@example.test"}
+    assert result.candidates[0].evidence == {key: "first@example.test"}
+    assert any(
+        "Conflicting" in warning and key in warning for warning in result.candidates[0].warnings
+    )
+
+
+def test_duplicate_singletons_do_not_hide_bad_fields_or_relax_final_schema(partial_mapping):
+    partial_mapping["candidates"].append(copy.deepcopy(partial_mapping["candidates"][0]))
+    with pytest.raises(ValueError, match="Only one"):
+        extraction.Extraction.model_validate(partial_mapping)
+    partial_mapping["candidates"][-1]["values"]["name"] = 42
+    with pytest.raises(ImportProblem, match="verified"):
+        validate_extraction(partial_mapping, TEXT)
+
+
+def test_duplicate_singletons_ignore_unsupported_first_value(partial_mapping):
+    partial_mapping["candidates"].append(copy.deepcopy(partial_mapping["candidates"][0]))
+    partial_mapping["candidates"][0]["values"]["name"] = "Unsupported name"
+    partial_mapping["candidates"][0]["evidence"]["name"] = "Unsupported name"
+    result = validate_extraction(partial_mapping, TEXT)
+    profiles = [c for c in result.candidates if c.section == "profile"]
+    assert len(profiles) == 1
+    assert profiles[0].values == {"name": "Alex Example"}
 
 
 def test_normalizes_document_ligatures_without_generating_words():
