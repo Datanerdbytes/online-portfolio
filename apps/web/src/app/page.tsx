@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { isAbsoluteHttpUrl } from "@/lib/resume";
 import {
   getAboutState,
   getContactState,
@@ -84,7 +85,9 @@ export default async function Home() {
       <ProfileHero
         profile={profile}
         email={contactData?.email ?? null}
-        projectsHref="#projects"
+        links={(contactData?.links ?? []).filter((link) =>
+          isAbsoluteHttpUrl(link.url)
+        )}
         resumeHref="/resume"
       />
 
