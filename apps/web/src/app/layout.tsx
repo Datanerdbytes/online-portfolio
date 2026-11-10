@@ -63,9 +63,9 @@ export default async function RootLayout({
       <body>
         <Script
           id="theme-init"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
-            __html: `try{document.documentElement.classList.toggle('light',localStorage.getItem('portfolio-theme')==='light')}catch{}`,
+            __html: `try{document.documentElement.classList.toggle('light',localStorage.getItem('portfolio-theme')==='light')}catch{}window.dispatchEvent(new Event('portfolio-theme'));`,
           }}
         />
         <a className="skip-link" href="#main-content">

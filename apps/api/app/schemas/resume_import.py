@@ -144,17 +144,23 @@ class Candidate(StrictModel):
         return self
 
 
-class Extraction(StrictModel):
+class MappingResponse(StrictModel):
     candidates: list[Candidate] = Field(max_length=100)
     not_imported: list[str] = Field(default_factory=list, max_length=30)
 
+    @model_validator(mode="after")
+    def bounded_notes(self):
+        if any(len(note) > 2000 for note in self.not_imported):
+            raise ValueError("Unsupported notes too long")
+        return self
+
+
+class Extraction(MappingResponse):
     @model_validator(mode="after")
     def unique_singletons(self):
         for section in ("profile", "contact"):
             if sum(c.section == section for c in self.candidates) > 1:
                 raise ValueError("Only one profile/contact proposal is allowed")
-        if any(len(note) > 2000 for note in self.not_imported):
-            raise ValueError("Unsupported notes too long")
         return self
 
 

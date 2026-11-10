@@ -18,7 +18,7 @@ from docx import Document
 from pypdf import PdfReader
 
 from app.core.config import settings
-from app.schemas.resume_import import VALUE_MODELS, Candidate, Extraction
+from app.schemas.resume_import import VALUE_MODELS, Candidate, Extraction, MappingResponse
 
 MAX_FILE_BYTES = 3 * 1024 * 1024
 MAX_TEXT = 50000
@@ -251,21 +251,71 @@ def ground_proposals(payload: object, text: str) -> object:
 
 def validate_extraction(payload: object, text: str) -> Extraction:
     try:
-        result = Extraction.model_validate(ground_proposals(payload, text))
-        if not result.candidates:
-            raise ValueError()
+        result = MappingResponse.model_validate(ground_proposals(payload, text))
+        retained: list[Candidate] = []
+        singletons: dict[str, Candidate] = {}
+        omitted_count = 0
         for candidate in result.candidates:
-            for key, value in candidate.values.items():
+            omitted = []
+            for key, value in list(candidate.values.items()):
                 if value is None or value == "" or value == []:
+                    candidate.values.pop(key)
+                    candidate.evidence.pop(key, None)
                     continue
                 excerpt = candidate.evidence.get(key)
-                if key not in candidate.generated and not excerpt:
-                    raise ValueError()
-            for evidence in candidate.evidence.values():
-                quotes = evidence if isinstance(evidence, list) else [evidence]
-                if not quotes or any(not quote or quote not in text for quote in quotes):
-                    raise ValueError()
-        return result
+                if key in candidate.generated and not excerpt:
+                    continue
+                quotes = excerpt if isinstance(excerpt, list) else [excerpt]
+                if any(not quote or quote not in text for quote in quotes):
+                    candidate.values.pop(key)
+                    candidate.evidence.pop(key, None)
+                    omitted.append(key)
+            candidate.generated = [key for key in candidate.generated if key in candidate.values]
+            if omitted:
+                candidate.warnings = [
+                    *candidate.warnings[:19],
+                    f"Fields omitted because their source evidence could not be verified: "
+                    f"{', '.join(omitted)}. Review this section against your file.",
+                ]
+            if not candidate.values:
+                omitted_count += 1
+                continue
+            if candidate.section in {"profile", "contact"}:
+                existing = singletons.get(candidate.section)
+                if existing:
+                    conflicts = []
+                    for key, value in candidate.values.items():
+                        if key not in existing.values:
+                            existing.values[key] = value
+                            if key in candidate.evidence:
+                                existing.evidence[key] = candidate.evidence[key]
+                            if key in candidate.generated:
+                                existing.generated.append(key)
+                        elif existing.values[key] != value:
+                            conflicts.append(key)
+                    warning = f"Duplicate {candidate.section} entries were combined. "
+                    if conflicts:
+                        warning += (
+                            f"Conflicting fields kept from the first verified entry: "
+                            f"{', '.join(conflicts)}. "
+                        )
+                    existing.warnings = [
+                        *(existing.warnings + candidate.warnings)[:19],
+                        warning + "Review this section against your file.",
+                    ]
+                    continue
+                singletons[candidate.section] = candidate
+            retained.append(candidate)
+        if not retained:
+            raise ValueError()
+        if omitted_count:
+            result.not_imported = [
+                *result.not_imported[:29],
+                f"Entries omitted because no usable fields remained after verification: "
+                f"{omitted_count}. Add any missing details in the manual editor.",
+            ]
+        result.candidates = retained
+        return Extraction.model_validate(result.model_dump())
     except Exception:
         raise ImportProblem(
             "The mapping could not be verified. Retry or use the manual editor; nothing was saved."
