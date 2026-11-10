@@ -24,7 +24,53 @@ export function deploymentUrl(value) {
   return url.origin;
 }
 
-export function validateResponse(kind, path, body) {
+export function parseResponse(raw) {
+  if (typeof raw === "object" && raw !== null && "body" in raw) {
+    return raw;
+  }
+  const str = String(raw);
+  const match = str.match(/\n__STATUS__:(\d{3})$/);
+  if (match) {
+    return {
+      status: parseInt(match[1], 10),
+      body: str.slice(0, match.index),
+    };
+  }
+  return { status: 200, body: str };
+}
+
+export function validateResponse(kind, path, rawResponse) {
+  const { status, body } = parseResponse(rawResponse);
+
+  if (body.includes("Sign in")) {
+    throw new Error("Authentication or sign-in screen detected.");
+  }
+
+  if (path.endsWith("/health") || path.endsWith("/ready")) {
+    if (status !== 200) {
+      throw new Error(`${kind} ${path} returned HTTP ${status}`);
+    }
+    const data = JSON.parse(body);
+    if (data.status !== "ok") throw new Error("Health/readiness check failed.");
+    return;
+  }
+
+  // When no portfolio has been published in a clean database:
+  if (status === 404) {
+    if (path === "/") {
+      return;
+    }
+    const data = JSON.parse(body);
+    if (data.detail !== "Portfolio not published") {
+      throw new Error(`Unexpected 404 response on ${path}: ${body}`);
+    }
+    return;
+  }
+
+  if (status !== 200) {
+    throw new Error(`${kind} ${path} returned unexpected HTTP ${status}`);
+  }
+
   if (path === "/") {
     if (
       !body.includes('id="main-content"') ||
@@ -35,9 +81,7 @@ export function validateResponse(kind, path, body) {
     return;
   }
   const data = JSON.parse(body);
-  if (path.endsWith("/health") || path.endsWith("/ready")) {
-    if (data.status !== "ok") throw new Error("Health/readiness check failed.");
-  } else if (path.endsWith("/resume")) {
+  if (path.endsWith("/resume")) {
     if (!data.profile?.name || !Array.isArray(data.skills)) {
       throw new Error("Resume read did not return stored profile data.");
     }
@@ -71,8 +115,10 @@ export function smoke(kind, origin, request) {
       : ["/", "/api/health", "/api/public/resume", "/api/public/projects"];
   if (!["api", "web"].includes(kind)) throw new Error("Expected api or web.");
   for (const path of paths) {
-    validateResponse(kind, path, request(path, origin));
-    console.log(`${kind} ${path}: passed`);
+    const response = parseResponse(request(path, origin));
+    validateResponse(kind, path, response);
+    const detail = response.status === 404 ? " (clean database: 404)" : "";
+    console.log(`${kind} ${path}: passed${detail}`);
   }
 }
 
@@ -99,7 +145,8 @@ if (
             "--deployment",
             url,
             "--",
-            "--fail",
+            "-w",
+            "\n__STATUS__:%{http_code}",
             "--silent",
             "--show-error",
             "--max-time",

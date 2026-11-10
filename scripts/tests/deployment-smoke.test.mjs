@@ -59,6 +59,64 @@ test("reject unavailable services, broken data contracts, and auth HTML", () => 
     assert.throws(() => validateResponse("web", path, body));
 });
 
+test("accept clean database when portfolio is not yet published", () => {
+  for (const kind of ["api", "web"]) {
+    const calls = [];
+    smoke(kind, "https://portfolio.vercel.app", (path) => {
+      calls.push(path);
+      if (path === "/") {
+        return "<html>404 Not Found</html>\n__STATUS__:404";
+      }
+      if (path.endsWith("/resume") || path.endsWith("/projects")) {
+        return '{"detail":"Portfolio not published"}\n__STATUS__:404';
+      }
+      return '{"status":"ok"}\n__STATUS__:200';
+    });
+    assert.deepEqual(
+      calls,
+      kind === "api"
+        ? [
+            "/api/v1/health",
+            "/api/v1/ready",
+            "/api/v1/public/resume",
+            "/api/v1/public/projects",
+          ]
+        : ["/", "/api/health", "/api/public/resume", "/api/public/projects"]
+    );
+  }
+});
+
+test("reject unexpected 404 or errors on health and data routes", () => {
+  // Health must never return 404
+  assert.throws(() =>
+    validateResponse("api", "/api/v1/health", {
+      status: 404,
+      body: '{"status":"ok"}',
+    })
+  );
+  // Readiness must never return 404 or 503
+  assert.throws(() =>
+    validateResponse("api", "/api/v1/ready", {
+      status: 503,
+      body: '{"status":"unavailable"}',
+    })
+  );
+  // Unexpected 404 payload must fail
+  assert.throws(() =>
+    validateResponse("api", "/api/v1/public/resume", {
+      status: 404,
+      body: '{"detail":"Internal Error"}',
+    })
+  );
+  // 500 error on resume must fail
+  assert.throws(() =>
+    validateResponse("web", "/api/public/resume", {
+      status: 500,
+      body: '{"detail":"Server error"}',
+    })
+  );
+});
+
 test("check both the database-backed API and frontend proxy routes", () => {
   for (const kind of ["api", "web"]) {
     const calls = [];
