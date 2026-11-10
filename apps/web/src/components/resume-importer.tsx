@@ -522,13 +522,17 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
             Text-based resumes only; PDFs may contain up to 10 pages. Scans and
             password-protected files are unsupported.
           </p>
-          <label className="flex items-start gap-3">
+          <label
+            htmlFor="resume-import-consent"
+            className="flex items-start gap-3 cursor-pointer select-none"
+          >
             <input
+              id="resume-import-consent"
               type="checkbox"
               checked={consent}
-              disabled={!context.enabled || busy || reviews.length > 0}
+              disabled={busy || reviews.length > 0}
               onChange={(e) => setConsent(e.target.checked)}
-              className="mt-1 size-5 shrink-0"
+              className="mt-1 size-5 shrink-0 cursor-pointer disabled:cursor-not-allowed"
             />
             <span>
               I agree to send the extracted resume text to NVIDIA for mapping
@@ -553,12 +557,20 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
             </div>
           )}
           {!reviews.length && (
-            <Button
-              disabled={!context.enabled || !file || !consent || busy}
-              onClick={() => void analyze()}
-            >
-              {busy ? "Processing…" : "Read and map resume"}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                disabled={!context.enabled || !file || !consent || busy}
+                onClick={() => void analyze()}
+              >
+                {busy ? "Processing…" : "Read and map resume"}
+              </Button>
+              {!context.enabled && (
+                <p className="text-sm text-muted-foreground">
+                  Resume import is currently disabled. Configure NVIDIA_API_KEY
+                  and RESUME_IMPORT_ENABLED on the backend to enable AI mapping.
+                </p>
+              )}
+            </div>
           )}
         </section>
       )}
