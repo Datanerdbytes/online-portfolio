@@ -19,6 +19,7 @@ from app.core.storage import ProfileImageError, get_image_store
 from app.db.session import get_db
 from app.main import app
 from app.models.owner import PortfolioPublication
+from tests.neon_support import configure_neon
 
 OWNER_ID = "owner-1"
 SNAPSHOT_ID = "snapshot-1"
@@ -163,7 +164,11 @@ class TestDeleteAllData:
         assert session.committed is False
         assert len(session.deleted) == 3
 
-    def test_requires_authentication(self):
+    def test_requires_authentication(self, monkeypatch):
+        # Configure managed auth explicitly: the auth dependency fails closed with
+        # 503 when no provider is configured, so the 401 path is only reachable
+        # once a provider URL is set. This must not depend on a developer's .env.
+        configure_neon(monkeypatch)
         with TestClient(app) as client:
             response = client.delete("/api/v1/portfolio/data")
         assert response.status_code == 401
