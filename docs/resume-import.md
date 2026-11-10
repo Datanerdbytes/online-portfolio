@@ -22,7 +22,7 @@ The picker stays visible while AI import is disabled so the setup state is clear
 The feature is **disabled by default**. Set these only on the FastAPI service:
 
 - `NVIDIA_API_KEY`: server-side Secret, never `NEXT_PUBLIC_` or committed.
-- `NVIDIA_MODEL`: defaults to `nvidia/nemotron-3.5-super-vl-120b-a12b`.
+- `NVIDIA_MODEL`: defaults to `nvidia/nemotron-3-ultra-550b-a55b`.
 - `RESUME_IMPORT_ENABLED`: enable only after the evaluation below passes.
 
 The adapter calls `https://integrate.api.nvidia.com/v1/chat/completions` without
@@ -106,14 +106,18 @@ Full CI also runs lint, types, production build, all existing tests, and disposa
 PostgreSQL migrations. Provider calls are mocked in CI. No live model-quality or
 real-document end-to-end verification is claimed until performed explicitly.
 
-## Model selection verification (2026-10-24)
+## Model selection verification
 
-Selected `nvidia/nemotron-3.5-super-vl-120b-a12b`, in non-reasoning mode with an
-8192-token output ceiling and hosted JSON-schema constraints. The final synthetic
-run passed basic section coverage/evidence (6.7s), ambiguous dates (25.1s), and
-embedded instruction isolation (69.8s). Earlier runs were about 3–4 seconds; hosted
-latency varied substantially but remained inside the 75-second gate. This is a small application-specific gate,
-not a general model benchmark or a latency guarantee.
+Selected `nvidia/nemotron-3-ultra-550b-a55b` on 2026-11-11, retaining non-reasoning
+mode, the 8192-token output ceiling, and hosted JSON-schema constraints. A comparison
+used three synthetic resumes, twice per model, with the same application request.
+Ultra passed validation in 6/6 runs (13.9s mean), versus 4/6 for the previous
+`nvidia/nemotron-3.5-super-vl-120b-a12b` (9.3s). Both recovered all scored facts,
+with 98.5% raw precision on those facts; Ultra's observed advantage was schema
+reliability, not demonstrated better factual accuracy. This small synthetic gate
+does not establish real-document accuracy, narrative quality, or a latency guarantee.
+Kimi K2.6 was inaccessible to the configured account; Mistral Large 4 exceeded the
+75-second timeout in all six attempts.
 
 The originally planned Llama 3.3 model and the older Nemotron Nano ID returned
 HTTP 410. Lightning 3.5 was available and fast, but did not consistently pass

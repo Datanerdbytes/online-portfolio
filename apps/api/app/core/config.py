@@ -1,7 +1,28 @@
+import os
 from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings
+
+
+def normalize_no_proxy_env() -> None:
+    # httpx 0.27 turns bracketed IPv6 NO_PROXY entries into invalid
+    # "all://*[::1]" mount patterns; the bare address is the valid form.
+    for key in ("NO_PROXY", "no_proxy"):
+        value = os.environ.get(key)
+        if not value:
+            continue
+        hosts: list[str] = []
+        for host in value.split(","):
+            host = host.strip()
+            if host.startswith("[") and host.endswith("]"):
+                host = host[1:-1]
+            if host and host not in hosts:
+                hosts.append(host)
+        os.environ[key] = ",".join(hosts)
+
+
+normalize_no_proxy_env()
 
 
 class Settings(BaseSettings):
@@ -31,7 +52,7 @@ class Settings(BaseSettings):
     RESUME_IMPORT_ENABLED: bool = False
     RESUME_IMPORT_LOCAL_PREVIEW: bool = False
     NVIDIA_API_KEY: str | None = None
-    NVIDIA_MODEL: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
+    NVIDIA_MODEL: str = "nvidia/nemotron-3-ultra-550b-a55b"
 
     # GitHub README sync
     GITHUB_PAT: str | None = None

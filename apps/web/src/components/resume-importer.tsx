@@ -7,7 +7,8 @@ import {
   AiWritingAssistant,
   writingLimits,
 } from "@/components/ai-writing-assistant";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   candidateValid,
   factsForWriting,
@@ -49,6 +50,7 @@ const labels: Record<string, string> = {
 const label = (key: string) =>
   labels[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
 const headers = { "X-Requested-With": "online-resume-admin" };
+const filePickerHint = "Choose a PDF, DOCX, or TXT resume file (up to 3 MiB)";
 function makeReview(candidate: Candidate, context: ImportContext): Review {
   const existing = entries(context, candidate.section);
   const target = suggestedTarget(candidate, existing);
@@ -511,17 +513,37 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
           <label className="block font-medium" htmlFor="resume-file">
             Resume file (PDF, DOCX, or TXT, up to 3 MiB)
           </label>
-          <input
-            id="resume-file"
-            type="file"
-            accept=".pdf,.docx,.txt,text/plain"
-            disabled={busy || reviews.length > 0}
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setError("");
-            }}
-            className="block max-w-full"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id="resume-file"
+              type="file"
+              accept=".pdf,.docx,.txt,text/plain"
+              disabled={busy || reviews.length > 0}
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                setError("");
+              }}
+              className="peer sr-only"
+            />
+            <label
+              htmlFor="resume-file"
+              title={filePickerHint}
+              aria-disabled={busy || reviews.length > 0}
+              className={cn(
+                buttonVariants({ variant: "secondary" }),
+                "cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2",
+                (busy || reviews.length > 0) && "cursor-not-allowed opacity-50"
+              )}
+            >
+              Choose file
+            </label>
+            <span
+              className="min-w-0 max-w-full truncate text-sm text-muted-foreground"
+              title={file ? file.name : filePickerHint}
+            >
+              {file ? file.name : "No file chosen"}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground">
             Upload a text-based PDF, DOCX, or plain-text file (up to 10 PDF
             pages). Scanned/image-only and password-protected PDFs are
@@ -548,10 +570,6 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
           </label>
           {context.can_read_locally && !reviews.length && (
             <div className="space-y-2">
-              <p className="text-sm">
-                Local test: read your document without sending it to NVIDIA or
-                saving resume fields.
-              </p>
               <Button
                 disabled={!file || busy}
                 variant="outline"
@@ -908,6 +926,10 @@ export function ResumeImporter({ initial }: { initial: ImportContext }) {
                   setNotes([]);
                   setStage("");
                   setFile(null);
+                  const input = document.getElementById(
+                    "resume-file"
+                  ) as HTMLInputElement | null;
+                  if (input) input.value = "";
                 }
               }}
             >
