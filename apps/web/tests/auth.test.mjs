@@ -292,6 +292,7 @@ function project() {
     title: "Resume site",
     summary: "Portfolio application.",
     technologies: ["Next.js", "FastAPI"],
+    highlights: [],
     repository_url: null,
     demo_url: null,
     display_order: 0,
@@ -590,6 +591,7 @@ test("project PUT requires all writable fields and rejects immutable fields", as
     title: "T",
     summary: "S",
     technologies: [],
+    highlights: ["Shipped the portfolio."],
     repository_url: null,
     demo_url: null,
     display_order: 3,
@@ -823,6 +825,34 @@ test("management supports empty technologies and validates actual entries", () =
   }
 });
 
+test("management parses highlight lines and mirrors the API's casefold dedupe", () => {
+  const helpers = harness().load("lib/project-management");
+  assert.deepEqual(Array.from(helpers.parseHighlights("")), []);
+  assert.deepEqual(Array.from(helpers.parseHighlights(" \n ")), []);
+  assert.deepEqual(
+    Array.from(helpers.parseHighlights("  First bullet \n\nSecond\n")),
+    ["First bullet", "Second"]
+  );
+  assert.deepEqual(
+    Array.from(helpers.parseHighlights("Deployed DBT\ndeployed dbt")),
+    ["Deployed DBT"]
+  );
+  for (const input of [
+    "x".repeat(501),
+    Array.from({ length: 21 }, (_, i) => `bullet ${i}`).join("\n"),
+  ]) {
+    assert.equal(helpers.parseHighlights(input), null);
+  }
+  const original = ["Kept as written."];
+  assert.deepEqual(
+    Array.from(helpers.formHighlights("Kept as written.", original)),
+    original
+  );
+  assert.deepEqual(Array.from(helpers.formHighlights("Changed.", original)), [
+    "Changed.",
+  ]);
+});
+
 test("reorder submits only changed targets in collections larger than 100", () => {
   const { changedOrders } = harness().load("lib/project-management");
   const projects = Array.from({ length: 101 }, (_, i) => ({
@@ -855,12 +885,32 @@ test("unchanged project details produce helpful feedback without a mutation", ()
     title: original.title,
     summary: original.summary,
     technologies: [...original.technologies],
+    highlights: [...(original.highlights ?? [])],
     repository_url: original.repository_url,
     demo_url: original.demo_url,
     display_order: original.display_order,
   };
 
   assert.equal(projectUpdateBody(unchanged, original), null);
+  const withHighlights = { ...original, highlights: ["One bullet."] };
+  assert.deepEqual(
+    projectUpdateBody(
+      { ...unchanged, highlights: ["One bullet."] },
+      withHighlights
+    ),
+    null
+  );
+  assert.deepEqual(
+    JSON.parse(
+      JSON.stringify(
+        projectUpdateBody(
+          { ...unchanged, highlights: ["Different."] },
+          withHighlights
+        )
+      )
+    ),
+    { highlights: ["Different."] }
+  );
   assert.equal(
     PROJECT_NO_CHANGES_MESSAGE,
     "Project details are unchanged. Screenshot uploads save immediately."
@@ -1028,6 +1078,7 @@ test("the legal reorder slug supports project CRUD alongside batch POST", async 
     title: "t",
     summary: "s",
     technologies: [],
+    highlights: [],
     repository_url: null,
     demo_url: null,
     display_order: 0,
@@ -1050,6 +1101,7 @@ test("the legal reorder slug supports project CRUD alongside batch POST", async 
               title: "t",
               summary: "s",
               technologies: [],
+              highlights: [],
               repository_url: null,
               demo_url: null,
               display_order: 0,

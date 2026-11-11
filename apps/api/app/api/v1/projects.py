@@ -109,6 +109,7 @@ def create_project(
         title=body.title,
         summary=body.summary,
         technologies=body.technologies,
+        highlights=body.highlights,
         repository_url=body.repository_url,
         demo_url=body.demo_url,
         display_order=body.display_order,
@@ -195,6 +196,7 @@ def replace_project(
         project.title = body.title
         project.summary = body.summary
         project.technologies = body.technologies
+        project.highlights = body.highlights
         project.repository_url = body.repository_url
         project.demo_url = body.demo_url
         project.display_order = body.display_order
@@ -221,7 +223,7 @@ def replace_project(
     description=(
         "Update only the supplied fields. Omitted fields are unchanged; null "
         "clears only the two URL fields. Null is invalid for title, summary, "
-        "technologies, and display_order. An empty body is rejected."
+        "technologies, highlights, and display_order. An empty body is rejected."
     ),
 )
 def patch_project(

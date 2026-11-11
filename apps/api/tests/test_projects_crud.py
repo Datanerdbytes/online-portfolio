@@ -172,6 +172,7 @@ def _replace_payload(**overrides):
         "title": "Resume site",
         "summary": "Portfolio application.",
         "technologies": ["Next.js", "FastAPI"],
+        "highlights": ["Deployed the portfolio to Vercel."],
         "repository_url": None,
         "demo_url": None,
         "display_order": 0,
@@ -435,6 +436,7 @@ class TestReplace:
             "title": "New title",
             "summary": "New summary.",
             "technologies": [],
+            "highlights": ["New highlight."],
             "repository_url": None,
             "demo_url": None,
             "display_order": 3,
@@ -446,6 +448,7 @@ class TestReplace:
         assert body["title"] == "New title"
         assert body["summary"] == "New summary."
         assert body["technologies"] == []
+        assert body["highlights"] == ["New highlight."]
         assert body["repository_url"] is None
         assert body["demo_url"] is None
         assert body["display_order"] == 3
@@ -587,6 +590,122 @@ class TestPatch:
             )
         assert response.status_code == 200
         assert response.json()["is_sample"] is True
+
+    def test_patch_highlights_trim_and_casefold_dedupe(self):
+        existing = Project(
+            slug="resume-site", title="T", summary="S", technologies=[], display_order=0
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"highlights": ["  First bullet  ", "FIRST BULLET", "Second"]},
+            )
+        assert response.status_code == 200
+        assert response.json()["highlights"] == ["First bullet", "Second"]
+
+    def test_patch_highlights_empty_list_clears(self):
+        existing = Project(
+            slug="resume-site",
+            title="T",
+            summary="S",
+            technologies=[],
+            highlights=["old"],
+            display_order=0,
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"highlights": []},
+            )
+        assert response.status_code == 200
+        assert response.json()["highlights"] == []
+
+    def test_patch_highlights_omitted_leaves_unchanged(self):
+        existing = Project(
+            slug="resume-site",
+            title="T",
+            summary="S",
+            technologies=[],
+            highlights=["kept"],
+            display_order=0,
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"title": "Revised"},
+            )
+        assert response.status_code == 200
+        assert response.json()["highlights"] == ["kept"]
+
+    def test_patch_highlights_blank_entry_400(self):
+        existing = Project(
+            slug="resume-site", title="T", summary="S", technologies=[], display_order=0
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"highlights": ["ok", "   "]},
+            )
+        assert response.status_code == 400
+
+    def test_patch_highlights_over_length_400(self):
+        existing = Project(
+            slug="resume-site", title="T", summary="S", technologies=[], display_order=0
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"highlights": ["x" * 501]},
+            )
+        assert response.status_code == 400
+
+    def test_patch_highlights_over_count_400(self):
+        existing = Project(
+            slug="resume-site", title="T", summary="S", technologies=[], display_order=0
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"highlights": [f"bullet {i}" for i in range(21)]},
+            )
+        assert response.status_code == 400
+
+    def test_patch_highlights_null_400(self):
+        existing = Project(
+            slug="resume-site", title="T", summary="S", technologies=[], display_order=0
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.patch(
+                "/api/v1/projects/resume-site",
+                json={"highlights": None},
+            )
+        assert response.status_code == 400
+
+    def test_put_requires_highlights(self):
+        existing = Project(
+            slug="resume-site", title="T", summary="S", technologies=[], display_order=0
+        )
+        session = StubSession(first=existing)
+        with _client_with_overrides(session) as client:
+            response = client.put(
+                "/api/v1/projects/resume-site",
+                json={
+                    "title": "T",
+                    "summary": "S",
+                    "technologies": [],
+                    "repository_url": None,
+                    "demo_url": None,
+                    "display_order": 0,
+                },
+            )
+        assert response.status_code == 400
 
     def test_patch_missing_target_404(self):
         session = StubSession(first=None)

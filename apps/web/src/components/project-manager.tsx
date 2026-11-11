@@ -32,6 +32,7 @@ import {
   isSlug,
   MAX_ORDER,
   formTechnologies,
+  formHighlights,
   parseOrder,
   projectUpdateBody,
   PROJECT_NO_CHANGES_MESSAGE,
@@ -43,6 +44,7 @@ type Values = {
   title: string;
   summary: string;
   technologies: string;
+  highlights: string;
   repository_url: string;
   demo_url: string;
   display_order: string;
@@ -53,6 +55,7 @@ const blank = (): Values => ({
   title: "",
   summary: "",
   technologies: "",
+  highlights: "",
   repository_url: "",
   demo_url: "",
   display_order: "0",
@@ -63,6 +66,7 @@ function valuesFor(project: Project): Values {
     title: project.title,
     summary: project.summary,
     technologies: project.technologies.join(", "),
+    highlights: (project.highlights ?? []).join("\n"),
     repository_url: project.repository_url ?? "",
     demo_url: project.demo_url ?? "",
     display_order: String(project.display_order),
@@ -327,6 +331,10 @@ export function ProjectManager({
       values.technologies,
       mode === "edit" ? editing?.technologies : undefined
     );
+    const highlights = formHighlights(
+      values.highlights,
+      mode === "edit" ? editing?.highlights : undefined
+    );
     const order = parseOrder(values.display_order);
     const repository = values.repository_url.trim(),
       demo = values.demo_url.trim();
@@ -345,6 +353,12 @@ export function ProjectManager({
     if (technologies === null) {
       setError(
         "Use 0–20 unique technologies, each 1–50 characters, separated by commas. Leave blank for none."
+      );
+      return;
+    }
+    if (highlights === null) {
+      setError(
+        "Use 0–20 unique highlights, each 1–500 characters, one per line. Leave blank for none."
       );
       return;
     }
@@ -370,6 +384,7 @@ export function ProjectManager({
       title,
       summary,
       technologies,
+      highlights,
       repository_url: repository || null,
       demo_url: demo || null,
       display_order: order,
@@ -611,6 +626,27 @@ export function ProjectManager({
             />
             <p className="mt-1 text-xs text-muted-foreground">
               Comma-separated, 0–20 unique items. Leave blank for none.
+            </p>
+          </div>
+          <div>
+            <label
+              htmlFor="project-highlights"
+              className="mb-1 block text-sm font-medium"
+            >
+              Highlights
+            </label>
+            <textarea
+              id="project-highlights"
+              className={`${inputClass} min-h-24`}
+              value={values.highlights}
+              disabled={pending}
+              onChange={(event) =>
+                setValues({ ...values, highlights: event.target.value })
+              }
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              One bullet per line, 0–20 unique items of up to 500 characters.
+              Leave blank for none.
             </p>
           </div>
           <div>

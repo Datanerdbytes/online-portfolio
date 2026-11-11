@@ -9,6 +9,7 @@ type WritableProjectFields = Pick<
   | "title"
   | "summary"
   | "technologies"
+  | "highlights"
   | "repository_url"
   | "demo_url"
   | "display_order"
@@ -75,6 +76,9 @@ export function isProject(value: unknown): value is Project {
     typeof value.summary === "string" &&
     Array.isArray(value.technologies) &&
     value.technologies.every((item: unknown) => typeof item === "string") &&
+    (value.highlights === undefined ||
+      (Array.isArray(value.highlights) &&
+        value.highlights.every((item: unknown) => typeof item === "string"))) &&
     (value.repository_url === null ||
       typeof value.repository_url === "string") &&
     (value.demo_url === null || typeof value.demo_url === "string") &&
@@ -110,6 +114,7 @@ export function projectResponse(project: Project): Project {
     title,
     summary,
     technologies,
+    highlights,
     repository_url,
     demo_url,
     display_order,
@@ -123,6 +128,7 @@ export function projectResponse(project: Project): Project {
     title,
     summary,
     technologies,
+    highlights: highlights ?? [],
     repository_url,
     demo_url,
     display_order,
@@ -139,6 +145,33 @@ export function parseTechnologies(value: string): string[] | null {
     new Set(items).size === items.length
     ? items
     : null;
+}
+export function parseHighlights(value: string): string[] | null {
+  // One bullet per line; blank lines are layout, not entries. Duplicates that
+  // differ only in case collapse to the first spelling, matching the API.
+  const items = value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const item of items) {
+    if (item.length > 500) return null;
+    const key = item.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    cleaned.push(item);
+  }
+  return cleaned.length <= 20 ? cleaned : null;
+}
+export function formHighlights(
+  value: string,
+  original?: string[]
+): string[] | null {
+  // An unchanged multiline display must not drop or rewrite stored bullets.
+  return original && value === original.join("\n")
+    ? original
+    : parseHighlights(value);
 }
 export function formTechnologies(
   value: string,
