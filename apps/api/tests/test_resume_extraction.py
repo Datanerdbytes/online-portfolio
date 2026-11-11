@@ -533,6 +533,48 @@ def test_wrapped_url_is_verified_without_following_it():
     assert result.candidates[1].evidence["url"] == "https://github.com/\nexample"
 
 
+def test_letter_spaced_source_text_grounds_a_normalized_item():
+    text = "Alex Example\nSkills\nM e d a l l i o n  A r c h i t e c t u r e\nGoogle BigQuery"
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "skills",
+            "values": {
+                "label": "Skills",
+                "items": ["Medallion Architecture", "Google BigQuery"],
+            },
+            "evidence": {
+                "label": "Skills",
+                "items": ["Medallion Architecture", "Google BigQuery"],
+            },
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    candidate = validate_extraction(payload, text).candidates[1]
+    assert candidate.values["items"] == ["Medallion Architecture", "Google BigQuery"]
+    assert all(item in text for item in candidate.evidence["items"])
+
+
+def test_hyphen_line_break_grounds_a_joined_item():
+    text = (
+        "Alex Example\nCore Strengths: Analytical Troubleshooting, Cross-\nFunctional Communication"
+    )
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "skills",
+            "values": {"label": "Core Strengths", "items": ["Cross-Functional Communication"]},
+            "evidence": {"label": "Core Strengths", "items": ["Cross-Functional Communication"]},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    candidate = validate_extraction(payload, text).candidates[1]
+    assert candidate.values["items"] == ["Cross-Functional Communication"]
+    assert candidate.evidence["items"] == ["Cross-\nFunctional Communication"]
+
+
 def test_month_year_date_normalizes_to_yyyy_mm_with_original_evidence():
     payload = proposal()
     payload["candidates"].append(
