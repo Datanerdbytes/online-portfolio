@@ -2266,12 +2266,15 @@ button {
 
 .resume-doc-highlights {
   margin-top: 8px;
-  display: grid;
-  gap: 5px;
+  list-style: disc;
   padding-left: 18px;
   color: hsl(var(--muted-foreground));
   font-size: 12.5px;
   line-height: 1.7;
+}
+
+.resume-doc-highlights li + li {
+  margin-top: 5px;
 }
 
 .resume-doc-highlights li::marker {
