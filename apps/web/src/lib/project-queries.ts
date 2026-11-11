@@ -127,6 +127,14 @@ export async function updateSkillItem(
   return result as ApiSkillItem;
 }
 
+export async function addSkillGroup(body: {
+  label: string;
+  display_order?: number;
+}): Promise<ApiSkillGroup> {
+  const result = await resumePost("/resume/skills", body);
+  return result as ApiSkillGroup;
+}
+
 export async function deleteSkillGroup(id: number): Promise<void> {
   await resumeDelete(`/resume/skills/${id}`);
 }
@@ -203,6 +211,23 @@ export function useUpdateProfile() {
       queryClient.setQueryData(
         RESUME_QUERY_KEY,
         (old: ApiResume | undefined) => ({ ...old, profile: data })
+      );
+    },
+  });
+}
+
+export function useAddSkillGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { label: string; display_order?: number }) =>
+      addSkillGroup(body),
+    onSuccess: (data) => {
+      queryClient.setQueryData(
+        RESUME_QUERY_KEY,
+        (old: ApiResume | undefined) => ({
+          ...old,
+          skills: [...(old?.skills ?? []), data],
+        })
       );
     },
   });

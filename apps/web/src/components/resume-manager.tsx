@@ -18,6 +18,7 @@ import type {
 import {
   useResume,
   useUpdateProfile,
+  useAddSkillGroup,
   useUpdateSkillGroup,
   useUpdateSkillItem,
   useDeleteSkillGroup,
@@ -339,6 +340,8 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
   const [newItemValue, setNewItemValue] = useState("");
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [groupLabelValue, setGroupLabelValue] = useState("");
+  const [addingGroup, setAddingGroup] = useState(false);
+  const [newGroupLabel, setNewGroupLabel] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<{
     kind: "group";
     id: number;
@@ -352,8 +355,10 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
   const deleteSkillGroup = useDeleteSkillGroup();
   const deleteSkillItem = useDeleteSkillItem();
   const addSkillItem = useAddSkillItem();
+  const addSkillGroup = useAddSkillGroup();
 
   const saving =
+    addSkillGroup.isPending ||
     updateSkillGroup.isPending ||
     updateSkillItem.isPending ||
     addSkillItem.isPending;
@@ -376,6 +381,25 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
       setMessage(handleMutationError(err));
     }
   }, [editingItem, itemValue, updateSkillItem]);
+
+  const addGroup = useCallback(async () => {
+    const label = newGroupLabel.trim();
+    if (!label) return;
+    setMessage("");
+    try {
+      await addSkillGroup.mutateAsync({
+        label,
+        display_order: skills.length,
+      });
+      setIsError(false);
+      setMessage("Added to your draft. Publish when ready.");
+      setAddingGroup(false);
+      setNewGroupLabel("");
+    } catch (err) {
+      setIsError(true);
+      setMessage(handleMutationError(err));
+    }
+  }, [newGroupLabel, skills.length, addSkillGroup]);
 
   const saveGroup = useCallback(async () => {
     if (editingGroupId === null) return;
@@ -598,6 +622,72 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
           </CardContent>
         </Card>
       ))}
+      {skills.length === 0 && !addingGroup && (
+        <p className="text-sm text-muted-foreground">
+          No skill groups yet. Add one to describe your strengths and tools.
+        </p>
+      )}
+      {addingGroup ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">New skill group</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <label
+                className="block text-sm font-medium"
+                htmlFor="new-skill-group"
+              >
+                Group name
+              </label>
+              <input
+                id="new-skill-group"
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+                placeholder="e.g. Programming languages"
+                value={newGroupLabel}
+                onChange={(e) => setNewGroupLabel(e.target.value)}
+                disabled={saving}
+                autoFocus
+                maxLength={200}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addGroup();
+                }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={addGroup}
+                disabled={saving || !newGroupLabel.trim()}
+              >
+                {saving ? "Saving…" : "Add group"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setAddingGroup(false);
+                  setNewGroupLabel("");
+                  setMessage("");
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setAddingGroup(true);
+            setNewGroupLabel("");
+            setMessage("");
+          }}
+        >
+          + Add skill group
+        </Button>
+      )}
       {deleteTarget && (
         <ConfirmDialog
           open

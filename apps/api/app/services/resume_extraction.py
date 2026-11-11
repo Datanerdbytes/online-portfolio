@@ -182,7 +182,29 @@ def source_excerpt(value: str, text: str) -> str | None:
     # source span so the review still displays an exact, verifiable quotation.
     pattern = r"\s+".join(re.escape(part) for part in value.split())
     match = re.search(pattern, text, re.IGNORECASE) if pattern else None
-    return match.group() if match and len(match.group()) <= 1000 else None
+    if match and len(match.group()) <= 1000:
+        return match.group()
+    return _formatting_insensitive_excerpt(value, text)
+
+
+def _formatting_insensitive_excerpt(value: str, text: str) -> str | None:
+    # Some exports space letters apart ("M e d a l l i o n") or split a
+    # hyphenated word across lines ("Cross-\nFunctional"). Whitespace is layout,
+    # not wording, so compare without it and map the hit back to an exact span.
+    compact_value = "".join(value.split())
+    if not compact_value:
+        return None
+    compact: list[str] = []
+    origin: list[int] = []
+    for index, char in enumerate(text):
+        if not char.isspace():
+            compact.append(char)
+            origin.append(index)
+    match = re.search(re.escape(compact_value), "".join(compact), re.IGNORECASE)
+    if not match:
+        return None
+    excerpt = text[origin[match.start()] : origin[match.end() - 1] + 1]
+    return excerpt if len(excerpt) <= 1000 else None
 
 
 def ground_proposals(payload: object, text: str) -> object:
@@ -394,7 +416,9 @@ becomes "2021-10") and keep the exact original wording as the evidence quote. Ke
 year-only dates as years and warn they need review. For a URL written without a scheme
 (e.g. "github.com/user/repo"), prefix "https://" in the value but keep the exact original
 scheme-less text as the evidence quote. For projects, put achievement/result bullets in
-highlights, one source-grounded string per bullet.
+highlights, one source-grounded string per bullet. A project summary MUST be copied as one
+contiguous span of the source document, never paraphrased, reworded, or assembled from
+separate sentences; use the same span as its evidence, and omit summary when no such span exists.
 Mark current only when explicitly stated. Do not classify absent end dates as current.
 For missing profile headline/introduction only, you may suggest concise wording grounded
 in the document: name these fields in generated; do not fabricate an evidence quote.
