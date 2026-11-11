@@ -57,3 +57,17 @@ export function sectionsForStep(step: Step): Section[] {
   if (step === "contact") return ["contact", "links"];
   return [step];
 }
+
+type StepStatus = {
+  status: "complete" | "needs-details" | "optional" | "empty";
+  detected: number;
+};
+
+/** First section still missing details, then the first with detected entries. */
+export function nextReviewStep(summaries: Record<Step, StepStatus>): Step {
+  for (const step of STEPS.slice(1, -1))
+    if (summaries[step].status === "needs-details") return step;
+  for (const step of STEPS.slice(1, -1))
+    if (summaries[step].detected > 0) return step;
+  return "review";
+}

@@ -773,9 +773,11 @@ export function ProjectManager({
                           <Badge variant="outline">Sample</Badge>
                         ) : null}
                       </div>
-                      <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                        {project.slug}
-                      </p>
+                      {!/^import-[0-9a-f]{16,}$/i.test(project.slug) && (
+                        <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
+                          {project.slug}
+                        </p>
+                      )}
                       <p className="line-clamp-2 text-sm text-muted-foreground [overflow-wrap:anywhere]">
                         {project.summary}
                       </p>

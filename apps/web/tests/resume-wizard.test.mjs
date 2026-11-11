@@ -55,6 +55,24 @@ test("stepHref links back to the wizard step", () => {
   assert.equal(wizard.stepHref("projects"), "/admin/resume?step=projects");
 });
 
+test("nextReviewStep prefers sections missing details, then detected entries", () => {
+  const summary = (status, detected = 0) => ({ status, detected });
+  const summaries = {
+    profile: summary("needs-details"),
+    skills: summary("complete"),
+    projects: summary("optional", 2),
+    experience: summary("needs-details"),
+    education: summary("empty"),
+    contact: summary("empty"),
+    review: summary("needs-details"),
+  };
+  assert.equal(wizard.nextReviewStep(summaries), "experience");
+  summaries.experience = summary("complete");
+  assert.equal(wizard.nextReviewStep(summaries), "projects");
+  summaries.projects = summary("complete");
+  assert.equal(wizard.nextReviewStep(summaries), "review");
+});
+
 test("sectionsForStep maps contact to contact and links", () => {
   assert.deepEqual(
     [...wizard.sectionsForStep("contact")],
