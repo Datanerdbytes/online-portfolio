@@ -35,12 +35,19 @@ class ProjectResponse(BaseModel):
     title: str
     summary: str
     technologies: List[str]
+    highlights: List[str] = []
     repository_url: Optional[str]
     demo_url: Optional[str]
     display_order: int
     is_sample: bool
     screenshot_url: Optional[str] = None
     screenshot_updated_at: Optional[datetime] = None
+
+    @field_validator("highlights", mode="before")
+    @classmethod
+    def _default_highlights(cls, value):
+        # Unflushed ORM rows expose None before the column default applies.
+        return [] if value is None else value
 
 
 class ProjectsResponse(BaseModel):

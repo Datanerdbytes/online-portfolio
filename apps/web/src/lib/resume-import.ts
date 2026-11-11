@@ -54,6 +54,7 @@ export type ImportContext = {
       title: string;
       summary: string;
       technologies: string[];
+      highlights: string[];
       repository_url: string | null;
       demo_url: string | null;
     }>;
@@ -76,7 +77,14 @@ export const sectionFields: Record<Section, string[]> = {
     "highlights",
   ],
   education: ["qualification", "institution", "started", "ended"],
-  projects: ["title", "summary", "technologies", "repository_url", "demo_url"],
+  projects: [
+    "title",
+    "summary",
+    "technologies",
+    "highlights",
+    "repository_url",
+    "demo_url",
+  ],
   links: ["label", "url"],
 };
 export const required: Record<Section, string[]> = {
@@ -149,6 +157,7 @@ export function entries(context: ImportContext, section: Section): Entry[] {
       title: x.title,
       summary: x.summary,
       technologies: x.technologies,
+      highlights: x.highlights ?? [],
       repository_url: x.repository_url,
       demo_url: x.demo_url,
     },

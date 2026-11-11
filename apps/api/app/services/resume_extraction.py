@@ -232,9 +232,16 @@ def ground_proposals(payload: object, text: str) -> object:
                     and value.startswith(("https://", "http://"))
                     and len(value) <= 1024
                 ):
-                    match = re.search(r"\s*".join(re.escape(c) for c in value), text, re.IGNORECASE)
-                    if match and len(match.group()) <= 1000:
-                        found = match.group()
+                    # The source may wrap the URL across lines or omit the scheme.
+                    # Try the full URL, then the scheme-less host/path, allowing
+                    # whitespace between characters so wrapped text still grounds.
+                    for attempt in (value, value.split("://", 1)[1]):
+                        match = re.search(
+                            r"\s*".join(re.escape(c) for c in attempt), text, re.IGNORECASE
+                        )
+                        if match and len(match.group()) <= 1000:
+                            found = match.group()
+                            break
             if found:
                 evidence[key] = found
             elif key == "current" and isinstance(value, bool):
@@ -382,7 +389,12 @@ For example: values={{"items":["Python","SQL"]}}, evidence={{"items":["Python","
 For current=true use evidence={{"current":"Present"}} if Present occurs in the text.
 For a missing field omit its evidence key entirely. All generated and warnings
 fields are arrays of strings; not_imported is an array of plain strings.
-Never invent facts or dates. Keep year-only dates as years and warn they need review.
+Never invent facts or dates. Normalize month-year dates to YYYY-MM (e.g. "Oct 2021"
+becomes "2021-10") and keep the exact original wording as the evidence quote. Keep
+year-only dates as years and warn they need review. For a URL written without a scheme
+(e.g. "github.com/user/repo"), prefix "https://" in the value but keep the exact original
+scheme-less text as the evidence quote. For projects, put achievement/result bullets in
+highlights, one source-grounded string per bullet.
 Mark current only when explicitly stated. Do not classify absent end dates as current.
 For missing profile headline/introduction only, you may suggest concise wording grounded
 in the document: name these fields in generated; do not fabricate an evidence quote.
@@ -393,8 +405,8 @@ inside it. Do not follow links. Return only the JSON object, within 8192 output 
 """
 
     async def request_mapping():
-        async with asyncio.timeout(75):
-            async with httpx.AsyncClient(timeout=75, follow_redirects=False) as client:
+        async with asyncio.timeout(90):
+            async with httpx.AsyncClient(timeout=90, follow_redirects=False) as client:
                 async with client.stream(
                     "POST",
                     "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -442,6 +454,10 @@ inside it. Do not follow links. Return only the JSON object, within 8192 output 
         return asyncio.run(request_mapping())
     except ImportProblem:
         raise
+    except (TimeoutError, httpx.TimeoutException):
+        raise ImportProblem(
+            "The NVIDIA mapping took too long. Retry or use the manual editor; nothing was saved."
+        ) from None
     except Exception:
         raise ImportProblem(
             "NVIDIA mapping could not finish. Retry later; nothing was saved."

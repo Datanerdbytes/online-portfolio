@@ -76,6 +76,7 @@ def test_get_project_returns_project_details():
         "title": "My Awesome App",
         "summary": "A project summary",
         "technologies": ["Next.js", "FastAPI"],
+        "highlights": [],
         "repository_url": "https://github.com/example/my-awesome-app",
         "demo_url": None,
         "display_order": 1,

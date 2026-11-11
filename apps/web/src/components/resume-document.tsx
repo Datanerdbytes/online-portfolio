@@ -164,6 +164,13 @@ export function ResumeDocument({ resume, projects, preview = false }: Props) {
                       )}
                     </div>
                     <p className="resume-doc-entry-text">{project.summary}</p>
+                    {(project.highlights ?? []).length > 0 && (
+                      <ul className="resume-doc-highlights">
+                        {(project.highlights ?? []).map((highlight, i) => (
+                          <li key={i}>{highlight}</li>
+                        ))}
+                      </ul>
+                    )}
                     {project.technologies.length > 0 && (
                       <p className="resume-doc-tags">
                         {project.technologies.join(" · ")}

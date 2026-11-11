@@ -179,6 +179,70 @@ test("candidate validation accepts individually quoted list evidence", () => {
   );
 });
 
+test("project entries carry highlights and default to an empty list", () => {
+  const context = {
+    resume: {
+      profile: null,
+      contact: null,
+      skills: [],
+      experience: [],
+      education: [],
+    },
+    projects: {
+      items: [
+        {
+          id: 1,
+          title: "Pipeline",
+          summary: "ETL",
+          technologies: ["SQL"],
+          highlights: ["Cut runtime 40%"],
+          repository_url: null,
+          demo_url: null,
+        },
+        {
+          id: 2,
+          title: "Legacy",
+          summary: "Old",
+          technologies: [],
+          repository_url: null,
+          demo_url: null,
+        },
+      ],
+    },
+    status: { revision: 0, profile_complete: false, owner_id: "owner" },
+    enabled: true,
+  };
+  const [first, second] = mapping.entries(context, "projects");
+  assert.deepEqual([...first.values.highlights], ["Cut runtime 40%"]);
+  assert.equal(second.values.highlights.length, 0);
+});
+
+test("candidate validation accepts project highlights with array evidence", () => {
+  const candidate = {
+    section: "projects",
+    values: {
+      title: "Pipeline",
+      summary: "ETL",
+      highlights: ["Cut runtime 40%"],
+    },
+    evidence: {
+      title: "Pipeline",
+      summary: "ETL",
+      highlights: ["Cut runtime 40%"],
+    },
+    generated: [],
+    warnings: [],
+  };
+  assert.equal(mapping.candidateValid(candidate), true);
+  assert.equal(
+    mapping.candidateValid({
+      ...candidate,
+      evidence: { ...candidate.evidence, highlights: [42] },
+    }),
+    false
+  );
+});
+
 test("AI writing proxy preserves authentication and returns only a separate draft", async () => {
   const h = harness({
     response: Response.json({ text: "Data engineering candidate" }),

@@ -34,7 +34,7 @@ from app.schemas.resume import (
     MAX_SKILL_GROUPS,
     MAX_SKILL_ITEMS_PER_GROUP,
 )
-from app.schemas.resume_import import REQUIRED, ApplyImport
+from app.schemas.resume_import import MAX_HIGHLIGHTS_PER_PROJECT, REQUIRED, ApplyImport
 
 MODELS: dict[str, Any] = {
     "profile": Profile,
@@ -120,12 +120,8 @@ def safe_values(section: str, values: dict):
         if isinstance(value, str):
             value = value.strip()
         if isinstance(value, list):
-            if any(
-                not isinstance(v, str)
-                or not v.strip()
-                or len(v) > (200 if key == "items" else 2000)
-                for v in value
-            ):
+            limit = 200 if key == "items" else 500 if key == "highlights" else 2000
+            if any(not isinstance(v, str) or not v.strip() or len(v) > limit for v in value):
                 raise HTTPException(400, "Check the selected list entries.")
             value = list(dict.fromkeys(v.strip() for v in value))
         if key in {"url", "demo_url", "repository_url"} and value:
@@ -271,6 +267,14 @@ def apply_import(db: Session, owner: str, body: ApplyImport):
                     value = list(dict.fromkeys([*row.technologies, *value]))
                     if len(value) > 20:
                         raise HTTPException(400, "A project can contain at most 20 technologies.")
+                elif key == "highlights" and section == "projects":
+                    value = list(dict.fromkeys([*row.highlights, *value]))
+                    if len(value) > MAX_HIGHLIGHTS_PER_PROJECT:
+                        raise HTTPException(
+                            400,
+                            "A project can contain at most "
+                            f"{MAX_HIGHLIGHTS_PER_PROJECT} highlights.",
+                        )
                 setattr(row, key, value)
         db.flush()
         if nested_key:
