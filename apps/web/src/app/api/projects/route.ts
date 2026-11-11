@@ -36,6 +36,7 @@ export async function POST(request: Request) {
       "title",
       "summary",
       "technologies",
+      "highlights",
       "repository_url",
       "demo_url",
       "display_order",

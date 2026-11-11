@@ -493,6 +493,7 @@ type UpdateProjectBody = {
   title?: string;
   summary?: string;
   technologies?: string[];
+  highlights?: string[];
   repository_url?: string | null;
   demo_url?: string | null;
   display_order?: number;
@@ -698,6 +699,7 @@ type CreateProjectBody = {
   title: string;
   summary: string;
   technologies: string[];
+  highlights: string[];
   repository_url: string | null;
   demo_url: string | null;
   display_order: number;

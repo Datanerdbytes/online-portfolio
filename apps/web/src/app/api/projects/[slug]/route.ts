@@ -1,7 +1,13 @@
 import { handleProjectMutation, isProject } from "@/lib/projects";
 
 const UPDATE_FIELDS = [
-  "title", "summary", "technologies", "repository_url", "demo_url", "display_order",
+  "title",
+  "summary",
+  "technologies",
+  "highlights",
+  "repository_url",
+  "demo_url",
+  "display_order",
 ] as const;
 
 export const dynamic = "force-dynamic";

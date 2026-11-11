@@ -21,6 +21,8 @@ ProjectSlug = Annotated[str, Field(min_length=1, max_length=100, pattern=SLUG_PA
 ProjectTitle = Annotated[str, Field(min_length=1, max_length=200)]
 ProjectSummary = Annotated[str, Field(min_length=1, max_length=1000)]
 ProjectTechnologies = Annotated[List[str], Field(max_length=20)]
+MAX_HIGHLIGHT_LENGTH = 500
+ProjectHighlights = Annotated[List[str], Field(max_length=20)]
 DisplayOrder = Annotated[int, Field(ge=0, le=MAX_DISPLAY_ORDER)]
 _http_url = TypeAdapter(AnyHttpUrl)
 
@@ -69,6 +71,7 @@ class _ProjectMutableFields(BaseModel):
     title: ProjectTitle
     summary: ProjectSummary
     technologies: ProjectTechnologies
+    highlights: ProjectHighlights = []
     repository_url: Optional[str] = None
     demo_url: Optional[str] = None
     display_order: DisplayOrder = 0
@@ -98,6 +101,30 @@ class _ProjectMutableFields(BaseModel):
             if item in seen:
                 raise ValueError("duplicate technology")
             seen.add(item)
+            cleaned.append(item)
+        return cleaned
+
+    @field_validator("highlights", mode="before")
+    @classmethod
+    def _clean_highlights(cls, value):
+        if not isinstance(value, list):
+            return value
+        # Mirror the import applier: trim, reject blanks, cap length, and
+        # deduplicate case-insensitively while keeping the first spelling.
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for item in value:
+            if not isinstance(item, str):
+                return value
+            item = item.strip()
+            if not item:
+                raise ValueError("highlight entries must not be blank")
+            if len(item) > MAX_HIGHLIGHT_LENGTH:
+                raise ValueError("highlight entries must be at most 500 characters")
+            key = item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
             cleaned.append(item)
         return cleaned
 
@@ -139,6 +166,7 @@ class ProjectCreate(_ProjectMutableFields):
 class ProjectReplace(_ProjectMutableFields):
     """Request body for PUT /api/v1/projects/{slug}; every writable field is required."""
 
+    highlights: ProjectHighlights
     repository_url: Optional[str]
     demo_url: Optional[str]
     display_order: DisplayOrder
@@ -155,7 +183,9 @@ class ProjectPatch(_ProjectMutableFields):
     demo_url: Optional[str] = None
     display_order: Optional[DisplayOrder] = None  # type: ignore[assignment]
 
-    @field_validator("title", "summary", "technologies", "display_order", mode="before")
+    @field_validator(
+        "title", "summary", "technologies", "highlights", "display_order", mode="before"
+    )
     @classmethod
     def _reject_explicit_null(cls, value):
         if value is None:
