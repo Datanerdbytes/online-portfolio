@@ -16,6 +16,8 @@ export function RecordActionButtons({
   onDelete,
   disabled,
 }: RecordActionButtonsProps) {
+  const editLabel = `Edit ${recordTitle}`;
+  const deleteLabel = `Delete ${recordTitle}`;
   return (
     <div className="flex items-center gap-2">
       <Button
@@ -23,8 +25,8 @@ export function RecordActionButtons({
         variant="ghost"
         disabled={disabled}
         onClick={onEdit}
-        aria-label={`Edit ${recordTitle}`}
-        title="Edit project"
+        aria-label={editLabel}
+        title={editLabel}
       >
         <Pencil className="h-5 w-5" aria-hidden="true" />
       </Button>
@@ -34,8 +36,8 @@ export function RecordActionButtons({
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={disabled}
         onClick={onDelete}
-        aria-label={`Delete ${recordTitle}`}
-        title="Delete project"
+        aria-label={deleteLabel}
+        title={deleteLabel}
       >
         <Trash2 className="h-5 w-5" aria-hidden="true" />
       </Button>

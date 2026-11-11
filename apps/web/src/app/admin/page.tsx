@@ -27,7 +27,7 @@ export default async function WorkspacePage() {
       detail:
         "Add experience or a project. You can also add education, skills, and contact details.",
       done: status.has_work,
-      href: "/admin/projects",
+      href: "/admin/resume?step=projects",
       action: "Edit projects",
     },
     {
@@ -68,7 +68,10 @@ export default async function WorkspacePage() {
         )}
       </div>
       <p>
-        <Link className="underline underline-offset-4" href="/admin/import">
+        <Link
+          className="underline underline-offset-4"
+          href="/admin/resume?step=profile&import=1"
+        >
           Already have a resume? Import it into your draft
         </Link>
       </p>
