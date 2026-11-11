@@ -24,6 +24,9 @@ class Project(OwnedContent, Base):
       PostgreSQL array operators if needed later. A comma-separated string was
       rejected because it is not natively ordered or queryable; JSONB was
       rejected because a plain array is simpler for a list of strings.
+    - ``highlights``: PostgreSQL ``text[]`` (``ARRAY(String(500))``). Ordered
+      achievement bullets, stored like ``technologies`` as a native array of
+      strings; each entry is longer (up to 500 characters).
     - ``repository_url`` / ``demo_url``: ``String(1024)``, optional (null when
       not supplied).
     - ``display_order``: ``Integer``, required, default 0. Orders entries
@@ -45,6 +48,12 @@ class Project(OwnedContent, Base):
     summary: Mapped[str] = mapped_column(String(1000), nullable=False)
     technologies: Mapped[list[str]] = mapped_column(
         ARRAY(String(50)),
+        nullable=False,
+        default=list,
+        server_default=text("'{}'::text[]"),
+    )
+    highlights: Mapped[list[str]] = mapped_column(
+        ARRAY(String(500)),
         nullable=False,
         default=list,
         server_default=text("'{}'::text[]"),

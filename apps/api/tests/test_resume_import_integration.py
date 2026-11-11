@@ -132,6 +132,62 @@ def test_merge_preserves_nested_entries_and_media_metadata(accounts, enabled):
     assert result.json()["status"]["profile_complete"] is False
 
 
+def test_project_highlights_import_merge_and_limit(accounts, enabled):
+    client, _, _, (a, _) = accounts
+    revision = client.get("/api/v1/portfolio", headers=a).json()["revision"]
+    created = apply(
+        client,
+        a,
+        revision,
+        [
+            {
+                "section": "projects",
+                "values": {
+                    "title": "Pipeline",
+                    "summary": "Data pipeline",
+                    "highlights": ["Cut runtime 40%", "Cut costs 25%"],
+                },
+            }
+        ],
+    )
+    assert created.status_code == 200, created.text
+    project = client.get("/api/v1/projects", headers=a).json()["items"][0]
+    assert project["highlights"] == ["Cut runtime 40%", "Cut costs 25%"]
+    merged = apply(
+        client,
+        a,
+        created.json()["revision"],
+        [
+            {
+                "section": "projects",
+                "target_id": project["id"],
+                "values": {"highlights": ["Cut costs 25%", "Added monitoring"]},
+            }
+        ],
+    )
+    assert merged.status_code == 200, merged.text
+    project = client.get("/api/v1/projects", headers=a).json()["items"][0]
+    assert project["highlights"] == ["Cut runtime 40%", "Cut costs 25%", "Added monitoring"]
+    too_many = apply(
+        client,
+        a,
+        merged.json()["revision"],
+        [
+            {
+                "section": "projects",
+                "target_id": project["id"],
+                "values": {"highlights": [f"Extra {i}" for i in range(20)]},
+            }
+        ],
+    )
+    assert too_many.status_code == 400
+    assert client.get("/api/v1/projects", headers=a).json()["items"][0]["highlights"] == [
+        "Cut runtime 40%",
+        "Cut costs 25%",
+        "Added monitoring",
+    ]
+
+
 def test_streamed_analysis_consent_gate_and_no_content_writes(accounts, enabled, monkeypatch):
     client, engine, ids, (a, _) = accounts
     monkeypatch.setattr(routes, "extract_bounded", lambda *_: "Alex Example")

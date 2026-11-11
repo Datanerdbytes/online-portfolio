@@ -153,6 +153,21 @@ def test_provider_failures_do_not_return_candidates(monkeypatch, status, finish,
         extraction.map_resume(TEXT)
 
 
+def test_provider_timeout_reports_a_retryable_failure(monkeypatch):
+    original = httpx.AsyncClient
+
+    def handler(request):
+        raise httpx.ReadTimeout("test-only timeout", request=request)
+
+    monkeypatch.setattr(
+        extraction.httpx,
+        "AsyncClient",
+        lambda **kw: original(transport=httpx.MockTransport(handler), **kw),
+    )
+    with pytest.raises(ImportProblem, match="took too long"):
+        extraction.map_resume(TEXT)
+
+
 def test_provider_receives_only_source_and_mapping_instructions(monkeypatch):
     original = httpx.AsyncClient
 
@@ -424,6 +439,28 @@ def test_absent_evidence_null_is_not_accepted_as_proof():
         validate_extraction(payload, TEXT)
 
 
+def test_evidence_for_a_missing_value_is_dropped_instead_of_failing_the_import():
+    text = "Alex Example\nSales dashboard: cut reporting time from 3 days to 4 hours."
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "projects",
+            "values": {"title": "Sales dashboard", "summary": None},
+            "evidence": {
+                "title": "Sales dashboard",
+                "summary": "cut reporting time",
+                "highlights": ["cut reporting time from 3 days to 4 hours"],
+            },
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, text)
+    project = result.candidates[1]
+    assert project.values == {"title": "Sales dashboard"}
+    assert project.evidence == {"title": "Sales dashboard"}
+
+
 def test_missing_list_null_is_absence_not_a_factual_value():
     payload = proposal()
     payload["candidates"].append(
@@ -494,6 +531,96 @@ def test_wrapped_url_is_verified_without_following_it():
     )
     result = validate_extraction(payload, TEXT + "\nGitHub: https://github.com/\nexample")
     assert result.candidates[1].evidence["url"] == "https://github.com/\nexample"
+
+
+def test_month_year_date_normalizes_to_yyyy_mm_with_original_evidence():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "experience",
+            "values": {"role": "Data Engineer", "started": "2021-10"},
+            "evidence": {"role": "Data Engineer", "started": "Oct 2021"},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, TEXT + "\nAcme Corp, Oct 2021 - Present")
+    candidate = result.candidates[1]
+    assert candidate.values["started"] == "2021-10"
+    assert candidate.evidence["started"] == "Oct 2021"
+
+
+def test_year_only_date_is_not_forced_into_a_month():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "experience",
+            "values": {"role": "Data Engineer", "started": "2021"},
+            "evidence": {"role": "Data Engineer", "started": "2021"},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, TEXT + "\nAcme Corp, 2021 - Present")
+    assert result.candidates[1].values["started"] == "2021"
+
+
+@pytest.mark.parametrize("evidence", ["https://github.com/example", "github.com/example"])
+def test_scheme_less_source_url_grounds_with_https_value(evidence):
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "links",
+            "values": {"label": "GitHub", "url": "https://github.com/example"},
+            "evidence": {"label": "GitHub", "url": evidence},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, TEXT + "\nGitHub: github.com/example")
+    candidate = result.candidates[1]
+    assert candidate.values["url"] == "https://github.com/example"
+    assert candidate.evidence["url"] == "github.com/example"
+
+
+def test_scheme_less_fallback_does_not_ground_an_invented_url():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "links",
+            "values": {"label": "GitHub", "url": "https://evil.example.com/x"},
+            "evidence": {"label": "GitHub", "url": "https://evil.example.com/x"},
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    result = validate_extraction(payload, TEXT + "\nGitHub: github.com/example")
+    assert "url" not in result.candidates[1].values
+
+
+def test_project_highlights_are_grounded_individually():
+    payload = proposal()
+    payload["candidates"].append(
+        {
+            "section": "projects",
+            "values": {
+                "title": "Data Engineer",
+                "summary": "Builds reliable data pipelines with Python.",
+                "highlights": ["Builds reliable data pipelines with Python.", "Unsupported claim"],
+            },
+            "evidence": {
+                "title": "Data Engineer",
+                "summary": "Builds reliable data pipelines with Python.",
+                "highlights": ["Builds reliable data pipelines with Python.", "Unsupported claim"],
+            },
+            "generated": [],
+            "warnings": [],
+        }
+    )
+    candidate = validate_extraction(payload, TEXT).candidates[1]
+    assert candidate.values["highlights"] == ["Builds reliable data pipelines with Python."]
+    assert candidate.evidence["highlights"] == ["Builds reliable data pipelines with Python."]
+    assert candidate.warnings
 
 
 @pytest.mark.parametrize("items", [[42], ["Data Engineer"] * 101])

@@ -106,6 +106,7 @@ export type Project = {
   title: string;
   summary: string;
   technologies: string[];
+  highlights?: string[];
   repository_url: string | null;
   demo_url: string | null;
   display_order: number;
@@ -138,6 +139,8 @@ export function isProject(value: unknown): value is Project {
     isString(value.summary) &&
     Array.isArray(value.technologies) &&
     value.technologies.every(isString) &&
+    (value.highlights === undefined ||
+      (Array.isArray(value.highlights) && value.highlights.every(isString))) &&
     (value.repository_url === null || isString(value.repository_url)) &&
     (value.demo_url === null || isString(value.demo_url)) &&
     (value.screenshot_url === undefined ||

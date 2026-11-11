@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Section = Literal["profile", "contact", "skills", "experience", "education", "projects", "links"]
 
+MAX_HIGHLIGHTS_PER_PROJECT = 20
+
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -56,6 +58,9 @@ class ProjectValues(StrictModel):
     summary: str | None = Field(None, max_length=1000)
     technologies: list[Annotated[str, Field(min_length=1, max_length=50)]] = Field(
         default_factory=list, max_length=20
+    )
+    highlights: list[Annotated[str, Field(min_length=1, max_length=500)]] = Field(
+        default_factory=list, max_length=MAX_HIGHLIGHTS_PER_PROJECT
     )
     repository_url: str | None = Field(None, max_length=1024)
     demo_url: str | None = Field(None, max_length=1024)
@@ -133,8 +138,11 @@ class Candidate(StrictModel):
         self.values = parsed.model_dump(exclude_unset=True, exclude_none=True)
         if any(len(v) > 1000 for v in self.evidence.values()):
             raise ValueError("Evidence too long")
-        if set(self.evidence) - set(self.values):
-            raise ValueError("Unexpected evidence field")
+        # Providers often quote a field they left null. A quote without a value
+        # is absence, not a fact: drop it instead of failing the whole import.
+        # Every retained value still needs grounding in validate_extraction.
+        for key in set(self.evidence) - set(self.values):
+            self.evidence.pop(key)
         if self.generated and (
             self.section != "profile" or set(self.generated) - {"headline", "introduction"}
         ):
