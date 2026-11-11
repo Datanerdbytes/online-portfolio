@@ -45,7 +45,11 @@ export function ReviewPanel({
       className="space-y-4 rounded-xl border bg-card p-5"
       aria-labelledby={`entry-${index}`}
     >
-      <h2 id={`entry-${index}`} className="text-xl font-semibold">
+      <h2
+        id={`entry-${index}`}
+        tabIndex={-1}
+        className="rounded text-xl font-semibold focus-visible:outline-2 focus-visible:outline-offset-4"
+      >
         {label(c.section)} · {index + 1}
       </h2>
       <label className="flex items-center gap-3">
@@ -188,24 +192,31 @@ export function ReviewPanel({
             </label>
           </div>
           {writingLimits[c.section]?.[key] && (
-            <AiWritingAssistant
-              section={c.section}
-              field={key}
-              ownerId={context.status.owner_id}
-              currentText={display(review.values[key])}
-              disabled={busy || !review.active}
-              facts={factsForWriting(candidates, c)}
-              onUse={(text) =>
-                onChange(index, {
-                  values: { ...review.values, [key]: text },
-                  selected: { ...review.selected, [key]: true },
-                  candidate: {
-                    ...c,
-                    generated: [...new Set([...c.generated, key])],
-                  },
-                })
-              }
-            />
+            <details className="text-sm">
+              <summary className="min-h-8 cursor-pointer underline underline-offset-2">
+                AI writing help for {label(key)}
+              </summary>
+              <div className="pt-2">
+                <AiWritingAssistant
+                  section={c.section}
+                  field={key}
+                  ownerId={context.status.owner_id}
+                  currentText={display(review.values[key])}
+                  disabled={busy || !review.active}
+                  facts={factsForWriting(candidates, c)}
+                  onUse={(text) =>
+                    onChange(index, {
+                      values: { ...review.values, [key]: text },
+                      selected: { ...review.selected, [key]: true },
+                      candidate: {
+                        ...c,
+                        generated: [...new Set([...c.generated, key])],
+                      },
+                    })
+                  }
+                />
+              </div>
+            </details>
           )}
           {c.evidence[key] ? (
             <details className="text-sm">

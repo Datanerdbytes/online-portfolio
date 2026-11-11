@@ -7,6 +7,7 @@ import {
   IMPORT_MAX_BYTES,
   type Candidate,
   type ImportContext,
+  type Section,
 } from "@/lib/resume-import";
 import {
   changesForSave,
@@ -38,8 +39,11 @@ export function useImportFlow(
   const [stale, setStale] = useState(false);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [refreshing, setRefreshing] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
   const active = useRef(false);
   const abort = useRef<AbortController | null>(null);
+  const cancelled = useRef(false);
   const saveAttempt = useRef<{ payload: string; key: string } | null>(null);
   const dirty = !saved && (busy || reviews.length > 0 || !!localText);
 
@@ -49,6 +53,16 @@ export function useImportFlow(
     },
     []
   );
+
+  useEffect(() => {
+    if (!analyzing) return;
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => window.clearInterval(timer);
+  }, [analyzing]);
 
   const sameSession = useCallback(async (): Promise<boolean> => {
     const owner = context?.status.owner_id;
@@ -100,6 +114,18 @@ export function useImportFlow(
   function update(index: number, change: Partial<Review>) {
     setReviews((previous) =>
       previous.map((r, i) => (i === index ? { ...r, ...change } : r))
+    );
+  }
+
+  function bulkUpdate(
+    sections: Section[],
+    transform: (review: Review, latest: ImportContext) => Review
+  ) {
+    if (!context) return;
+    setReviews((previous) =>
+      previous.map((r) =>
+        sections.includes(r.candidate.section) ? transform(r, context) : r
+      )
     );
   }
 
@@ -160,7 +186,10 @@ export function useImportFlow(
       return;
     }
     active.current = true;
+    cancelled.current = false;
     setBusy(true);
+    setAnalyzing(true);
+    setElapsed(0);
     setError("");
     setReviews([]);
     setNotes([]);
@@ -261,17 +290,26 @@ export function useImportFlow(
       if (input) input.value = "";
     } catch (e) {
       setError(
-        e instanceof Error && e.name !== "AbortError"
-          ? e.message
-          : "Import timed out. Retry or use the manual editor; nothing was saved."
+        cancelled.current
+          ? "Import cancelled. Nothing was saved."
+          : e instanceof Error && e.name !== "AbortError"
+            ? e.message
+            : "Import timed out. Retry or use the manual editor; nothing was saved."
       );
       setStage("");
     } finally {
       clearTimeout(timer);
       active.current = false;
       abort.current = null;
+      setAnalyzing(false);
       setBusy(false);
     }
+  }
+
+  function cancel() {
+    if (!abort.current) return;
+    cancelled.current = true;
+    abort.current.abort();
   }
 
   async function refresh() {
@@ -345,6 +383,13 @@ export function useImportFlow(
       setNotes([]);
       setStage("Selected changes saved as a private draft.");
       onSaved?.(body.counts);
+      try {
+        const latest = await loadContext();
+        setContext(latest);
+        setRevision(latest.status.revision);
+      } catch {
+        /* The save succeeded; React Query still refreshes the editor. */
+      }
     } catch (e) {
       setError(
         e instanceof Error && e.name !== "TimeoutError"
@@ -391,13 +436,17 @@ export function useImportFlow(
     stale,
     counts,
     refreshing,
+    analyzing,
+    elapsed,
     dirty,
     changes,
     problems,
     missing,
     update,
+    bulkUpdate,
     readLocally,
     analyze,
+    cancel,
     refresh,
     save,
     discard,

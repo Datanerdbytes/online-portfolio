@@ -100,10 +100,113 @@ test("makeReview matches one existing entry and keeps populated fields unselecte
     candidate("skills", { label: "Languages", items: ["TypeScript"] }),
     ctx
   );
-  assert.equal(skills.active, false);
+  assert.equal(skills.active, true);
   assert.equal(skills.target, 4);
   assert.equal(skills.selected.label, false);
   assert.equal(skills.selected.items, true);
+});
+
+test("makeReview includes only entries whose required values are present", () => {
+  const ctx = context();
+  assert.equal(
+    review.makeReview(candidate("skills", { label: "Tools" }), ctx).active,
+    true
+  );
+  assert.equal(
+    review.makeReview(candidate("skills", { label: "" }), ctx).active,
+    false
+  );
+  assert.equal(
+    review.makeReview(
+      candidate("projects", { title: "Pipeline", summary: "ETL" }),
+      ctx
+    ).active,
+    true
+  );
+  assert.equal(
+    review.makeReview(candidate("projects", { title: "Pipeline" }), ctx).active,
+    false
+  );
+  assert.equal(
+    review.makeReview(
+      candidate("education", {
+        qualification: "BSc",
+        institution: "University",
+      }),
+      ctx
+    ).active,
+    true
+  );
+  assert.equal(
+    review.makeReview(
+      candidate("experience", { role: "Engineer", organization: "Acme" }),
+      ctx
+    ).active,
+    false
+  );
+  assert.equal(
+    review.makeReview(
+      candidate("links", { label: "Portfolio", url: "https://example.com" }),
+      ctx
+    ).active,
+    true
+  );
+});
+
+test("includeReadyReview fills only unpopulated values and leaves AI fields unselected", () => {
+  const ctx = context({
+    skills: [{ id: 4, label: "Languages", items: [] }],
+  });
+  const base = review.makeReview(
+    candidate(
+      "skills",
+      { label: "Languages", items: ["TypeScript"] },
+      { generated: ["items"] }
+    ),
+    ctx
+  );
+  const inactive = {
+    ...base,
+    active: false,
+    selected: { label: false, items: false },
+  };
+  const included = review.includeReadyReview(inactive, ctx);
+  assert.equal(included.active, true);
+  assert.equal(included.selected.label, false);
+  assert.equal(included.selected.items, false);
+
+  const plainItems = review.includeReadyReview(
+    { ...inactive, candidate: { ...inactive.candidate, generated: [] } },
+    ctx
+  );
+  assert.equal(plainItems.selected.items, true);
+
+  const incomplete = review.includeReadyReview(
+    {
+      ...inactive,
+      values: { label: "", items: [] },
+      candidate: { ...inactive.candidate, values: { label: "", items: [] } },
+    },
+    ctx
+  );
+  assert.equal(incomplete.active, false);
+});
+
+test("excludeReview and skipMatchedReview deactivate the right entries", () => {
+  const ctx = context({
+    skills: [{ id: 4, label: "Languages", items: [] }],
+  });
+  const matched = review.makeReview(
+    candidate("skills", { label: "Languages", items: [] }),
+    ctx
+  );
+  assert.equal(review.skipMatchedReview(matched).active, false);
+  const unmatched = review.makeReview(
+    candidate("skills", { label: "Tools", items: [] }),
+    ctx
+  );
+  assert.equal(review.skipMatchedReview(unmatched).active, true);
+  assert.equal(review.excludeReview(matched).active, false);
 });
 
 test("issues report required, date, current-role, email, and URL problems", () => {

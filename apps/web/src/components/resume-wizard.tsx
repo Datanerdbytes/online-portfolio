@@ -25,8 +25,12 @@ import {
 import type { ApiResume, Project } from "@/lib/api";
 import { display, type ImportContext } from "@/lib/resume-import";
 import {
+  excludeReview,
+  includeReadyReview,
+  issues,
   label,
   sectionSummary,
+  skipMatchedReview,
   type Review,
   type SectionSummary,
 } from "@/lib/resume-review";
@@ -38,9 +42,11 @@ import {
 import {
   STEP_LABELS,
   STEPS,
+  nextReviewStep,
   parseStep,
   sectionsForStep,
   stepHref,
+  stepIndex,
   type Step,
 } from "@/lib/resume-wizard";
 import { useImportFlow } from "@/lib/use-import-flow";
@@ -57,6 +63,12 @@ const descriptions: Record<Step, string> = {
   contact: "Add the best way for people to reach you.",
   review: "Check each section, save your draft, then publish when ready.",
 };
+
+function attention(count: number): string {
+  return `${count} required field${count === 1 ? "" : "s"} ${
+    count === 1 ? "needs" : "need"
+  } attention`;
+}
 
 type Props = {
   initialResume: ApiResume | null;
@@ -193,8 +205,9 @@ export function ResumeWizard({
     };
     const navigate = (event: MouseEvent) => {
       const anchor = (event.target as HTMLElement).closest("a[href]");
+      if (!anchor) return;
+      if ((anchor.getAttribute("href") ?? "").startsWith("#")) return;
       if (
-        anchor &&
         !window.confirm(
           "Leave this page? Your unsaved import review will be discarded."
         )
@@ -250,48 +263,155 @@ export function ResumeWizard({
     );
   }
 
+  function blockingGuides(value: Step) {
+    if (!context) return [];
+    return stepReviews(value)
+      .map(({ review, index }) => ({
+        index,
+        heading: `${label(review.candidate.section)} ${index + 1}`,
+        problems: issues(review, context),
+      }))
+      .filter((guide) => guide.problems.length > 0);
+  }
+
+  function jumpTo(index: number) {
+    const target = document.getElementById(`entry-${index}`);
+    target?.scrollIntoView({ block: "start" });
+    target?.focus({ preventScroll: true });
+  }
+
   function gapNotice(value: Step, summary: SectionSummary) {
     if (summary.status !== "needs-details") return null;
+    const guides = blockingGuides(value);
     return (
-      <p
+      <div
         role="status"
-        className="rounded-xl border border-destructive/40 bg-card p-4 text-sm"
+        className="space-y-2 rounded-xl border border-destructive/40 bg-card p-4 text-sm"
       >
-        {summary.missingRequired > 0
-          ? `${summary.missingRequired} required field${
-              summary.missingRequired === 1 ? "" : "s"
-            } still need${summary.missingRequired === 1 ? "s" : ""} attention.`
-          : "Some imported values need review before saving."}{" "}
-        {value === "profile" && publishMissing.length > 0
-          ? `Publishing also needs: ${publishMissing.map(label).join(", ")}.`
-          : ""}{" "}
-        You can still save a partial draft.
-      </p>
+        <p>
+          {summary.missingRequired > 0
+            ? `${attention(summary.missingRequired)}.`
+            : "Some imported values need review before saving."}{" "}
+          You can still save a partial draft.
+        </p>
+        {guides.length > 0 && (
+          <ul className="list-disc space-y-1 pl-5">
+            {guides.map((guide) => (
+              <li key={guide.index}>
+                <button
+                  type="button"
+                  className="font-medium underline underline-offset-2"
+                  onClick={() => jumpTo(guide.index)}
+                >
+                  {guide.heading}
+                </button>
+                : {guide.problems.join(" ")}
+              </li>
+            ))}
+          </ul>
+        )}
+        {value === "profile" && publishMissing.length > 0 && (
+          <p>Publishing also needs: {publishMissing.map(label).join(", ")}.</p>
+        )}
+      </div>
     );
+  }
+
+  function bulk(
+    value: Step,
+    transform: (review: Review, latest: ImportContext) => Review
+  ) {
+    flow.bulkUpdate(sectionsForStep(value), transform);
   }
 
   function reviewPanels(value: Step) {
     if (!context) return null;
     const list = stepReviews(value);
+    if (!list.length) return null;
     const duplicates = duplicateTargets(list);
-    return list.map(({ review, index }) => (
-      <ReviewPanel
-        key={index}
-        review={review}
-        index={index}
-        context={context}
-        candidates={flow.reviews.map((r) => r.candidate)}
-        busy={flow.busy}
-        duplicate={duplicates.has(index)}
-        onChange={flow.update}
-      />
-    ));
+    const included = list.filter(({ review }) => review.active).length;
+    return (
+      <>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+          <p role="status" className="text-sm text-muted-foreground">
+            {list.length} detected · {included} included
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={flow.busy}
+              onClick={() => bulk(value, includeReadyReview)}
+            >
+              Include all ready
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={flow.busy}
+              onClick={() => bulk(value, skipMatchedReview)}
+            >
+              Skip matched
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={flow.busy}
+              onClick={() => bulk(value, excludeReview)}
+            >
+              Exclude all
+            </Button>
+          </div>
+        </div>
+        {list.map(({ review, index }) => (
+          <ReviewPanel
+            key={index}
+            review={review}
+            index={index}
+            context={context}
+            candidates={flow.reviews.map((r) => r.candidate)}
+            busy={flow.busy}
+            duplicate={duplicates.has(index)}
+            onChange={flow.update}
+          />
+        ))}
+      </>
+    );
   }
 
   function profileStep() {
-    if (reviewing)
+    if (reviewing) {
+      const continueStep: Step = nextReviewStep(summaries);
       return (
         <>
+          <section className="space-y-3 rounded-xl border bg-card p-5">
+            <h3 className="font-semibold">Resume mapped</h3>
+            <p className="text-sm">
+              {flow.reviews.length}{" "}
+              {flow.reviews.length === 1 ? "entry" : "entries"} extracted ·{" "}
+              {flow.changes.length} selected for saving. Entries with required
+              values are included by default; AI suggestions stay unselected.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {/* Literal targets: react-hooks/refs rejects a computed step passed to go(). */}
+              {continueStep !== "review" && (
+                <Button
+                  onClick={() => {
+                    if (continueStep === "skills") go("skills");
+                    else if (continueStep === "projects") go("projects");
+                    else if (continueStep === "experience") go("experience");
+                    else if (continueStep === "education") go("education");
+                    else if (continueStep === "contact") go("contact");
+                  }}
+                >
+                  Continue to {STEP_LABELS[continueStep]}
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => go("review")}>
+                Review and save
+              </Button>
+            </div>
+          </section>
           {gapNotice("profile", summaries.profile)}
           <p className="rounded-xl border bg-card p-4 text-sm">
             <strong>Required before publishing:</strong>{" "}
@@ -310,6 +430,7 @@ export function ResumeWizard({
           )}
         </>
       );
+    }
     if (intakeOpen)
       return (
         <>
@@ -321,9 +442,11 @@ export function ResumeWizard({
             onConsent={flow.setConsent}
             busy={flow.busy}
             reviewing={reviewing}
+            analyzing={flow.analyzing}
             localText={flow.localText}
             onReadLocally={() => void flow.readLocally()}
             onAnalyze={() => void flow.analyze()}
+            onCancel={flow.cancel}
             onClearLocalText={flow.clearLocalText}
           />
           <div>
@@ -481,9 +604,7 @@ export function ResumeWizard({
                   {STEP_LABELS[value]}: {summary.saved} saved,{" "}
                   {summary.accepted} selected from this file
                   {summary.missingRequired
-                    ? `, ${summary.missingRequired} required field${
-                        summary.missingRequired === 1 ? "" : "s"
-                      } need attention`
+                    ? `, ${attention(summary.missingRequired)}`
                     : ""}
                   {summary.blocking.length
                     ? `, ${summary.blocking.length} blocking issue${
@@ -538,7 +659,9 @@ export function ResumeWizard({
             >
               {flow.busy
                 ? "Saving…"
-                : `Save selected changes (${flow.changes.length} entries)`}
+                : `Save selected changes (${flow.changes.length} ${
+                    flow.changes.length === 1 ? "entry" : "entries"
+                  })`}
             </Button>
             <Button
               variant="outline"
@@ -570,7 +693,8 @@ export function ResumeWizard({
             <ul>
               {Object.entries(flow.counts).map(([section, count]) => (
                 <li key={section}>
-                  {label(section)}: {count} entries applied
+                  {label(section)}: {count} {count === 1 ? "entry" : "entries"}{" "}
+                  applied
                 </li>
               ))}
             </ul>
@@ -589,9 +713,7 @@ export function ResumeWizard({
               <li key={value}>
                 {STEP_LABELS[value]}: {summary.saved} saved
                 {summary.missingRequired
-                  ? `, ${summary.missingRequired} required field${
-                      summary.missingRequired === 1 ? "" : "s"
-                    } need attention`
+                  ? `, ${attention(summary.missingRequired)}`
                   : ""}
                 .
               </li>
@@ -630,6 +752,48 @@ export function ResumeWizard({
     );
   }
 
+  function stepFooter() {
+    const index = stepIndex(step);
+    const previous = index > 0 ? STEPS[index - 1] : null;
+    const next = index < STEPS.length - 1 ? STEPS[index + 1] : null;
+    const complete = STEPS.slice(0, -1).filter(
+      (value) => summaries[value].status === "complete"
+    ).length;
+    return (
+      <nav
+        aria-label="Step actions"
+        className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 shadow-sm"
+      >
+        <div>
+          {previous && (
+            <Button variant="outline" onClick={() => go(previous)}>
+              Back: {STEP_LABELS[previous]}
+            </Button>
+          )}
+        </div>
+        <p role="status" className="text-sm text-muted-foreground">
+          {reviewing
+            ? `${flow.changes.length} of ${flow.reviews.length} entries selected`
+            : `${complete} of ${STEPS.length - 1} sections complete`}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {reviewing && next !== null && next !== "review" && (
+            <Button variant="outline" onClick={() => go("review")}>
+              Review and save
+            </Button>
+          )}
+          {next && (
+            <Button onClick={() => go(next)}>
+              {next === "review"
+                ? "Review and save"
+                : `Next: ${STEP_LABELS[next]}`}
+            </Button>
+          )}
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -642,6 +806,7 @@ export function ResumeWizard({
       <StepNav step={step} summaries={summaries} onSelect={go} />
       <p role="status" aria-live="polite">
         {flow.stage}
+        {flow.analyzing ? ` · ${flow.elapsed}s elapsed` : ""}
       </p>
       <p role="alert" className="text-destructive">
         {flow.error}
@@ -668,6 +833,7 @@ export function ResumeWizard({
           {step === "review" && reviewStep()}
         </section>
       </div>
+      {stepFooter()}
     </div>
   );
 }

@@ -14,9 +14,11 @@ type Props = {
   onConsent: (consent: boolean) => void;
   busy: boolean;
   reviewing: boolean;
+  analyzing: boolean;
   localText: string;
   onReadLocally: () => void;
   onAnalyze: () => void;
+  onCancel: () => void;
   onClearLocalText: () => void;
 };
 
@@ -28,9 +30,11 @@ export function ImportIntake({
   onConsent,
   busy,
   reviewing,
+  analyzing,
   localText,
   onReadLocally,
   onAnalyze,
+  onCancel,
   onClearLocalText,
 }: Props) {
   const disabled = busy || reviewing;
@@ -132,6 +136,16 @@ export function ImportIntake({
                 Resume import is currently disabled. Configure NVIDIA_API_KEY
                 and RESUME_IMPORT_ENABLED on the backend to enable AI mapping.
               </p>
+            )}
+            {analyzing && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Keep this tab open. Large resumes can take a minute or more.
+                </p>
+                <Button variant="outline" onClick={onCancel}>
+                  Cancel import
+                </Button>
+              </div>
             )}
           </div>
         )}

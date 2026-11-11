@@ -41,6 +41,15 @@ export const labels: Record<string, string> = {
 export const label = (key: string) =>
   labels[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
 
+function hasRequired(section: Section, values: Values): boolean {
+  return required[section].every((key) => display(values[key]).trim());
+}
+
+/** An extracted entry is safe to include once every required value is present. */
+export function readyToInclude(candidate: Candidate): boolean {
+  return hasRequired(candidate.section, candidate.values);
+}
+
 export function makeReview(
   candidate: Candidate,
   context: ImportContext
@@ -51,7 +60,9 @@ export function makeReview(
   return {
     candidate,
     target,
-    active: ["profile", "contact"].includes(candidate.section),
+    active:
+      ["profile", "contact"].includes(candidate.section) ||
+      readyToInclude(candidate),
     values: { ...candidate.values },
     selected: Object.fromEntries(
       sectionFields[candidate.section].map((key) => [
@@ -82,6 +93,33 @@ export function selectedValues(review: Review): Values {
 
 export function merged(review: Review, context: ImportContext): Values {
   return { ...currentValues(review, context), ...selectedValues(review) };
+}
+
+/** Include a ready entry and preselect values that do not replace saved data. */
+export function includeReadyReview(
+  review: Review,
+  context: ImportContext
+): Review {
+  if (!hasRequired(review.candidate.section, review.values)) return review;
+  const current = currentValues(review, context);
+  const selected = { ...review.selected };
+  for (const key of sectionFields[review.candidate.section])
+    if (
+      !selected[key] &&
+      !display(current[key]).trim() &&
+      display(review.values[key]).trim() &&
+      !review.candidate.generated.includes(key)
+    )
+      selected[key] = true;
+  return { ...review, active: true, selected };
+}
+
+export function excludeReview(review: Review): Review {
+  return { ...review, active: false };
+}
+
+export function skipMatchedReview(review: Review): Review {
+  return review.target == null ? review : { ...review, active: false };
 }
 
 export function issues(review: Review, context: ImportContext): string[] {

@@ -74,6 +74,9 @@ build/
 # Stored avatar media (never committed)
 apps/api/media/
 
+# Personal documents (never commit a real resume)
+/resume.pdf
+
 # Misc
 *.local
 .cache/
