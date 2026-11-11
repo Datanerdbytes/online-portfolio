@@ -1,6 +1,5 @@
 "use client";
 
-import { useImportNavigationGuard } from "@/lib/use-import-navigation-guard";
 import { useCallback, useRef, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -12,11 +11,9 @@ import type {
   ApiEducation,
   ApiExperience,
   ApiProfile,
-  ApiResume,
   ApiSkillGroup,
 } from "@/lib/api";
 import {
-  useResume,
   useUpdateProfile,
   useAddSkillGroup,
   useUpdateSkillGroup,
@@ -44,15 +41,6 @@ import {
   type ProfileImageKind,
 } from "@/lib/avatar";
 
-type Tab = "profile" | "skills" | "experience" | "education" | "contact";
-
-type Props = {
-  profile: ApiProfile | null;
-  skills: ApiSkillGroup[];
-  experience: ApiExperience[];
-  education: ApiEducation[];
-  contact: ApiContact | null;
-};
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -225,7 +213,7 @@ function ProfileImageControl({
 // Profile tab
 // ---------------------------------------------------------------------------
 
-function ProfileTab({ profile }: { profile: ApiProfile | null }) {
+export function ProfileTab({ profile }: { profile: ApiProfile | null }) {
   const [values, setValues] = useState({
     name: profile?.name ?? "",
     headline: profile?.headline ?? "",
@@ -329,7 +317,7 @@ function ProfileTab({ profile }: { profile: ApiProfile | null }) {
 // Skills tab
 // ---------------------------------------------------------------------------
 
-function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
+export function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
   const [editingItem, setEditingItem] = useState<{
     id: number;
     item: string;
@@ -715,7 +703,7 @@ function SkillsTab({ skills }: { skills: ApiSkillGroup[] }) {
 // Experience tab
 // ---------------------------------------------------------------------------
 
-function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
+export function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
   const [editing, setEditing] = useState<ApiExperience | null>(null);
   const [adding, setAdding] = useState(false);
   const [values, setValues] = useState({
@@ -1055,7 +1043,7 @@ function ExperienceTab({ experience }: { experience: ApiExperience[] }) {
 // Education tab
 // ---------------------------------------------------------------------------
 
-function EducationTab({ education }: { education: ApiEducation[] }) {
+export function EducationTab({ education }: { education: ApiEducation[] }) {
   const [editing, setEditing] = useState<ApiEducation | null>(null);
   const [adding, setAdding] = useState(false);
   const [values, setValues] = useState({
@@ -1327,7 +1315,7 @@ function EducationTab({ education }: { education: ApiEducation[] }) {
 // Contact tab
 // ---------------------------------------------------------------------------
 
-function ContactTab({ contact }: { contact: ApiContact | null }) {
+export function ContactTab({ contact }: { contact: ApiContact | null }) {
   const [values, setValues] = useState({
     phone: contact?.phone ?? "",
     email: contact?.email ?? "",
@@ -1408,70 +1396,5 @@ function ContactTab({ contact }: { contact: ApiContact | null }) {
         </Button>
       </CardContent>
     </Card>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Main component
-// ---------------------------------------------------------------------------
-
-export function ResumeManager({
-  profile,
-  skills,
-  experience,
-  education,
-  contact,
-}: Props) {
-  const [tab, setTab] = useState<Tab>("profile");
-
-  const resume = useResume({
-    initialData: {
-      profile,
-      skills,
-      experience,
-      education,
-      contact,
-    } as ApiResume,
-  });
-
-  const editorContainer = useRef<HTMLDivElement>(null);
-  useImportNavigationGuard(editorContainer, resume.dataUpdatedAt, tab);
-
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "profile", label: "Profile" },
-    { id: "skills", label: "Skills" },
-    { id: "experience", label: "Experience" },
-    { id: "education", label: "Education" },
-    { id: "contact", label: "Contact" },
-  ];
-
-  return (
-    <div ref={editorContainer} className="space-y-6">
-      <nav className="flex flex-wrap gap-2" aria-label="Resume sections">
-        {tabs.map((t) => (
-          <Button
-            key={t.id}
-            variant={tab === t.id ? "default" : "outline"}
-            size="sm"
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-          </Button>
-        ))}
-      </nav>
-      {tab === "profile" && (
-        <ProfileTab profile={resume.data?.profile ?? profile} />
-      )}
-      {tab === "skills" && <SkillsTab skills={resume.data?.skills ?? skills} />}
-      {tab === "experience" && (
-        <ExperienceTab experience={resume.data?.experience ?? experience} />
-      )}
-      {tab === "education" && (
-        <EducationTab education={resume.data?.education ?? education} />
-      )}
-      {tab === "contact" && (
-        <ContactTab contact={resume.data?.contact ?? contact} />
-      )}
-    </div>
   );
 }

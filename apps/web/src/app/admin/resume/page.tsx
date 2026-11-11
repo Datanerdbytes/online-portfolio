@@ -1,43 +1,64 @@
-import Link from "next/link";
 import { workspaceSession } from "@/lib/workspace";
-import { fetchResume } from "@/lib/api";
-import { ResumeManager } from "@/components/resume-manager";
+import { fetchBackend } from "@/lib/auth";
+import { fetchProjects, fetchResume, type Project } from "@/lib/api";
+import { ResumeWizard } from "@/components/resume-wizard";
 import { ProjectsQueryProvider } from "@/components/projects-query-provider";
+import { isProjectsResponse, projectResponse } from "@/lib/project-management";
+import type { ImportContext } from "@/lib/resume-import";
+import { parseStep } from "@/lib/resume-wizard";
 
-export default async function AdminResumePage() {
+export default async function AdminResumePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const session = await workspaceSession();
   if (!session) return null;
-  const resume = await fetchResume(session.token);
+  const params = await searchParams;
+  const initialStep = parseStep(params.step);
+  const importParam = Array.isArray(params.import)
+    ? params.import[0]
+    : params.import;
+  const initialImport = importParam === "1" || importParam === "true";
+
+  const [resume, importContext, projects] = await Promise.all([
+    fetchResume(session.token),
+    fetchBackend("/api/v1/resume-import/context", {
+      headers: { Authorization: `Bearer ${session.token}` },
+    }),
+    (async () => {
+      let items: Project[] = [];
+      let listStatus: "ok" | "unavailable" = "unavailable";
+      try {
+        const data = await fetchProjects(session.token);
+        if (!isProjectsResponse(data)) throw new Error("Invalid project list");
+        items = data.items.map(projectResponse);
+        listStatus = "ok";
+      } catch {
+        /* The project manager provides a retry while preserving drafts. */
+      }
+      return { items, listStatus };
+    })(),
+  ]);
+
   return (
-    <section className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Resume</h1>
-        <p className="mt-2 text-muted-foreground">
-          Tell your story. Save your draft here, then preview and publish when
-          ready.
-        </p>
-      </div>
-      <p>
-        <Link className="underline underline-offset-4" href="/admin/import">
-          Import resume
-        </Link>
-      </p>
-      {resume ? (
-        <ProjectsQueryProvider>
-          <ResumeManager
-            profile={resume.profile}
-            skills={resume.skills}
-            experience={resume.experience}
-            education={resume.education}
-            contact={resume.contact}
-          />
-        </ProjectsQueryProvider>
-      ) : (
-        <p role="alert">
-          We couldn’t load your resume. Your saved work is unchanged. Refresh to
-          try again.
+    <ProjectsQueryProvider>
+      {!resume && (
+        <p role="alert" className="mb-4">
+          We couldn’t load your saved resume. Your saved work is unchanged.
+          Refresh to try again; import and editing remain available.
         </p>
       )}
-    </section>
+      <ResumeWizard
+        initialResume={resume}
+        initialProjects={projects.items}
+        initialListStatus={projects.listStatus}
+        initialContext={
+          importContext.error ? null : (importContext.body as ImportContext)
+        }
+        initialStep={initialStep}
+        initialImport={initialImport}
+      />
+    </ProjectsQueryProvider>
   );
 }

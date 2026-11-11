@@ -1163,6 +1163,48 @@ test("sign-in page redirects an already authenticated owner to the requested adm
   );
 });
 
+test("sign-in page accepts a resume wizard step destination", async () => {
+  const h = harness({
+    neon: {
+      token: async () => ({ data: { token: "existing-session-token" } }),
+    },
+    fetch: async () =>
+      Response.json({
+        owner_id: "owner",
+        authenticated: true,
+        expires_at: expires(),
+      }),
+  });
+
+  await assert.rejects(
+    h.load("app/auth/signin/page").default({
+      searchParams: Promise.resolve({ next: "/admin/resume?step=profile" }),
+    }),
+    /redirect:\/admin\/resume\?step=profile/
+  );
+});
+
+test("sign-in page rejects destinations outside the admin app", async () => {
+  const h = harness({
+    neon: {
+      token: async () => ({ data: { token: "existing-session-token" } }),
+    },
+    fetch: async () =>
+      Response.json({
+        owner_id: "owner",
+        authenticated: true,
+        expires_at: expires(),
+      }),
+  });
+
+  await assert.rejects(
+    h.load("app/auth/signin/page").default({
+      searchParams: Promise.resolve({ next: "https://example.com/phish" }),
+    }),
+    /redirect:\/admin$/
+  );
+});
+
 test("registration uses Neon and does not publish login email as profile data", async () => {
   let called = 0;
   const h = harness({

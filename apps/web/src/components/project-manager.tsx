@@ -228,9 +228,11 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
 export function ProjectManager({
   initialProjects,
   initialListStatus = "ok",
+  headingLevel = "h2",
 }: {
   initialProjects: Project[];
   initialListStatus?: Status;
+  headingLevel?: "h2" | "h3";
 }) {
   const projectsQuery = useProjects({
     initialData:
@@ -477,17 +479,31 @@ export function ProjectManager({
       aria-busy={pending}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2
-          ref={heading}
-          tabIndex={-1}
-          className="rounded text-xl font-bold focus-visible:outline-2 focus-visible:outline-offset-4"
-        >
-          {mode === "create"
-            ? "Add project"
-            : mode === "edit"
-              ? "Edit project"
-              : "Projects"}
-        </h2>
+        {headingLevel === "h3" ? (
+          <h3
+            ref={heading}
+            tabIndex={-1}
+            className="rounded text-xl font-bold focus-visible:outline-2 focus-visible:outline-offset-4"
+          >
+            {mode === "create"
+              ? "Add project"
+              : mode === "edit"
+                ? "Edit project"
+                : "Projects"}
+          </h3>
+        ) : (
+          <h2
+            ref={heading}
+            tabIndex={-1}
+            className="rounded text-xl font-bold focus-visible:outline-2 focus-visible:outline-offset-4"
+          >
+            {mode === "create"
+              ? "Add project"
+              : mode === "edit"
+                ? "Edit project"
+                : "Projects"}
+          </h2>
+        )}
         {mode === "list" ? (
           <Button
             ref={addButton}

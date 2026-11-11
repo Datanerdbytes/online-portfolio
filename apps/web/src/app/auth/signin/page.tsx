@@ -33,7 +33,13 @@ export default async function SignInPage({
     if (result.identity) {
       const params = await searchParams;
       const next = typeof params.next === "string" ? params.next : null;
-      redirect(SIGN_IN_DESTINATIONS.includes(next ?? "") ? next! : "/admin");
+      redirect(
+        next &&
+          (SIGN_IN_DESTINATIONS.includes(next) ||
+            next.startsWith("/admin/resume?"))
+          ? next
+          : "/admin"
+      );
     }
   }
 

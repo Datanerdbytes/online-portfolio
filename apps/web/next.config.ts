@@ -1,7 +1,20 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async redirects() {
+    return [
+      {
+        source: "/admin/import",
+        destination: "/admin/resume?step=profile&import=1",
+        permanent: false,
+      },
+      {
+        source: "/admin/projects",
+        destination: "/admin/resume?step=projects",
+        permanent: false,
+      },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {

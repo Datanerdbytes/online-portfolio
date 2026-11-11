@@ -75,15 +75,18 @@ export default function SignInForm() {
       else {
         form.reset();
         const next = new URLSearchParams(window.location.search).get("next");
-        const destination = [
-          "/admin",
-          "/admin/resume",
-          "/admin/projects",
-          "/admin/preview",
-          "/admin/account",
-        ].includes(next ?? "")
-          ? next!
-          : "/admin";
+        const destination =
+          next &&
+          ([
+            "/admin",
+            "/admin/resume",
+            "/admin/projects",
+            "/admin/preview",
+            "/admin/account",
+          ].includes(next) ||
+            next.startsWith("/admin/resume?"))
+            ? next
+            : "/admin";
         router.replace(destination);
         router.refresh();
       }

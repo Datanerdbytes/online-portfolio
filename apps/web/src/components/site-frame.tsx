@@ -49,14 +49,6 @@ export function SiteFrame({
                   Resume
                 </Link>
                 <Link
-                  href="/admin/projects"
-                  aria-current={
-                    pathname === "/admin/projects" ? "page" : undefined
-                  }
-                >
-                  Projects
-                </Link>
-                <Link
                   href="/admin/preview"
                   aria-current={
                     pathname === "/admin/preview" ? "page" : undefined
