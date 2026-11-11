@@ -98,6 +98,7 @@ def _project_payload(slug="resume-site", **overrides):
         "title": "Resume site",
         "summary": "Portfolio application.",
         "technologies": ["Next.js", "FastAPI"],
+        "highlights": ["Deployed the portfolio to Vercel."],
         "repository_url": None,
         "demo_url": None,
         "display_order": 0,
@@ -139,6 +140,7 @@ class TestCreatePersistence:
                 "title": "Updated title",
                 "summary": "Updated summary.",
                 "technologies": [],
+                "highlights": ["Updated highlight."],
                 "repository_url": None,
                 "demo_url": None,
                 "display_order": 3,
@@ -146,6 +148,7 @@ class TestCreatePersistence:
         )
         assert response.status_code == 200
         assert response.json()["is_sample"] is False
+        assert response.json()["highlights"] == ["Updated highlight."]
 
 
 class TestReorderAtomic:
