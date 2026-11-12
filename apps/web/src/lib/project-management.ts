@@ -188,6 +188,153 @@ export function parseOrder(value: string): number | null {
   return isStrictOrder(parsed) ? parsed : null;
 }
 
+export type ProjectFormValues = {
+  slug: string;
+  title: string;
+  summary: string;
+  technologies: string;
+  highlights: string;
+  repository_url: string;
+  demo_url: string;
+  display_order: string;
+};
+
+export function blankProjectForm(): ProjectFormValues {
+  return {
+    slug: "",
+    title: "",
+    summary: "",
+    technologies: "",
+    highlights: "",
+    repository_url: "",
+    demo_url: "",
+    display_order: "0",
+  };
+}
+
+export function projectFormFor(project: Project): ProjectFormValues {
+  return {
+    slug: project.slug,
+    title: project.title,
+    summary: project.summary,
+    technologies: project.technologies.join(", "),
+    highlights: (project.highlights ?? []).join("\n"),
+    repository_url: project.repository_url ?? "",
+    demo_url: project.demo_url ?? "",
+    display_order: String(project.display_order),
+  };
+}
+
+// Parsed form output with the arrays the API requires, distinct from the
+// optional-field Project shape it was parsed from.
+export type ParsedProjectValues = {
+  title: string;
+  summary: string;
+  technologies: string[];
+  highlights: string[];
+  repository_url: string | null;
+  demo_url: string | null;
+  display_order: number;
+};
+
+export type ParsedProjectForm =
+  | { values: ParsedProjectValues; error: null }
+  | { values: null; error: string };
+
+export function parseProjectForm(
+  values: ProjectFormValues,
+  original?: Project | null
+): ParsedProjectForm {
+  const title = values.title.trim(),
+    summary = values.summary.trim();
+  const technologies = formTechnologies(
+    values.technologies,
+    original?.technologies
+  );
+  const highlights = formHighlights(values.highlights, original?.highlights);
+  const order = parseOrder(values.display_order);
+  const repository = values.repository_url.trim(),
+    demo = values.demo_url.trim();
+  const repositoryChanged =
+    !original || repository !== (original.repository_url ?? "");
+  const demoChanged = !original || demo !== (original.demo_url ?? "");
+  if (!title || title.length > 200 || !summary || summary.length > 1000) {
+    return {
+      values: null,
+      error:
+        "Title must contain 1–200 characters and summary 1–1000 characters.",
+    };
+  }
+  if (technologies === null) {
+    return {
+      values: null,
+      error:
+        "Use 0–20 unique technologies, each 1–50 characters, separated by commas. Leave blank for none.",
+    };
+  }
+  if (highlights === null) {
+    return {
+      values: null,
+      error:
+        "Use 0–20 unique highlights, each 1–500 characters, one per line. Leave blank for none.",
+    };
+  }
+  if (
+    (repositoryChanged && repository && !safeProjectLink(repository)) ||
+    (demoChanged && demo && !safeProjectLink(demo))
+  ) {
+    return {
+      values: null,
+      error:
+        "URLs must be absolute HTTP(S) URLs of at most 1024 characters, or blank.",
+    };
+  }
+  if (order === null) {
+    return {
+      values: null,
+      error: "Sort priority must be a whole number between 0 and 2147483647.",
+    };
+  }
+  return {
+    values: {
+      title,
+      summary,
+      technologies,
+      highlights,
+      repository_url: repository || null,
+      demo_url: demo || null,
+      display_order: order,
+    },
+    error: null,
+  };
+}
+
+// Semantic replacement for the wizard's DOM-snapshot dirty check on the
+// projects step: true only when the draft really holds unsaved edits.
+export function projectEditsPending(
+  mode: "list" | "create" | "edit",
+  values: ProjectFormValues,
+  original?: Project | null
+): boolean {
+  if (mode === "list") return false;
+  if (mode === "create") {
+    const blank = blankProjectForm();
+    for (const key of Object.keys(blank) as (keyof ProjectFormValues)[]) {
+      if (values[key] !== blank[key]) return true;
+    }
+    return false;
+  }
+  if (!original) return true;
+  const parsed = parseProjectForm(values, original);
+  if (parsed.values === null) return true; // invalid edits are still edits
+  return (
+    projectUpdateBody(parsed.values, {
+      ...original,
+      highlights: original.highlights ?? [],
+    }) !== null
+  );
+}
+
 export function orderedProjects(
   projects: Project[],
   drafts: Record<string, string>
