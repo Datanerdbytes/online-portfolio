@@ -526,7 +526,10 @@ export function ProjectManager({
         </div>
       ) : null}
       {success ? (
-        <p role="status" className="text-sm">
+        <p
+          role="status"
+          className="rounded-md border border-emerald-600/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-800 [overflow-wrap:anywhere] dark:text-emerald-300"
+        >
           {success}
         </p>
       ) : null}
@@ -581,7 +584,6 @@ export function ProjectManager({
           </Button>
         ) : null}
       </div>
-      {mode !== "list" && !deleteTarget ? messages : null}
       {mode !== "list" ? (
         <form onSubmit={submit} className="space-y-5" noValidate>
           {mode === "edit" ? (
@@ -781,6 +783,7 @@ export function ProjectManager({
               Cancel
             </Button>
           </div>
+          {!deleteTarget ? messages : null}
         </form>
       ) : (
         <>
