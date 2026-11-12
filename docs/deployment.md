@@ -68,9 +68,14 @@ The deployment job checks the generated source map before uploading the backend.
 The frontend build uses `--standalone` to inline traced dependencies into the
 build output instead of referring to ignored source `node_modules` files.
 
-Both Vercel projects were configured without Git integration when this workflow
-was introduced. Keep automatic Git production deployments disabled so they do
-not release a commit before these checks pass. Routine production changes
+Both Vercel projects are connected to this repository for pull-request preview
+deployments. Automatic Git deployments never release to production: the root
+`vercel.json` disables every Git-triggered deployment for the backend project,
+whose Git builds start at the repository root and cannot find the FastAPI
+entrypoint under `apps/api`, and `apps/web/vercel.json` disables only the `main`
+branch for the frontend so previews keep working. Keep these settings in place;
+without them a commit could be released before the checks above pass, and a
+backend release would skip the migration step. Routine production changes
 should go through this workflow rather than a direct local CLI deployment.
 
 ## Database changes and recovery
