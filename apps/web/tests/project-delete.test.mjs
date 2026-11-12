@@ -223,7 +223,8 @@ test("uploadProjectScreenshot returns a controlled error on upstream failure", a
       size: 32,
     }),
     (error) =>
-      error.status === 413 && error.message === "Image must be 2 MB or smaller."
+      error.status === 413 &&
+      error.message === "GIFs must be 4 MB or smaller; other images 2 MB."
   );
 });
 

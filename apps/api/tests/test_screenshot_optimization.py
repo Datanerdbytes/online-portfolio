@@ -49,6 +49,10 @@ def test_resize_rejects_excessive_pixel_dimensions(monkeypatch):
 MAX_BYTES = 2_000
 # Raster transcode tests still must fit inside the declared upload limit.
 GENEROUS_MAX_BYTES = 10_000_000
+# The GIF input cap sits above the stored limit so oversized GIFs transcode
+# down instead of being rejected; mirrors the production settings.
+STORED_LIMIT = 2 * 1024 * 1024
+GIF_INPUT_LIMIT = 4 * 1024 * 1024
 
 
 def _gif(*, animated: bool = True, size: tuple[int, int] = (8, 8), frames: int = 3) -> bytes:
@@ -236,6 +240,74 @@ def test_gif_transcode_rejects_when_no_tier_fits_the_budget():
     payload = _gif(frames=3)
     with pytest.raises(screenshots.AvatarValidationError) as raised:
         screenshots._transcode_gif(payload, max_bytes=0)
+    assert raised.value.detail == "Screenshot too large"
+    assert raised.value.status_code == 413
+
+
+def test_gif_transcode_last_resort_tier_fits_the_budget(monkeypatch):
+    from app.core.image_processing import optimize_animated_gif
+
+    payload = _gif(frames=3)
+    monkeypatch.setattr(screenshots, "_FALLBACK_FRAMES", 2)
+    monkeypatch.setattr(screenshots, "_FALLBACK_QUALITY", 70)
+    monkeypatch.setattr(screenshots, "_LAST_RESORT_FRAMES", 1)
+    monkeypatch.setattr(screenshots, "_LAST_RESORT_QUALITY", 40)
+    fallback = optimize_animated_gif(
+        payload,
+        max_edge=screenshots.MAX_SCREENSHOT_EDGE,
+        max_pixels=screenshots.MAX_SCREENSHOT_PIXELS,
+        max_frames=2,
+        quality=70,
+    )
+    # A budget just under the fallback tier's output must switch to the last
+    # resort tier (a single low-quality frame) instead of rejecting.
+    detected, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=None,
+        data=payload,
+        max_bytes=len(fallback) - 1,
+        input_max_bytes=GENEROUS_MAX_BYTES,
+    )
+
+    assert detected == "image/webp"
+    assert len(stored) <= len(fallback) - 1
+    with Image.open(BytesIO(stored)) as output:
+        assert output.n_frames == 1
+
+
+def test_prepare_accepts_gif_input_above_the_stored_limit():
+    # A GIF larger than the stored limit but within the input cap is accepted:
+    # the transcode brings the stored bytes back under the stored limit.
+    payload = _gif(frames=3) + b"\x00" * (STORED_LIMIT + 1)
+    assert len(payload) > STORED_LIMIT
+    assert len(payload) < GIF_INPUT_LIMIT
+
+    detected, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=len(payload),
+        data=payload,
+        max_bytes=STORED_LIMIT,
+        input_max_bytes=GIF_INPUT_LIMIT,
+    )
+
+    assert detected == "image/webp"
+    assert len(stored) <= STORED_LIMIT
+    with Image.open(BytesIO(stored)) as output:
+        assert output.format == "WEBP"
+        assert output.is_animated
+        assert output.n_frames == 3
+
+
+def test_prepare_rejects_gif_input_above_the_gif_cap():
+    payload = _gif(frames=3) + b"\x00" * (GIF_INPUT_LIMIT + 1)
+    with pytest.raises(screenshots.AvatarValidationError) as raised:
+        screenshots.prepare_screenshot_upload(
+            declared_content_type="image/gif",
+            declared_size=len(payload),
+            data=payload,
+            max_bytes=STORED_LIMIT,
+            input_max_bytes=GIF_INPUT_LIMIT,
+        )
     assert raised.value.detail == "Screenshot too large"
     assert raised.value.status_code == 413
 

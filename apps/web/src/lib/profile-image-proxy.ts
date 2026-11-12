@@ -7,7 +7,8 @@ const UPSTREAM_TIMEOUT_MS = 10000;
 
 export function createProfileImageHandlers(
   apiPath: string,
-  imageLabel: string
+  imageLabel: string,
+  { maxUploadBytes = AVATAR_UPLOAD_MAX_BYTES }: { maxUploadBytes?: number } = {}
 ) {
   async function GET(req: NextRequest) {
     const controller = new AbortController();
@@ -139,20 +140,20 @@ export function createProfileImageHandlers(
               { status: 400, headers: { "Cache-Control": "no-store" } }
             );
           }
-          if (Number(contentLength) > AVATAR_UPLOAD_MAX_BYTES) {
+          if (Number(contentLength) > maxUploadBytes) {
             return tooLargeResponse(imageLabel);
           }
         }
         let bodyBytes: Uint8Array;
         try {
-          bodyBytes = await readBoundedBody(req, AVATAR_UPLOAD_MAX_BYTES);
+          bodyBytes = await readBoundedBody(req, maxUploadBytes);
         } catch (error) {
           if (error instanceof RequestBodyTooLarge) {
             return tooLargeResponse(imageLabel);
           }
           throw error;
         }
-        if (bodyBytes.byteLength > AVATAR_UPLOAD_MAX_BYTES) {
+        if (bodyBytes.byteLength > maxUploadBytes) {
           return tooLargeResponse(imageLabel);
         }
         const arrayBuffer = new ArrayBuffer(bodyBytes.byteLength);

@@ -200,7 +200,8 @@ function ProjectScreenshotControl({
           </div>
           <p className="text-xs text-muted-foreground">
             JPEG, PNG, or WebP up to 2 MB, resized to a thumbnail. GIF files up
-            to 2 MB are converted to an animated thumbnail (up to 120 frames).
+            to 4 MB are converted and compressed to an animated thumbnail under
+            2 MB.
           </p>
         </div>
       </div>

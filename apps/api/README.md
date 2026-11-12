@@ -40,7 +40,7 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 - `GET /api/v1/resume/profile/avatar` and `GET /api/v1/resume/profile/banner` — Public image reads for the independent sidebar profile photo and square hero banner. Both return the image bytes with an ETag; absent images return 404.
 - `PUT` and `DELETE` on those image paths — Owner-only uploads and removals. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default). Image files are stored beneath `MEDIA_ROOT`; the database stores only generated filenames and image metadata.
 - `GET /api/v1/projects/{slug}/screenshot` — Public read of the project's optional screenshot, returned with an ETag. Missing projects or screenshots return 404.
-- `PUT` and `DELETE /api/v1/projects/{slug}/screenshot` — Owner-only upload, replacement, or removal. Uploads accept JPEG, PNG, WebP, or GIF up to `MAX_AVATAR_BYTES` (2 MiB by default), reuse the validated profile-image storage, and persist only generated filenames and image metadata. Uploaded screenshots are shown as small thumbnails beside project technology tags.
+- `PUT` and `DELETE /api/v1/projects/{slug}/screenshot` — Owner-only upload, replacement, or removal. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default) and GIF up to `MAX_SCREENSHOT_GIF_BYTES` (4 MiB by default, transcoded into an animated WebP that fits the stored limit), reuse the validated profile-image storage, and persist only generated filenames and image metadata. Uploaded screenshots are shown as small thumbnails beside project technology tags.
 
 ### Public portfolio sections
 
@@ -172,17 +172,18 @@ Project screenshots are decoded on upload, oriented, and resized to fit within
 400 × 400 pixels without stretching, cropping, or enlarging small images. They
 are stored as WebP at quality 80 without source metadata. Uploads accept JPEG,
 PNG, or WebP up to 2 MiB; screenshots above 20 million pixels are rejected.
-GIF uploads are verified against their magic bytes and the same 2 MiB input
-limit, then transcoded into an animated WebP thumbnail: every frame is
-re-encoded at ≤400 px on the long edge (never upscaled), the loop count and
-per-frame timing are preserved, and recordings longer than 120 frames keep
-evenly spaced frames whose durations absorb the dropped ones. If the encoded
-animation exceeds 2 MiB, a second tier halves the frame rate and quality
-before the upload is rejected with 413. Profile photos use the same processing
-with a 512 × 512 bound and do not accept GIFs; hero banners use a 1200 × 1200
-bound. Both use WebP quality 85. Proportions are preserved without upscaling,
-and the frontend's existing crops still control the displayed shape. The same
-2 MiB upload and 20-million-pixel input limits apply to all three types.
+GIF uploads are verified against their magic bytes and may arrive up to
+`MAX_SCREENSHOT_GIF_BYTES` (4 MiB by default) — above the stored limit —
+because they are transcoded into an animated WebP thumbnail that must fit
+`MAX_AVATAR_BYTES`: every frame is re-encoded at ≤400 px on the long edge
+(never upscaled), the loop count and per-frame timing are preserved, and
+recordings longer than 120 frames keep evenly spaced frames whose durations
+absorb the dropped ones. If the encoded animation exceeds 2 MiB, deeper tiers
+halve the frame rate and lower the quality before the upload is rejected with 413. Profile photos use the same processing with a 512 × 512 bound and do not
+accept GIFs; hero banners use a 1200 × 1200 bound. Both use WebP quality 85.
+Proportions are preserved without upscaling, and the frontend's existing crops
+still control the displayed shape. Profile photos and banners share the 2 MiB
+upload and 20-million-pixel input limits.
 
 To convert existing screenshots, run from `apps/api` with the intended database
 and media settings configured. Preview first; applying requires a new backup

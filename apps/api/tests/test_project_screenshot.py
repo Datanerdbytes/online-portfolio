@@ -248,7 +248,7 @@ def test_upload_rejects_oversized_gif():
     frames = Image.new("P", (10, 10), "navy")
     gif = BytesIO()
     frames.save(gif, format="GIF")
-    oversized = gif.getvalue() + b"\x00" * (settings.MAX_AVATAR_BYTES + 1)
+    oversized = gif.getvalue() + b"\x00" * (settings.MAX_SCREENSHOT_GIF_BYTES + 1)
 
     project = _project()
     session, store = StubSession(project), StubStore()
@@ -261,6 +261,41 @@ def test_upload_rejects_oversized_gif():
     assert response.status_code == 413
     assert response.json() == {"detail": "Screenshot too large"}
     assert not store.saved
+
+
+def test_upload_transcodes_gif_above_the_stored_limit():
+    # GIFs larger than the stored limit but within the GIF input cap are
+    # accepted: the transcode must land the stored bytes back under the limit.
+    frames_images = [Image.new("P", (10, 10), (i * 20, 10, 90)) for i in range(3)]
+    gif = BytesIO()
+    frames_images[0].save(
+        gif,
+        format="GIF",
+        save_all=True,
+        append_images=frames_images[1:],
+        duration=100,
+        loop=0,
+    )
+    oversized = gif.getvalue() + b"\x00" * (settings.MAX_AVATAR_BYTES + 1)
+    assert len(oversized) > settings.MAX_AVATAR_BYTES
+    assert len(oversized) < settings.MAX_SCREENSHOT_GIF_BYTES
+
+    project = _project()
+    session, store = StubSession(project), StubStore()
+    with _client(session, store) as client:
+        response = client.put(
+            SCREENSHOT_PATH,
+            files={"file": ("screenshot.gif", oversized, "image/gif")},
+        )
+
+    assert response.status_code == 200
+    assert project.screenshot_content_type == "image/webp"
+    assert project.screenshot_filename.endswith(".webp")
+    with Image.open(BytesIO(store.saved[0][1])) as thumbnail:
+        assert thumbnail.format == "WEBP"
+        assert thumbnail.is_animated
+        assert thumbnail.n_frames == 3
+    assert session.committed
 
 
 def test_upload_replaces_previous_file_after_commit():

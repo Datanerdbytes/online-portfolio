@@ -24,13 +24,16 @@ export const AVATAR_ACCEPT = "image/jpeg,image/png,image/webp";
  * Project screenshots additionally accept GIFs, which the API converts into a
  * bounded animated WebP thumbnail (frames sampled, loop and timing kept) so
  * the animation survives without oversized files. Raster images are resized
- * to a static thumbnail.
+ * to a static thumbnail. GIFs may arrive above the stored limit: the API
+ * compresses them to fit AVATAR_MAX_BYTES before storage.
  */
 export const SCREENSHOT_CONTENT_TYPES = [
   ...AVATAR_CONTENT_TYPES,
   "image/gif",
 ] as const;
 export const SCREENSHOT_ACCEPT = `${AVATAR_ACCEPT},image/gif`;
+export const SCREENSHOT_GIF_MAX_BYTES = 4 * 1024 * 1024;
+export const SCREENSHOT_UPLOAD_MAX_BYTES = SCREENSHOT_GIF_MAX_BYTES + 64 * 1024;
 
 export function initialsFromName(name: string): string {
   const parts = name
@@ -92,6 +95,12 @@ export function validateScreenshotFile(file: File): string | null {
     )
   ) {
     return "Upload a JPEG, PNG, WebP, or GIF image.";
+  }
+  if (file.type === "image/gif") {
+    if (file.size > SCREENSHOT_GIF_MAX_BYTES) {
+      return "GIF must be 4 MB or smaller.";
+    }
+    return null;
   }
   if (file.size > AVATAR_MAX_BYTES) {
     return "Image must be 2 MB or smaller.";
