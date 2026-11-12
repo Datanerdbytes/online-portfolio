@@ -9,12 +9,15 @@ export type Step =
   | "contact"
   | "review";
 
+// Authoring order: resume writers fill in their work history before the
+// skills and projects it feeds. Deep links are label-keyed, so only the
+// display order changed.
 export const STEPS = [
   "profile",
-  "skills",
-  "projects",
   "experience",
   "education",
+  "skills",
+  "projects",
   "contact",
   "review",
 ] as const satisfies readonly Step[];
@@ -51,6 +54,17 @@ export function stepIndex(step: Step): number {
 export function stepHref(step: Step): string {
   return `/admin/resume?step=${step}`;
 }
+
+/**
+ * What each step editor reports to the wizard so the sticky footer can offer
+ * one "Save changes" / "Discard" for every pending edit in the step.
+ * `save` replays the existing per-record mutations and returns whether the
+ * step came out clean.
+ */
+export type StepEditControls = {
+  save: () => Promise<boolean>;
+  discard: () => void;
+};
 
 export function sectionsForStep(step: Step): Section[] {
   if (step === "review") return ALL_SECTIONS;

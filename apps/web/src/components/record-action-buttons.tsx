@@ -5,8 +5,10 @@ import { Pencil, Trash2 } from "lucide-react";
 
 export interface RecordActionButtonsProps {
   recordTitle: string;
-  onEdit: () => void;
-  onDelete: () => void;
+  /** Receives the edit button element, so callers can restore focus later. */
+  onEdit: (trigger: HTMLButtonElement) => void;
+  /** Receives the delete button element, so callers can restore focus later. */
+  onDelete: (trigger: HTMLButtonElement) => void;
   disabled: boolean;
 }
 
@@ -24,7 +26,7 @@ export function RecordActionButtons({
         size="icon"
         variant="ghost"
         disabled={disabled}
-        onClick={onEdit}
+        onClick={(event) => onEdit(event.currentTarget)}
         aria-label={editLabel}
         title={editLabel}
       >
@@ -35,7 +37,7 @@ export function RecordActionButtons({
         variant="ghost"
         className="text-destructive hover:bg-destructive/10 hover:text-destructive"
         disabled={disabled}
-        onClick={onDelete}
+        onClick={(event) => onDelete(event.currentTarget)}
         aria-label={deleteLabel}
         title={deleteLabel}
       >

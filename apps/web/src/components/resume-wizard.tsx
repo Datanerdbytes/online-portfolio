@@ -11,6 +11,8 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { EditorPublicationControl } from "@/components/editor-publication-control";
 import { ImportIntake } from "@/components/import-intake";
 import { ProjectManager } from "@/components/project-manager";
 import { ReviewPanel } from "@/components/review-panel";
@@ -20,6 +22,7 @@ import {
   EducationTab,
   ExperienceTab,
   ProfileTab,
+  ResumeUnavailableNotice,
   SkillsTab,
 } from "@/components/resume-sections";
 import type { ApiResume, Project } from "@/lib/api";
@@ -35,6 +38,7 @@ import {
   type SectionSummary,
 } from "@/lib/resume-review";
 import {
+  PORTFOLIO_STATUS_QUERY_KEY,
   PROJECTS_QUERY_KEY,
   RESUME_QUERY_KEY,
   useResume,
@@ -48,6 +52,7 @@ import {
   stepHref,
   stepIndex,
   type Step,
+  type StepEditControls,
 } from "@/lib/resume-wizard";
 import { useImportFlow } from "@/lib/use-import-flow";
 
@@ -79,23 +84,16 @@ type Props = {
   initialImport: boolean;
 };
 
+type PendingLeave =
+  | { kind: "step"; next: Step }
+  | { kind: "link"; href: string }
+  | { kind: "pop"; href: string };
+
 function EmptyState({ children }: { children: ReactNode }) {
   return (
     <p role="status" className="rounded-xl border bg-card p-5">
       {children}
     </p>
-  );
-}
-
-function snapshotOf(element: HTMLElement | null): string {
-  if (!element) return "";
-  return JSON.stringify(
-    Array.from(
-      element.querySelectorAll("input:not([type=file]),textarea,select")
-    ).map((e) => {
-      const input = e as HTMLInputElement;
-      return [input.type, input.value, input.checked];
-    })
   );
 }
 
@@ -116,6 +114,9 @@ export function ResumeWizard({
     setIntakeOpen(false);
     void queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
     void queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
+    void queryClient.invalidateQueries({
+      queryKey: PORTFOLIO_STATUS_QUERY_KEY,
+    });
   }, [queryClient]);
   const flow = useImportFlow(initialContext, handleSaved);
   const resume = useResume(
@@ -124,6 +125,7 @@ export function ResumeWizard({
   const data = resume.data ?? initialResume;
   const reviewing = flow.reviews.length > 0;
   const context = flow.context;
+  const ownerId = context?.status.owner_id ?? null;
   const liveContext = useMemo<ImportContext | null>(() => {
     if (!context || !data) return context;
     return {
@@ -146,10 +148,23 @@ export function ResumeWizard({
       },
     };
   }, [context, data]);
-  const container = useRef<HTMLDivElement>(null);
-  const baseline = useRef("");
   const stepHeading = useRef<HTMLHeadingElement>(null);
   const previousReviews = useRef(0);
+
+  // Semantic dirty state for the active step, reported by the step editor
+  // itself, plus the save/discard controls the footer drives.
+  const [stepDirty, setStepDirty] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const controlsRef = useRef<StepEditControls | null>(null);
+  const handleStepDirty = useCallback((dirty: boolean) => {
+    setStepDirty(dirty);
+  }, []);
+  const handleStepControls = useCallback(
+    (controls: StepEditControls | null) => {
+      controlsRef.current = controls;
+    },
+    []
+  );
 
   const summaries = useMemo(
     () =>
@@ -166,20 +181,27 @@ export function ResumeWizard({
     ? flow.missing
     : PUBLISH_FIELDS.filter((key) => !display(data?.profile?.[key]).trim());
 
-  const formDirty = () => snapshotOf(container.current) !== baseline.current;
-
-  // The projects step reports its own semantic dirty state; the DOM snapshot
-  // baseline goes stale there whenever the edit form opens or closes.
-  const [projectsDirty, setProjectsDirty] = useState(false);
+  // One guard for every exit: in-wizard navigation, top-nav links, browser
+  // back, and tab close. Armed for both manual unsaved edits and an open
+  // import review.
+  const guarded = (stepDirty && !reviewing) || flow.dirty;
+  const [pendingLeave, setPendingLeave] = useState<PendingLeave | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [confirmDiscardReview, setConfirmDiscardReview] = useState(false);
+  const guardedRef = useRef(guarded);
+  const lastUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    baseline.current = snapshotOf(container.current);
-  }, [step, flow.saved, resume.dataUpdatedAt]);
+    guardedRef.current = guarded;
+  }, [guarded]);
+
+  useEffect(() => {
+    lastUrlRef.current = window.location.href;
+  }, []);
 
   useEffect(() => {
     if (flow.reviews.length > 0 && previousReviews.current === 0) {
       stepHeading.current?.focus();
-      baseline.current = snapshotOf(container.current);
     }
     previousReviews.current = flow.reviews.length;
   }, [flow.reviews.length]);
@@ -194,31 +216,51 @@ export function ResumeWizard({
 
   useEffect(() => {
     const onPop = () => {
-      setStep(
-        parseStep(new URLSearchParams(window.location.search).get("step"))
-      );
+      const popped = window.location.href;
+      const last = lastUrlRef.current;
+      if (!last || popped === last) return;
+      if (guardedRef.current) {
+        // A popstate cannot be cancelled: restore the current entry and ask
+        // before the user's edit history is left behind.
+        window.history.pushState(null, "", last);
+        setPendingLeave({ kind: "pop", href: popped });
+      } else {
+        lastUrlRef.current = popped;
+        setStep(parseStep(new URL(popped).searchParams.get("step")));
+        setStepDirty(false);
+        controlsRef.current = null;
+      }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   useEffect(() => {
-    if (!flow.dirty) return;
+    if (!guarded) return;
     const unload = (event: BeforeUnloadEvent) => {
       event.preventDefault();
+      event.returnValue = "";
     };
     const navigate = (event: MouseEvent) => {
-      const anchor = (event.target as HTMLElement).closest("a[href]");
+      if (event.defaultPrevented) return;
+      if (event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+        return;
+      const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>(
+        "a[href]"
+      );
       if (!anchor) return;
-      if ((anchor.getAttribute("href") ?? "").startsWith("#")) return;
-      if (
-        !window.confirm(
-          "Leave this page? Your unsaved import review will be discarded."
-        )
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      const href = anchor.getAttribute("href") ?? "";
+      if (!href || href.startsWith("#")) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setPendingLeave({
+        kind: "link",
+        href: url.pathname + url.search + url.hash,
+      });
     };
     window.addEventListener("beforeunload", unload);
     document.addEventListener("click", navigate, true);
@@ -226,23 +268,62 @@ export function ResumeWizard({
       window.removeEventListener("beforeunload", unload);
       document.removeEventListener("click", navigate, true);
     };
-  }, [flow.dirty]);
+  }, [guarded]);
+
+  async function saveStep() {
+    const controls = controlsRef.current;
+    if (!controls || savePending) return;
+    setSavePending(true);
+    try {
+      await controls.save();
+    } finally {
+      setSavePending(false);
+    }
+  }
+
+  function navigateToStep(next: Step) {
+    setStep(next);
+    setStepDirty(false);
+    controlsRef.current = null;
+    const href = stepHref(next);
+    window.history.pushState(null, "", href);
+    lastUrlRef.current = new URL(href, window.location.href).href;
+    setTimeout(() => stepHeading.current?.focus(), 0);
+  }
+
+  function confirmLeave() {
+    const target = pendingLeave;
+    setPendingLeave(null);
+    if (!target) return;
+    if (target.kind === "step") {
+      navigateToStep(target.next);
+      return;
+    }
+    if (target.kind === "pop") {
+      const url = new URL(target.href, window.location.href);
+      lastUrlRef.current = url.href;
+      if (url.pathname === "/admin/resume") {
+        window.history.replaceState(null, "", url.href);
+        setStep(parseStep(url.searchParams.get("step")));
+        setStepDirty(false);
+        controlsRef.current = null;
+        setTimeout(() => stepHeading.current?.focus(), 0);
+      } else {
+        window.location.assign(url.href);
+      }
+      return;
+    }
+    // A full navigation guarantees in-memory edits are truly discarded.
+    window.location.assign(target.href);
+  }
 
   function go(next: Step) {
     if (next === step) return;
-    if (!reviewing) {
-      const dirty = step === "projects" ? projectsDirty : formDirty();
-      if (
-        dirty &&
-        !window.confirm(
-          "You have unsaved edits on this step. Leave and discard them?"
-        )
-      )
-        return;
+    if (guarded) {
+      setPendingLeave({ kind: "step", next });
+      return;
     }
-    setStep(next);
-    window.history.pushState(null, "", stepHref(next));
-    setTimeout(() => stepHeading.current?.focus(), 0);
+    navigateToStep(next);
   }
 
   function stepReviews(value: Step) {
@@ -475,16 +556,30 @@ export function ResumeWizard({
             : "your name, headline, and introduction are complete."}{" "}
           You can save a partial draft.
         </p>
-        <div>
-          <Button
-            variant="outline"
-            disabled={!context}
-            onClick={() => setIntakeOpen(true)}
-          >
-            Import a resume
-          </Button>
+        <div className="space-y-1">
+          <div>
+            <Button
+              variant="outline"
+              disabled={!context}
+              onClick={() => setIntakeOpen(true)}
+            >
+              Import a resume
+            </Button>
+          </div>
+          {!context && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Resume import is unavailable right now. You can keep editing
+              manually.
+            </p>
+          )}
         </div>
-        <ProfileTab profile={data?.profile ?? null} />
+        <ProfileTab
+          profile={data?.profile ?? null}
+          unavailable={!data}
+          ownerId={ownerId}
+          onDirtyChange={handleStepDirty}
+          onControls={handleStepControls}
+        />
       </>
     );
   }
@@ -504,7 +599,14 @@ export function ResumeWizard({
           )}
         </>
       );
-    return <SkillsTab skills={data?.skills ?? []} />;
+    return (
+      <SkillsTab
+        skills={data?.skills ?? []}
+        unavailable={!data}
+        onDirtyChange={handleStepDirty}
+        onControls={handleStepControls}
+      />
+    );
   }
 
   function projectsStep() {
@@ -527,7 +629,9 @@ export function ResumeWizard({
         initialProjects={initialProjects}
         initialListStatus={initialListStatus}
         headingLevel="h3"
-        onDirtyChange={setProjectsDirty}
+        ownerId={ownerId}
+        onDirtyChange={handleStepDirty}
+        onControls={handleStepControls}
       />
     );
   }
@@ -547,7 +651,15 @@ export function ResumeWizard({
           )}
         </>
       );
-    return <ExperienceTab experience={data?.experience ?? []} />;
+    return (
+      <ExperienceTab
+        experience={data?.experience ?? []}
+        unavailable={!data}
+        ownerId={ownerId}
+        onDirtyChange={handleStepDirty}
+        onControls={handleStepControls}
+      />
+    );
   }
 
   function educationStep() {
@@ -565,7 +677,14 @@ export function ResumeWizard({
           )}
         </>
       );
-    return <EducationTab education={data?.education ?? []} />;
+    return (
+      <EducationTab
+        education={data?.education ?? []}
+        unavailable={!data}
+        onDirtyChange={handleStepDirty}
+        onControls={handleStepControls}
+      />
+    );
   }
 
   function contactStep() {
@@ -583,7 +702,14 @@ export function ResumeWizard({
           )}
         </>
       );
-    return <ContactTab contact={data?.contact ?? null} />;
+    return (
+      <ContactTab
+        contact={data?.contact ?? null}
+        unavailable={!data}
+        onDirtyChange={handleStepDirty}
+        onControls={handleStepControls}
+      />
+    );
   }
 
   function reviewStep() {
@@ -673,14 +799,7 @@ export function ResumeWizard({
             <Button
               variant="outline"
               disabled={flow.busy}
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Discard this review? Your existing draft will be kept."
-                  )
-                )
-                  flow.discard();
-              }}
+              onClick={() => setConfirmDiscardReview(true)}
             >
               Discard review
             </Button>
@@ -728,8 +847,8 @@ export function ResumeWizard({
           })}
         </ul>
         <p className="text-sm text-muted-foreground">
-          Saving keeps your work private. Publishing from the preview makes it
-          visible to visitors.
+          Saving keeps your work private. Publishing makes it visible to
+          visitors — use the Publish button above, or Preview first.
         </p>
         <div className="flex flex-wrap gap-3">
           <Button asChild>
@@ -766,22 +885,48 @@ export function ResumeWizard({
     const complete = STEPS.slice(0, -1).filter(
       (value) => summaries[value].status === "complete"
     ).length;
+    const dirty = stepDirty && !reviewing;
     return (
       <nav
         aria-label="Step actions"
         className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3 shadow-sm"
       >
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           {previous && (
             <Button variant="outline" onClick={() => go(previous)}>
               Back: {STEP_LABELS[previous]}
             </Button>
           )}
+          {dirty && (
+            <div
+              role="status"
+              className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-600/40 bg-amber-500/10 px-3 py-1.5"
+            >
+              <span className="text-sm font-medium">Unsaved changes</span>
+              <Button
+                size="sm"
+                onClick={() => void saveStep()}
+                disabled={savePending}
+              >
+                {savePending ? "Saving…" : "Save changes"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setConfirmDiscard(true)}
+                disabled={savePending}
+              >
+                Discard
+              </Button>
+            </div>
+          )}
         </div>
         <p role="status" className="text-sm text-muted-foreground">
           {reviewing
             ? `${flow.changes.length} of ${flow.reviews.length} entries selected`
-            : `${complete} of ${STEPS.length - 1} sections complete`}
+            : `${complete} of ${STEPS.length - 1} sections complete${
+                resume.isFetching ? " · Refreshing…" : ""
+              }`}
         </p>
         <div className="flex flex-wrap gap-2">
           {reviewing && next !== null && next !== "review" && (
@@ -801,6 +946,10 @@ export function ResumeWizard({
     );
   }
 
+  const leaveDescription = reviewing
+    ? "Your unsaved import review will be discarded if you leave."
+    : "Your unsaved edits on this step will be discarded. Save them first to keep your work.";
+
   return (
     <div className="space-y-6">
       <div>
@@ -810,6 +959,10 @@ export function ResumeWizard({
           Nothing is published until you choose to publish.
         </p>
       </div>
+      <EditorPublicationControl
+        reviewing={reviewing}
+        savePending={savePending}
+      />
       <StepNav step={step} summaries={summaries} onSelect={go} />
       <p role="status" aria-live="polite">
         {flow.stage}
@@ -818,7 +971,8 @@ export function ResumeWizard({
       <p role="alert" className="text-destructive">
         {flow.error}
       </p>
-      <div ref={container} className="space-y-6">
+      <div className="space-y-6">
+        {!data && !reviewing && <ResumeUnavailableNotice />}
         <section aria-labelledby="step-heading" className="space-y-6">
           <div>
             <h2
@@ -841,6 +995,42 @@ export function ResumeWizard({
         </section>
       </div>
       {stepFooter()}
+      <ConfirmDialog
+        open={pendingLeave !== null}
+        title="Leave with unsaved changes?"
+        description={leaveDescription}
+        confirmLabel="Discard and leave"
+        cancelLabel="Keep editing"
+        onConfirm={confirmLeave}
+        onCancel={() => setPendingLeave(null)}
+        pending={false}
+      />
+      <ConfirmDialog
+        open={confirmDiscard}
+        title="Discard unsaved changes on this step?"
+        description="Your edits on this step will be lost. This cannot be undone."
+        confirmLabel="Discard changes"
+        cancelLabel="Keep editing"
+        onConfirm={() => {
+          setConfirmDiscard(false);
+          controlsRef.current?.discard();
+        }}
+        onCancel={() => setConfirmDiscard(false)}
+        pending={false}
+      />
+      <ConfirmDialog
+        open={confirmDiscardReview}
+        title="Discard this review?"
+        description="Your existing draft will be kept; the pending import selections will be lost."
+        confirmLabel="Discard review"
+        cancelLabel="Keep reviewing"
+        onConfirm={() => {
+          setConfirmDiscardReview(false);
+          flow.discard();
+        }}
+        onCancel={() => setConfirmDiscardReview(false)}
+        pending={flow.busy}
+      />
     </div>
   );
 }

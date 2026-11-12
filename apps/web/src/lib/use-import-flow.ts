@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   candidateValid,
+  display,
   IMPORT_MAX_BYTES,
   type Candidate,
   type ImportContext,
@@ -11,6 +12,7 @@ import {
 } from "@/lib/resume-import";
 import {
   changesForSave,
+  currentValues,
   issues,
   makeReview,
   missingProfileFields,
@@ -317,19 +319,30 @@ export function useImportFlow(
     setError("");
     try {
       const latest = await loadContext();
+      const previousContext = context;
       setContext(latest);
       setRevision(latest.status.revision);
       setReviews((previous) =>
-        previous.map((r) => ({
-          ...makeReview(r.candidate, latest),
-          values: r.values,
-          active: r.active,
-        }))
+        previous.map((r) => {
+          const fresh = makeReview(r.candidate, latest);
+          const selected = { ...fresh.selected };
+          // Selections on fields whose saved value did not change survive the
+          // refresh; anything that changed falls back to the safe default.
+          if (fresh.target === r.target && previousContext) {
+            const before = currentValues(r, previousContext);
+            const after = currentValues(fresh, latest);
+            for (const key of Object.keys(selected)) {
+              if (display(before[key]) === display(after[key]))
+                selected[key] = r.selected[key] ?? selected[key];
+            }
+          }
+          return { ...fresh, values: r.values, active: r.active, selected };
+        })
       );
       setStale(false);
       saveAttempt.current = null;
       setStage(
-        "Existing values refreshed. Reconfirm which imported fields to use."
+        "Existing values refreshed. Selections on unchanged fields were kept; reconfirm any field whose saved value changed."
       );
     } catch (e) {
       setError((e as Error).message);

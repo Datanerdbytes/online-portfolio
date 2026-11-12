@@ -9,16 +9,18 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import type { StepEditControls } from "@/lib/resume-wizard";
+import { useStepEdits } from "@/lib/use-step-edits";
 import { ProjectSaveButton } from "@/components/project-save-button";
-import { PublishChangesButton } from "@/components/publish-changes-button";
 import { Spinner } from "@/components/ui/spinner";
+import { FieldAiWriting } from "@/components/ai-writing-assistant";
+import { manualFacts } from "@/lib/resume-import";
+import { generateSlug, slugify } from "@/lib/slug";
 import type { Project } from "@/lib/api";
 import {
   useCreateProject,
   useDeleteProject,
-  usePortfolioStatus,
   useProjects,
-  usePublishPortfolio,
   useReorderProjects,
   useUpdateProject,
   useUploadProjectScreenshot,
@@ -102,9 +104,7 @@ function ProjectScreenshotControl({
         name: file.name,
         updatedAt: updated.screenshot_updated_at,
       });
-      setMessage(
-        "Screenshot saved to your draft. Publish to update the public projects page."
-      );
+      setMessage("Screenshot saved to your draft.");
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -121,9 +121,7 @@ function ProjectScreenshotControl({
     try {
       await remove.mutateAsync(project.slug);
       setUploadedFile(null);
-      setMessage(
-        "Project screenshot removed from your draft. Publish to update the public projects page."
-      );
+      setMessage("Project screenshot removed from your draft.");
       setConfirmRemove(false);
     } catch (error) {
       setIsError(true);
@@ -137,12 +135,8 @@ function ProjectScreenshotControl({
     <div className="space-y-3 rounded-md border p-4">
       <h3 className="text-sm font-semibold">Project screenshot</h3>
       <p className="text-sm text-muted-foreground">
-        Screenshot uploads save automatically to your draft. Use Save project
-        details for the fields below, then{" "}
-        <Link href="/admin/preview" className="underline underline-offset-4">
-          preview and publish
-        </Link>{" "}
-        to update the public projects page.
+        Screenshot uploads save to your draft automatically. Field changes save
+        with the step&apos;s Save changes button.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-md border bg-muted">
@@ -243,12 +237,18 @@ export function ProjectManager({
   initialListStatus = "ok",
   headingLevel = "h2",
   onDirtyChange,
+  onControls,
+  ownerId = null,
 }: {
   initialProjects: Project[];
   initialListStatus?: Status;
   headingLevel?: "h2" | "h3";
   /** Reports whether unsaved edits exist, for the wizard's step-leave guard. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Registers save/discard controls for the wizard's step footer. */
+  onControls?: (controls: StepEditControls | null) => void;
+  /** Owner id for the AI writing assistant; resolved lazily when null. */
+  ownerId?: string | null;
 }) {
   const projectsQuery = useProjects({
     initialData:
@@ -266,6 +266,9 @@ export function ProjectManager({
   const [mode, setMode] = useState<"list" | "create" | "edit">("list");
   const [editing, setEditing] = useState<Project | null>(null);
   const [values, setValues] = useState<ProjectFormValues>(blankProjectForm);
+  // The slug is generated from the title unless the user edits the Advanced
+  // field, so creating a project never requires typing a URL-safe id.
+  const [slugTouched, setSlugTouched] = useState(false);
   const [orders, setOrders] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState(false);
@@ -276,8 +279,6 @@ export function ProjectManager({
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
   const reorderMutation = useReorderProjects();
-  const portfolioStatus = usePortfolioStatus();
-  const publishMutation = usePublishPortfolio();
   const pending =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -293,8 +294,6 @@ export function ProjectManager({
   const onScreenshotBusy = useCallback((busy: boolean) => {
     setScreenshotBusy(busy);
   }, []);
-  const dialog = useRef<HTMLDialogElement>(null);
-  const cancelDelete = useRef<HTMLButtonElement>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -332,36 +331,44 @@ export function ProjectManager({
     if (previousMode.current !== mode) heading.current?.focus();
     previousMode.current = mode;
   }, [mode]);
+  // Return focus to the list when the delete dialog closes (cancel or after
+  // the delete completes), matching the previous native-dialog behavior.
+  const previousDeleteTarget = useRef(deleteTarget);
   useEffect(() => {
-    const element = dialog.current;
-    if (deleteTarget && element && !element.open) {
-      element.showModal();
-      cancelDelete.current?.focus();
-    } else if (!deleteTarget && element?.open) {
-      element.close();
+    if (previousDeleteTarget.current && !deleteTarget) {
       const trigger = deleteTrigger.current;
       if (trigger?.isConnected) trigger.focus();
-      else addButton.current?.focus();
+      else heading.current?.focus();
     }
-    if (deleteTarget && !pending) cancelDelete.current?.focus();
-  }, [deleteTarget, pending]);
+    previousDeleteTarget.current = deleteTarget;
+  }, [deleteTarget]);
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function saveForm(): Promise<boolean> {
     // The ref flips synchronously, so a fast second submit cannot slip through
     // the gap before React re-renders with the pending flag.
-    if (submitting.current || pending) return;
+    if (submitting.current || pending) return false;
     clearMessages();
-    if (mode === "create" && !isSlug(values.slug)) {
+    // Auto-derived slugs dedupe against existing projects (and suffix on
+    // collision), so a repeated title never blocks the user.
+    const effectiveSlug =
+      mode === "create"
+        ? slugTouched
+          ? values.slug
+          : generateSlug(
+              [values.title],
+              projects.map((project) => project.slug)
+            )
+        : "";
+    if (mode === "create" && !isSlug(effectiveSlug)) {
       setError(
-        "Slug must use lowercase letters, numbers, and single hyphens (1–100 characters), with no surrounding spaces."
+        "Add a title, or set a link address under Advanced using lowercase letters, numbers, and single hyphens (1–100 characters), with no surrounding spaces."
       );
-      return;
+      return false;
     }
     const parsed = parseProjectForm(values, mode === "edit" ? editing : null);
     if (parsed.values === null) {
       setError(parsed.error);
-      return;
+      return false;
     }
     if (mode === "edit" && editing) {
       const body = projectUpdateBody(parsed.values, {
@@ -370,97 +377,93 @@ export function ProjectManager({
       });
       if (!body) {
         setSuccess(PROJECT_NO_CHANGES_MESSAGE);
-        return;
+        return true;
       }
       submitting.current = true;
-      updateMutation.mutate(
-        { slug: editing.slug, body },
-        {
-          onSuccess: () => {
-            submitting.current = false;
-            setMode("list");
-            setEditing(null);
-            setSuccess(
-              "Project draft saved. Publish to update your public portfolio."
-            );
-          },
-          onError: (err) => {
-            submitting.current = false;
-            const error = err as ApiError;
-            setAuthError(error.status === 401 || error.status === 403);
-            setError(error.message);
-          },
-        }
-      );
-    } else {
-      submitting.current = true;
-      createMutation.mutate(
-        { slug: values.slug, ...parsed.values },
-        {
-          onSuccess: () => {
-            submitting.current = false;
-            setMode("list");
-            setValues(blankProjectForm());
-            setSuccess(
-              "Project created in your draft. Publish to update your public portfolio."
-            );
-          },
-          onError: (err) => {
-            submitting.current = false;
-            const error = err as ApiError;
-            setAuthError(error.status === 401 || error.status === 403);
-            setError(error.message);
-          },
-        }
-      );
+      try {
+        await updateMutation.mutateAsync({ slug: editing.slug, body });
+        submitting.current = false;
+        setMode("list");
+        setEditing(null);
+        setSuccess("Project draft saved.");
+        return true;
+      } catch (err) {
+        submitting.current = false;
+        const error = err as ApiError;
+        setAuthError(error.status === 401 || error.status === 403);
+        setError(error.message);
+        return false;
+      }
+    }
+    submitting.current = true;
+    try {
+      await createMutation.mutateAsync({
+        slug: effectiveSlug,
+        ...parsed.values,
+      });
+      submitting.current = false;
+      setMode("list");
+      setValues(blankProjectForm());
+      setSlugTouched(false);
+      setSuccess("Project created in your draft.");
+      return true;
+    } catch (err) {
+      submitting.current = false;
+      const error = err as ApiError;
+      setAuthError(error.status === 401 || error.status === 403);
+      setError(error.message);
+      return false;
     }
   }
-  function saveOrder() {
-    if (pending) return;
-    clearMessages();
+  async function saveAll(): Promise<boolean> {
+    let ok = true;
+    if (mode !== "list") ok = await saveForm();
     const changed = changedOrders(projects, orders);
-    if (!changed.orders) {
-      setError(changed.error ?? "Invalid display order.");
-      return;
-    }
-    if (!changed.orders.length) return;
-    const submitted = new Set(changed.orders.map((entry) => entry.slug));
-    reorderMutation.mutate(changed.orders, {
-      onSuccess: () => {
+    if (changed.orders && changed.orders.length > 0) {
+      const submitted = changed.orders;
+      try {
+        await reorderMutation.mutateAsync(submitted);
         setOrders((drafts) =>
           Object.fromEntries(
-            Object.entries(drafts).filter(([slug]) => !submitted.has(slug))
+            Object.entries(drafts).filter(
+              ([slug]) => !submitted.some((entry) => entry.slug === slug)
+            )
           )
         );
-        setSuccess(
-          "Draft order saved. Publish to update your public portfolio."
-        );
-      },
-      onError: (err) => {
+        setSuccess("Order saved to your draft.");
+      } catch (err) {
         const error = err as ApiError;
         setAuthError(error.status === 401 || error.status === 403);
         setError(error.message);
-      },
-    });
+        ok = false;
+      }
+    } else if (changed.orders === null) {
+      setError(changed.error ?? "Invalid display order.");
+      ok = false;
+    }
+    return ok;
   }
-  function publishChanges() {
-    if (pending || publishMutation.isPending) return;
-    const status = portfolioStatus.data;
-    if (!status) return;
+  function discardEdits() {
+    if (mode !== "list") {
+      setMode("list");
+      setEditing(null);
+    }
+    setSlugTouched(false);
+    setOrders({});
     clearMessages();
-    publishMutation.mutate(status.revision, {
-      onSuccess: () => {
-        setSuccess("Changes published. Your public portfolio is up to date.");
-      },
-      onError: (err) => {
-        const error = err as ApiError;
-        // A stale revision is recoverable: refetching loads the revision the
-        // backend expects, so the next attempt can succeed.
-        if (error.status === 409) void portfolioStatus.refetch();
-        setAuthError(error.status === 401 || error.status === 403);
-        setError(error.message);
-      },
-    });
+  }
+  async function confirmDelete() {
+    if (!deleteTarget || pending) return;
+    const target = deleteTarget;
+    try {
+      await deleteMutation.mutateAsync(target.slug);
+      setDeleteTarget(null);
+      setSuccess("Project deleted from your draft.");
+    } catch (err) {
+      const error = err as ApiError;
+      setAuthError(error.status === 401 || error.status === 403);
+      setError(error.message);
+    }
   }
   const orderChanges = changedOrders(projects, orders);
   // Semantic "unsaved edits" signal for the wizard's step-leave guard: covers
@@ -469,10 +472,13 @@ export function ProjectManager({
     projectEditsPending(mode, values, editing) ||
     orderChanges.orders === null ||
     (orderChanges.orders?.length ?? 0) > 0;
-  useEffect(() => {
-    onDirtyChange?.(editsPending);
-    return () => onDirtyChange?.(false);
-  }, [editsPending, onDirtyChange]);
+  useStepEdits({
+    dirty: editsPending,
+    save: saveAll,
+    discard: discardEdits,
+    onDirtyChange,
+    onControls,
+  });
   const inputClass =
     "min-h-11 w-full min-w-0 rounded-md border border-input px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
   const messages = (
@@ -555,10 +561,17 @@ export function ProjectManager({
         ) : null}
       </div>
       {mode !== "list" ? (
-        <form onSubmit={submit} className="space-y-5" noValidate>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveForm();
+          }}
+          className="space-y-5"
+          noValidate
+        >
           {mode === "edit" ? (
             <p className="break-words text-sm text-muted-foreground [overflow-wrap:anywhere]">
-              Editing {editing?.slug}. Leave a URL blank to clear it.
+              Editing “{editing?.title}”. Leave a URL blank to clear it.
             </p>
           ) : null}
           {mode === "edit" && editing ? (
@@ -573,24 +586,40 @@ export function ProjectManager({
             />
           ) : null}
           {mode === "create" ? (
-            <div>
-              <label
-                htmlFor="project-slug"
-                className="mb-1 block text-sm font-medium"
-              >
-                Slug
-              </label>
-              <input
-                id="project-slug"
-                className={inputClass}
-                value={values.slug}
-                maxLength={100}
-                disabled={pending}
-                onChange={(event) =>
-                  setValues({ ...values, slug: event.target.value })
-                }
-              />
-            </div>
+            <details className="text-sm">
+              <summary className="w-fit cursor-pointer rounded text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4">
+                Advanced
+              </summary>
+              <div className="mt-2">
+                <label
+                  htmlFor="project-slug"
+                  className="mb-1 block text-sm font-medium"
+                >
+                  Link address (slug)
+                </label>
+                <input
+                  id="project-slug"
+                  className={inputClass}
+                  value={slugTouched ? values.slug : slugify(values.title)}
+                  maxLength={100}
+                  disabled={pending}
+                  onChange={(event) => {
+                    setSlugTouched(true);
+                    setValues({ ...values, slug: event.target.value });
+                  }}
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Created for you from the title. Only change it if you need an
+                  exact address.
+                </p>
+                {slugTouched && !isSlug(values.slug) ? (
+                  <p role="alert" className="mt-1 text-sm text-destructive">
+                    Slug must use lowercase letters, numbers, and single hyphens
+                    (1–100 characters), with no surrounding spaces.
+                  </p>
+                ) : null}
+              </div>
+            </details>
           ) : null}
           <div>
             <label
@@ -626,6 +655,19 @@ export function ProjectManager({
               onChange={(event) =>
                 setValues({ ...values, summary: event.target.value })
               }
+            />
+            <FieldAiWriting
+              section="projects"
+              field="summary"
+              ownerId={ownerId}
+              currentText={values.summary}
+              facts={manualFacts("projects", "summary", {
+                title: values.title,
+                technologies: values.technologies,
+                highlights: values.highlights,
+              })}
+              disabled={pending}
+              onUse={(text) => setValues({ ...values, summary: text })}
             />
           </div>
           <div>
@@ -769,7 +811,7 @@ export function ProjectManager({
           </div>
           <p className="text-sm text-muted-foreground">
             Move projects up or down, or choose a position. Preview the order,
-            then select Save order to save your draft.
+            then save it with the step&apos;s Save changes button below.
           </p>
           {listStatus === "unavailable" ? (
             <p role="status" className="text-sm text-destructive">
@@ -944,7 +986,8 @@ export function ProjectManager({
                           clearMessages();
                           setMode("edit");
                         }}
-                        onDelete={() => {
+                        onDelete={(trigger) => {
+                          deleteTrigger.current = trigger;
                           setDeleteTarget(project);
                           clearMessages();
                         }}
@@ -979,103 +1022,28 @@ export function ProjectManager({
                     Discard order changes
                   </Button>
                 ) : null}
-                <Button
-                  className="min-h-11"
-                  disabled={
-                    pending ||
-                    Boolean(deleteTarget) ||
-                    !orderChanges.orders?.length ||
-                    Boolean(orderChanges.error)
-                  }
-                  onClick={saveOrder}
-                >
-                  {reorderMutation.isPending ? "Saving order…" : "Save order"}
-                </Button>
-                <PublishChangesButton
-                  status={portfolioStatus.data ?? null}
-                  publishing={publishMutation.isPending}
-                  disabled={pending || Boolean(deleteTarget)}
-                  onPublish={publishChanges}
-                />
               </div>
             </div>
           </div>
         </>
       )}
-      <dialog
-        ref={dialog}
-        aria-labelledby="delete-project-title"
-        onKeyDown={(event) => {
-          if (event.key !== "Tab") return;
-          const controls = event.currentTarget.querySelectorAll<HTMLElement>(
-            "button:not(:disabled), a[href]"
-          );
-          const first = controls[0],
-            last = controls[controls.length - 1];
-          if (!first) {
-            event.preventDefault();
-            return;
-          }
-          if (event.shiftKey && event.target === first) {
-            event.preventDefault();
-            last.focus();
-          } else if (!event.shiftKey && event.target === last) {
-            event.preventDefault();
-            first.focus();
-          }
-        }}
-        onCancel={(event) => {
-          event.preventDefault();
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title={
+          deleteTarget ? `Delete “${deleteTarget.title}”?` : "Delete project?"
+        }
+        description="This cannot be undone."
+        confirmLabel="Delete project"
+        cancelLabel="Cancel"
+        onConfirm={confirmDelete}
+        onCancel={() => {
           if (!pending) setDeleteTarget(null);
         }}
-        className="m-auto w-[calc(100%_-_2rem)] max-w-md rounded-lg border bg-background p-6 text-foreground shadow-lg backdrop:bg-black/40"
+        pending={pending}
+        pendingLabel="Deleting…"
       >
-        <h3
-          id="delete-project-title"
-          className="mb-3 text-lg font-semibold [overflow-wrap:anywhere]"
-        >
-          Delete “{deleteTarget?.title}”?
-        </h3>
-        <p className="mb-4 text-sm text-muted-foreground">
-          This cannot be undone.
-        </p>
         {deleteTarget ? messages : null}
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button
-            ref={cancelDelete}
-            size="lg"
-            variant="outline"
-            disabled={pending}
-            onClick={() => setDeleteTarget(null)}
-          >
-            Cancel
-          </Button>
-          <Button
-            size="lg"
-            variant="destructive"
-            disabled={pending || !deleteTarget}
-            onClick={() => {
-              if (!deleteTarget || pending) return;
-              deleteMutation.mutate(deleteTarget.slug, {
-                onSuccess: () => {
-                  deleteTrigger.current = null;
-                  setDeleteTarget(null);
-                  setSuccess(
-                    "Project deleted from your draft. Publish to update your public portfolio."
-                  );
-                },
-                onError: (err) => {
-                  const error = err as ApiError;
-                  setAuthError(error.status === 401 || error.status === 403);
-                  setError(error.message);
-                },
-              });
-            }}
-          >
-            {pending ? "Deleting…" : "Delete project"}
-          </Button>
-        </div>
-      </dialog>
+      </ConfirmDialog>
     </section>
   );
 }

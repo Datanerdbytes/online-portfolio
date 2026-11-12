@@ -4,6 +4,7 @@ import { fetchProjects, fetchResume } from "@/lib/api";
 import { resolveAccountResume } from "@/lib/resume";
 import { ResumeDocument } from "@/components/resume-document";
 import { PublicationControls } from "@/components/publication-controls";
+import { PreviewRefresher } from "@/components/preview-refresher";
 import Link from "next/link";
 
 export default async function PreviewPage() {
@@ -36,6 +37,7 @@ export default async function PreviewPage() {
     );
   return (
     <section className="space-y-6">
+      <PreviewRefresher />
       <div>
         <p className="eyebrow">Only visible to you</p>
         <h1 className="text-3xl font-bold">Preview your portfolio</h1>

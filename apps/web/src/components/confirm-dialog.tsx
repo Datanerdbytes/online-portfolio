@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef } from "react";
+import { useCallback, useEffect, useId, useRef, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 export interface ConfirmDialogProps {
@@ -13,6 +13,8 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
   pending: boolean;
   pendingLabel?: string;
+  /** Extra content (e.g. an inline error) shown between description and buttons. */
+  children?: ReactNode;
 }
 
 export function ConfirmDialog({
@@ -25,6 +27,7 @@ export function ConfirmDialog({
   onCancel,
   pending,
   pendingLabel = "Deleting…",
+  children,
 }: ConfirmDialogProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelButton = useRef<HTMLButtonElement>(null);
@@ -88,6 +91,7 @@ export function ConfirmDialog({
       >
         {description}
       </p>
+      {children}
       <div className="mt-4 flex flex-wrap gap-3">
         <Button
           ref={cancelButton}

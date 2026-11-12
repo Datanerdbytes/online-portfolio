@@ -256,3 +256,40 @@ export function factsForWriting(
       .filter((c) => Object.keys(c.evidence).length > 0)
   );
 }
+
+// Fields that must never reach the writing model: private or identity data.
+const PRIVATE_FACT_FIELDS = [
+  "email",
+  "phone",
+  "url",
+  "repository_url",
+  "demo_url",
+  "location",
+  "name",
+];
+
+/**
+ * Manual-mode facts for the writing assistant: the user's own saved draft
+ * provides the evidence, shaped like import evidence and filtered through the
+ * same privacy rules. The field being written is excluded from its own facts.
+ */
+export function manualFacts(
+  section: Section,
+  field: string,
+  values: Values
+): string {
+  const evidence = Object.fromEntries(
+    Object.entries(values)
+      .filter(
+        ([key, value]) =>
+          key !== field &&
+          key !== "slug" &&
+          !PRIVATE_FACT_FIELDS.includes(key) &&
+          typeof value === "string" &&
+          value.trim() !== ""
+      )
+      .map(([key, value]) => [key, String(value)])
+  );
+  if (Object.keys(evidence).length === 0) return "[]";
+  return JSON.stringify([{ section, evidence }]);
+}

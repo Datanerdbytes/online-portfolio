@@ -46,7 +46,7 @@ export default async function AdminResumePage({
       {!resume && (
         <p role="alert" className="mb-4">
           We couldn’t load your saved resume. Your saved work is unchanged.
-          Refresh to try again; import and editing remain available.
+          Refresh to try again; the editor is read-only until it loads.
         </p>
       )}
       <ResumeWizard
