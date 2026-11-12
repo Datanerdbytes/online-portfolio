@@ -119,6 +119,35 @@ def test_list_sections_return_items_envelope():
         assert response.json() == {"items": []}, section
 
 
+def test_public_projects_rewrite_screenshot_urls():
+    project = SimpleNamespace(
+        id=7,
+        slug="dashboard",
+        title="Dashboard",
+        summary="A published project",
+        technologies=["dbt"],
+        highlights=[],
+        repository_url=None,
+        demo_url=None,
+        display_order=0,
+        is_sample=False,
+        screenshot_url="/api/v1/projects/dashboard/screenshot",
+        screenshot_updated_at="2026-11-12T01:12:56Z",
+    )
+    session = _session()
+    session.query.return_value.order_by.return_value.all.return_value = [project]
+
+    with _client_with_public_session(session) as client:
+        response = client.get("/api/v1/public/projects")
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["screenshot_url"] == (
+        f"/api/v1/public/users/{PUBLIC_USER_ID}/projects/dashboard/screenshot"
+    )
+    assert item["screenshot_updated_at"] == "2026-11-12T01:12:56Z"
+
+
 def test_contact_returns_details():
     contact = SimpleNamespace(id=3, phone="+15555550100", email="ada@example.com", links=[])
     session = _session()

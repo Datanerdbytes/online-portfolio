@@ -242,6 +242,8 @@ def test_published_images_survive_draft_replacement_and_removal(accounts, tmp_pa
             f"/api/v1/public/users/{ids[0]}/resume/profile/avatar"
         )
         screenshot_url = f"/api/v1/public/users/{ids[0]}/projects/with-image/screenshot"
+        listing = client.get(f"/api/v1/public/users/{ids[0]}/projects").json()
+        assert listing["items"][0]["screenshot_url"] == screenshot_url
         screenshot = client.get(screenshot_url).content
         assert client.delete("/api/v1/projects/with-image", headers=a).status_code == 204
         assert client.get(screenshot_url).content == screenshot
