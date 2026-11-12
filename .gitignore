@@ -77,6 +77,9 @@ apps/api/media/
 # Personal documents (never commit a real resume)
 /resume.pdf
 
+# Local agent scratch space (issue tracker files, never committed)
+.scratch/
+
 # Misc
 *.local
 .cache/
