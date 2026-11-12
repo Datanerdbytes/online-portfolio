@@ -29,6 +29,26 @@ const BRAND_ICONS = {
   threads: faThreads,
 } as const;
 
+// Brand colors for logos that are not black. Black logo brands (github, x,
+// threads) keep the adaptive currentColor so they stay visible in dark mode.
+const BRAND_FILLS: Partial<Record<Exclude<SocialBrand, "tableau">, string>> = {
+  facebook: "#0866FF",
+  slack: "#4A154B",
+  discord: "#5865F2",
+};
+
+// Instagram's recognizable look is its official diagonal gradient, so it
+// carries its own paint server instead of a flat color.
+const INSTAGRAM_GRADIENT_ID = "instagram-brand-gradient";
+
+const INSTAGRAM_GRADIENT_STOPS = [
+  { offset: "0%", color: "#FEDA75" },
+  { offset: "25%", color: "#FA7E1E" },
+  { offset: "50%", color: "#D62976" },
+  { offset: "75%", color: "#962FBF" },
+  { offset: "100%", color: "#4F5BD5" },
+];
+
 function identifySocialBrand(label: string, url: string): SocialBrand | null {
   const normalizedLabel = label.toLowerCase();
   let hostname = "";
@@ -103,13 +123,37 @@ function SocialMark({ brand }: { brand: Exclude<SocialBrand, "tableau"> }) {
   const icon = BRAND_ICONS[brand];
   const [width, height, , , pathData] = icon.icon;
   const paths = Array.isArray(pathData) ? pathData : [pathData];
+  const isInstagram = brand === "instagram";
+  const fill = isInstagram
+    ? `url(#${INSTAGRAM_GRADIENT_ID})`
+    : BRAND_FILLS[brand];
   return (
     <svg
       className="masthead-social-mark"
       viewBox={`0 0 ${width} ${height}`}
       aria-hidden="true"
       focusable="false"
+      style={fill ? { fill } : undefined}
     >
+      {isInstagram && (
+        <defs>
+          <linearGradient
+            id={INSTAGRAM_GRADIENT_ID}
+            x1="0"
+            y1="1"
+            x2="1"
+            y2="0"
+          >
+            {INSTAGRAM_GRADIENT_STOPS.map((stop) => (
+              <stop
+                key={stop.offset}
+                offset={stop.offset}
+                stopColor={stop.color}
+              />
+            ))}
+          </linearGradient>
+        </defs>
+      )}
       {paths.map((path, index) => (
         <path d={path} key={index} />
       ))}
