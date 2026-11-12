@@ -8,6 +8,7 @@ import type {
   ApiExperience,
   ApiEducation,
   ApiContact,
+  ApiContactLink,
   Project,
   ProjectsResponse,
 } from "@/lib/api";
@@ -255,6 +256,33 @@ export async function addEducation(body: PatchBody): Promise<ApiEducation> {
 export async function updateContact(body: PatchBody): Promise<ApiContact> {
   const result = await resumePatch("/resume/contact", body);
   return result as ApiContact;
+}
+
+export type ContactLinkBody = {
+  label?: string;
+  url?: string;
+  display_order?: number;
+};
+
+export async function addContactLink(body: {
+  label: string;
+  url: string;
+  display_order?: number;
+}): Promise<ApiContactLink> {
+  const result = await resumePost("/resume/contact/links", body);
+  return result as ApiContactLink;
+}
+
+export async function updateContactLink(
+  id: number,
+  body: ContactLinkBody
+): Promise<ApiContactLink> {
+  const result = await resumePatch(`/resume/contact/links/${id}`, body);
+  return result as ApiContactLink;
+}
+
+export async function deleteContactLink(id: number): Promise<void> {
+  await resumeDelete(`/resume/contact/links/${id}`);
 }
 
 export function useResume(options?: { initialData?: ApiResume }) {
@@ -966,5 +994,38 @@ export function useUpdateContact() {
         })
       );
     },
+  });
+}
+
+function refreshResume(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
+}
+
+export function useAddContactLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: {
+      label: string;
+      url: string;
+      display_order?: number;
+    }) => addContactLink(body),
+    onSuccess: () => refreshResume(queryClient),
+  });
+}
+
+export function useUpdateContactLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: ContactLinkBody }) =>
+      updateContactLink(id, body),
+    onSuccess: () => refreshResume(queryClient),
+  });
+}
+
+export function useDeleteContactLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteContactLink(id),
+    onSuccess: () => refreshResume(queryClient),
   });
 }

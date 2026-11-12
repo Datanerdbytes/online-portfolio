@@ -4,6 +4,7 @@ import Script from "next/script";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { Header } from "@/components/header";
+import { SocialLinks } from "@/components/social-links";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
 import { getAboutState, getContactState } from "@/lib/resume-server";
 import "./globals.css";
@@ -86,19 +87,10 @@ export default async function RootLayout({
               <div className="content-width footer-inner">
                 <div className="footer-brand">
                   <p className="footer-name">{profile.name}</p>
+                  <SocialLinks links={links} className="footer-socials" />
                 </div>
                 <nav aria-label="Portfolio links" className="footer-links">
                   <Link href="/resume">Resume</Link>
-                  {links.map((link) => (
-                    <a
-                      key={link.url}
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {link.label}
-                    </a>
-                  ))}
                   <Link href="/build-your-portfolio">
                     Build your own portfolio
                   </Link>

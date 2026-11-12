@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import type {
   ApiContact,
+  ApiContactLink,
   ApiEducation,
   ApiExperience,
   ApiProfile,
@@ -28,9 +29,13 @@ import {
   useDeleteEducation,
   useAddEducation,
   useUpdateContact,
+  useAddContactLink,
+  useUpdateContactLink,
+  useDeleteContactLink,
   useUploadProfileImage,
   useRemoveProfileImage,
 } from "@/lib/project-queries";
+import { isAbsoluteHttpUrl } from "@/lib/resume";
 import { ProfileAvatar } from "@/components/profile-avatar";
 import {
   AVATAR_ACCEPT,
@@ -1323,9 +1328,27 @@ export function ContactTab({ contact }: { contact: ApiContact | null }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
+  const [draft, setDraft] = useState({ label: "", url: "" });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValues, setEditValues] = useState({ label: "", url: "" });
+  const [pendingRemoval, setPendingRemoval] = useState<ApiContactLink | null>(
+    null
+  );
+
   const updateContact = useUpdateContact();
+  const addLink = useAddContactLink();
+  const updateLink = useUpdateContactLink();
+  const deleteLink = useDeleteContactLink();
 
   const saving = updateContact.isPending;
+  const links = useMemo(() => contact?.links ?? [], [contact]);
+  const linksBusy =
+    addLink.isPending || updateLink.isPending || deleteLink.isPending;
+
+  const report = useCallback((err: unknown, fallback: string) => {
+    setIsError(true);
+    setMessage(handleMutationError(err) || fallback);
+  }, []);
 
   const save = useCallback(async () => {
     setMessage("");
@@ -1337,10 +1360,94 @@ export function ContactTab({ contact }: { contact: ApiContact | null }) {
       setIsError(false);
       setMessage("Draft saved. Preview and publish when ready.");
     } catch (err) {
-      setIsError(true);
-      setMessage(handleMutationError(err));
+      report(err, "Saving the contact failed. Check the API and try again.");
     }
-  }, [values, updateContact]);
+  }, [values, updateContact, report]);
+
+  const addNewLink = useCallback(async () => {
+    const label = draft.label.trim();
+    const url = draft.url.trim();
+    if (!label || !isAbsoluteHttpUrl(url)) {
+      setIsError(true);
+      setMessage("Add a label and a full https:// or http:// URL.");
+      return;
+    }
+    const displayOrder = links.reduce(
+      (max, link) => Math.max(max, link.display_order),
+      -1
+    );
+    setMessage("");
+    try {
+      await addLink.mutateAsync({
+        label,
+        url,
+        display_order: displayOrder + 1,
+      });
+      setIsError(false);
+      setMessage("Link added. It appears on the live site when you publish.");
+      setDraft({ label: "", url: "" });
+    } catch (err) {
+      report(err, "Adding the link failed. Check the API and try again.");
+    }
+  }, [draft, links, addLink, report]);
+
+  const startEdit = useCallback((link: ApiContactLink) => {
+    setEditingId(link.id);
+    setEditValues({ label: link.label, url: link.url });
+    setMessage("");
+    setIsError(false);
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (editingId === null) return;
+    const label = editValues.label.trim();
+    const url = editValues.url.trim();
+    if (!label || !isAbsoluteHttpUrl(url)) {
+      setIsError(true);
+      setMessage("Add a label and a full https:// or http:// URL.");
+      return;
+    }
+    setMessage("");
+    try {
+      await updateLink.mutateAsync({ id: editingId, body: { label, url } });
+      setIsError(false);
+      setMessage("Link updated. It appears on the live site when you publish.");
+      setEditingId(null);
+    } catch (err) {
+      report(err, "Saving the link failed. Check the API and try again.");
+    }
+  }, [editingId, editValues, updateLink, report]);
+
+  const confirmRemoval = useCallback(async () => {
+    if (!pendingRemoval) return;
+    const target = pendingRemoval;
+    setMessage("");
+    try {
+      await deleteLink.mutateAsync(target.id);
+      setIsError(false);
+      setMessage(
+        "Link removed. It disappears from the live site when you publish."
+      );
+      setPendingRemoval(null);
+      if (editingId === target.id) setEditingId(null);
+    } catch (err) {
+      report(err, "Removing the link failed. Check the API and try again.");
+    }
+  }, [pendingRemoval, deleteLink, editingId, report]);
+
+  const linkField = (
+    value: string,
+    onChange: (v: string) => void,
+    extra: Record<string, string>
+  ) => (
+    <input
+      className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={linksBusy}
+      {...extra}
+    />
+  );
 
   return (
     <Card>
@@ -1349,8 +1456,11 @@ export function ContactTab({ contact }: { contact: ApiContact | null }) {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1">
-          <label className="block text-sm font-medium">Email</label>
+          <label className="block text-sm font-medium" htmlFor="contact-email">
+            Email
+          </label>
           <input
+            id="contact-email"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
             value={values.email}
             onChange={(e) =>
@@ -1360,8 +1470,11 @@ export function ContactTab({ contact }: { contact: ApiContact | null }) {
           />
         </div>
         <div className="space-y-1">
-          <label className="block text-sm font-medium">Phone</label>
+          <label className="block text-sm font-medium" htmlFor="contact-phone">
+            Phone
+          </label>
           <input
+            id="contact-phone"
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
             value={values.phone}
             onChange={(e) =>
@@ -1370,20 +1483,142 @@ export function ContactTab({ contact }: { contact: ApiContact | null }) {
             disabled={saving}
           />
         </div>
-        {contact?.links && contact.links.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-sm font-medium">Social links</p>
-            {contact.links.map((l) => (
-              <div key={l.id} className="flex items-center gap-2 text-sm">
-                <span className="w-28 shrink-0 font-medium">{l.label}</span>
-                <span className="truncate text-muted-foreground">{l.url}</span>
-              </div>
-            ))}
-            <p className="text-xs text-muted-foreground">
-              Link editing available via the API directly.
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Social links</p>
+          {links.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No social links yet. Add the profiles you want visitors to reach.
             </p>
+          )}
+          <ul className="space-y-2">
+            {links.map((link) =>
+              editingId === link.id ? (
+                <li
+                  key={link.id}
+                  className="space-y-2 rounded-md border bg-muted/40 p-3"
+                >
+                  <div className="grid gap-2 sm:grid-cols-[200px_minmax(0,1fr)]">
+                    <div className="space-y-1">
+                      <label
+                        className="block text-xs font-medium"
+                        htmlFor={`link-label-${link.id}`}
+                      >
+                        Label
+                      </label>
+                      {linkField(
+                        editValues.label,
+                        (v) => setEditValues((e) => ({ ...e, label: v })),
+                        {
+                          id: `link-label-${link.id}`,
+                        }
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <label
+                        className="block text-xs font-medium"
+                        htmlFor={`link-url-${link.id}`}
+                      >
+                        URL
+                      </label>
+                      {linkField(
+                        editValues.url,
+                        (v) => setEditValues((e) => ({ ...e, url: v })),
+                        {
+                          id: `link-url-${link.id}`,
+                          inputMode: "url",
+                        }
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={saveEdit}
+                      disabled={
+                        linksBusy ||
+                        !editValues.label.trim() ||
+                        !editValues.url.trim()
+                      }
+                    >
+                      {updateLink.isPending ? "Saving…" : "Save link"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setEditingId(null)}
+                      disabled={linksBusy}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </li>
+              ) : (
+                <li
+                  key={link.id}
+                  className="flex flex-wrap items-center gap-2 rounded-md border px-3 py-2"
+                >
+                  <span className="min-w-24 font-medium">{link.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                    {link.url}
+                  </span>
+                  <RecordActionButtons
+                    recordTitle={`${link.label} link`}
+                    onEdit={() => startEdit(link)}
+                    onDelete={() => setPendingRemoval(link)}
+                    disabled={linksBusy}
+                  />
+                </li>
+              )
+            )}
+          </ul>
+          <div className="grid gap-2 rounded-md border bg-muted/40 p-3 sm:grid-cols-[200px_minmax(0,1fr)]">
+            <div className="space-y-1">
+              <label
+                className="block text-xs font-medium"
+                htmlFor="new-link-label"
+              >
+                Label
+              </label>
+              {linkField(
+                draft.label,
+                (v) => setDraft((d) => ({ ...d, label: v })),
+                {
+                  id: "new-link-label",
+                  placeholder: "Facebook",
+                }
+              )}
+            </div>
+            <div className="space-y-1">
+              <label
+                className="block text-xs font-medium"
+                htmlFor="new-link-url"
+              >
+                URL
+              </label>
+              {linkField(
+                draft.url,
+                (v) => setDraft((d) => ({ ...d, url: v })),
+                {
+                  id: "new-link-url",
+                  inputMode: "url",
+                  placeholder: "https://www.instagram.com/username/",
+                }
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <Button
+                size="sm"
+                onClick={addNewLink}
+                disabled={linksBusy || !draft.label.trim() || !draft.url.trim()}
+              >
+                {addLink.isPending ? "Adding…" : "Add link"}
+              </Button>
+            </div>
           </div>
-        )}
+          <p className="text-xs text-muted-foreground">
+            Saved links appear as icons on the live site once published.
+          </p>
+        </div>
         {message && (
           <p
             className={`text-sm ${isError ? "text-destructive" : "text-muted-foreground"}`}
@@ -1395,6 +1630,16 @@ export function ContactTab({ contact }: { contact: ApiContact | null }) {
           {saving ? "Saving…" : "Save contact"}
         </Button>
       </CardContent>
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        title={`Remove ${pendingRemoval?.label ?? "link"}?`}
+        description="The link stops appearing on the live site after you publish."
+        confirmLabel="Remove link"
+        cancelLabel="Keep link"
+        onConfirm={confirmRemoval}
+        onCancel={() => setPendingRemoval(null)}
+        pending={deleteLink.isPending}
+      />
     </Card>
   );
 }

@@ -141,16 +141,7 @@ export const resume: ResumeContent = {
   contact: {
     phone: "+63 923-456-8257",
     email: "roel.somido@icloud.com",
-    links: [
-      {
-        label: "GitHub",
-        url: "https://github.com/Datanerdbytes",
-      },
-      {
-        label: "Tableau Public",
-        url: "https://public.tableau.com/app/profile/roel.somido/vizzes",
-      },
-    ],
+    links: [],
   },
   projects: [
     {
