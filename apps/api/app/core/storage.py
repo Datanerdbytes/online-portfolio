@@ -27,6 +27,7 @@ CONTENT_TYPE_EXTENSIONS: dict[str, str] = {
     "image/jpeg": "jpg",
     "image/png": "png",
     "image/webp": "webp",
+    "image/gif": "gif",
 }
 
 
@@ -148,7 +149,7 @@ class DatabaseProfileImageStore:
 
     @staticmethod
     def _validate_filename(filename: str) -> None:
-        if not re.fullmatch(r"[a-f0-9]{32}\.(jpg|png|webp)", filename):
+        if not re.fullmatch(r"[a-f0-9]{32}\.(jpg|png|webp|gif)", filename):
             raise ProfileImageStorageUnavailable("image storage unavailable")
 
     def path_for(self, filename: str) -> Path:

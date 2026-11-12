@@ -26,9 +26,9 @@ import {
   type ApiError,
 } from "@/lib/project-queries";
 import {
-  AVATAR_ACCEPT,
+  SCREENSHOT_ACCEPT,
   profileImageUrl,
-  validateAvatarFile,
+  validateScreenshotFile,
 } from "@/lib/avatar";
 import {
   blankProjectForm,
@@ -89,7 +89,7 @@ function ProjectScreenshotControl({
     if (!file) return;
     setMessage("");
     setIsError(false);
-    const validationError = validateAvatarFile(file);
+    const validationError = validateScreenshotFile(file);
     if (validationError) {
       setIsError(true);
       setMessage(validationError);
@@ -199,7 +199,8 @@ function ProjectScreenshotControl({
             ) : null}
           </div>
           <p className="text-xs text-muted-foreground">
-            JPEG, PNG, or WebP up to 2 MB. Automatically resized to a thumbnail.
+            JPEG, PNG, or WebP up to 2 MB, resized to a thumbnail. GIF files up
+            to 2 MB keep their animation at their original size.
           </p>
         </div>
       </div>
@@ -218,7 +219,7 @@ function ProjectScreenshotControl({
       <input
         ref={fileInput}
         type="file"
-        accept={AVATAR_ACCEPT}
+        accept={SCREENSHOT_ACCEPT}
         className="hidden"
         onChange={onFileChange}
       />
