@@ -913,7 +913,7 @@ test("unchanged project details produce helpful feedback without a mutation", ()
   );
   assert.equal(
     PROJECT_NO_CHANGES_MESSAGE,
-    "Project details are unchanged. Screenshot uploads save immediately."
+    "No field changes to save. Screenshot uploads and removals save to your draft immediately."
   );
 });
 

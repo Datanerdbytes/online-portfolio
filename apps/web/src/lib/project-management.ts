@@ -16,7 +16,7 @@ type WritableProjectFields = Pick<
 >;
 
 export const PROJECT_NO_CHANGES_MESSAGE =
-  "Project details are unchanged. Screenshot uploads save immediately.";
+  "No field changes to save. Screenshot uploads and removals save to your draft immediately.";
 
 export function projectUpdateBody(
   writable: WritableProjectFields,
