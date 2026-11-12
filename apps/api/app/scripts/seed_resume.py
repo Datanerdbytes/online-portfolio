@@ -23,7 +23,6 @@ from app.db.tenant import TenantSession
 from app.models.owner import LEGACY_OWNER_ID
 from app.models.resume import (
     Contact,
-    ContactLink,
     Education,
     Experience,
     ExperienceHighlight,
@@ -307,23 +306,6 @@ def seed():
         if not existing_contact:
             contact = Contact(phone="+63 923-456-8257", email="roel.somido@icloud.com")
             session.add(contact)
-            session.flush()
-            session.add(
-                ContactLink(
-                    contact_id=contact.id,
-                    label="GitHub",
-                    url="https://github.com/Datanerdbytes",
-                    display_order=0,
-                )
-            )
-            session.add(
-                ContactLink(
-                    contact_id=contact.id,
-                    label="Tableau Public",
-                    url="https://public.tableau.com/app/profile/roel.somido/vizzes",
-                    display_order=1,
-                )
-            )
             print("  ✓ Contact seeded")
         else:
             print("  - Contact already exists, skipping")

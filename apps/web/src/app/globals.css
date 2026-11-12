@@ -447,11 +447,6 @@ button {
   color: hsl(var(--foreground));
 }
 
-.masthead-social-link.is-placeholder {
-  border-style: dashed;
-  opacity: 0.6;
-}
-
 .masthead-social-mark {
   display: block;
   width: 16px;
@@ -1421,6 +1416,14 @@ button {
   gap: 6px;
 }
 
+.footer-socials {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .footer-name {
   font-family: var(--font-display);
   font-size: 26px;
@@ -1435,6 +1438,9 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 22px;
+  /* Center the links row against the brand column so the meta text (also
+     centered) shares its baseline. */
+  align-self: center;
 }
 
 .footer-links a {
@@ -1460,6 +1466,9 @@ button {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-align: right;
+  /* Center the meta against the links row: the links are vertically centered
+     inside 44px touch targets, so a top-aligned meta floated visibly higher. */
+  align-self: center;
 }
 
 .system-status {
@@ -2685,8 +2694,15 @@ button {
     flex-direction: column;
   }
 
+  .footer-links {
+    align-self: flex-start;
+  }
+
   .footer-meta {
     text-align: left;
+    /* Column layout: keep the meta left with the links, not horizontally
+       centered by the desktop align-self. */
+    align-self: flex-start;
   }
 
   .builder-grid,

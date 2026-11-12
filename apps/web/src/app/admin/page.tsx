@@ -18,7 +18,7 @@ export default async function WorkspacePage() {
     {
       title: "Introduce yourself",
       detail: "Add your name, headline, and a short introduction.",
-      done: status.profile_complete,
+      state: status.profile_complete ? "Complete" : "To do",
       href: "/admin/resume",
       action: "Edit resume",
     },
@@ -26,14 +26,22 @@ export default async function WorkspacePage() {
       title: "Tell your story",
       detail:
         "Add experience or a project. You can also add education, skills, and contact details.",
-      done: status.has_work,
+      state: status.has_work ? "Complete" : "Optional",
       href: "/admin/resume?step=projects",
       action: "Edit projects",
     },
     {
+      title: "Connect your socials",
+      detail:
+        "Add Facebook, Instagram, or other profiles. They appear as icons on your live portfolio.",
+      state: "Optional",
+      href: "/admin/resume?step=contact",
+      action: "Edit social links",
+    },
+    {
       title: "Preview and publish",
       detail: "Review your saved draft, publish it, and share your link.",
-      done: status.is_published,
+      state: status.is_published ? "Complete" : "To do",
       href: "/admin/preview",
       action: "Preview portfolio",
     },
@@ -75,16 +83,13 @@ export default async function WorkspacePage() {
           Already have a resume? Import it into your draft
         </Link>
       </p>
-      <ol className="grid gap-4 sm:grid-cols-3">
-        {steps.map((step, index) => (
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((step) => (
           <li
             key={step.title}
             className="flex flex-col gap-3 rounded-xl border bg-card p-5"
           >
-            <p className="text-sm text-muted-foreground">
-              Step {index + 1} ·{" "}
-              {step.done ? "Complete" : index === 1 ? "Optional" : "To do"}
-            </p>
+            <p className="text-sm text-muted-foreground">{step.state}</p>
             <h2 className="text-xl font-semibold">{step.title}</h2>
             <p className="grow text-sm text-muted-foreground">{step.detail}</p>
             <Link
