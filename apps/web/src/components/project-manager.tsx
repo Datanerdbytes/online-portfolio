@@ -113,7 +113,9 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
         name: file.name,
         updatedAt: updated.screenshot_updated_at,
       });
-      setMessage("Screenshot saved to your draft.");
+      setMessage(
+        "Screenshot saved to your draft. Publish to update the public projects page."
+      );
     } catch (error) {
       setIsError(true);
       setMessage(
@@ -130,7 +132,9 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
     try {
       await remove.mutateAsync(project.slug);
       setUploadedFile(null);
-      setMessage("Project screenshot removed.");
+      setMessage(
+        "Project screenshot removed from your draft. Publish to update the public projects page."
+      );
       setConfirmRemove(false);
     } catch (error) {
       setIsError(true);
@@ -144,8 +148,12 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
     <div className="space-y-3 rounded-md border p-4">
       <h3 className="text-sm font-semibold">Project screenshot</h3>
       <p className="text-sm text-muted-foreground">
-        Screenshot uploads save automatically. Use Save project details for the
-        fields below.
+        Screenshot uploads save automatically to your draft. Use Save project
+        details for the fields below, then{" "}
+        <Link href="/admin/preview" className="underline underline-offset-4">
+          preview and publish
+        </Link>{" "}
+        to update the public projects page.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="relative h-20 w-32 shrink-0 overflow-hidden rounded-md border bg-muted">
@@ -401,7 +409,9 @@ export function ProjectManager({
           onSuccess: () => {
             setMode("list");
             setEditing(null);
-            setSuccess("Project draft saved.");
+            setSuccess(
+              "Project draft saved. Publish to update your public portfolio."
+            );
           },
           onError: (err) => {
             const error = err as ApiError;
@@ -417,7 +427,9 @@ export function ProjectManager({
           onSuccess: () => {
             setMode("list");
             setValues(blank());
-            setSuccess("Project created.");
+            setSuccess(
+              "Project created in your draft. Publish to update your public portfolio."
+            );
           },
           onError: (err) => {
             const error = err as ApiError;
@@ -1035,7 +1047,9 @@ export function ProjectManager({
                 onSuccess: () => {
                   deleteTrigger.current = null;
                   setDeleteTarget(null);
-                  setSuccess("Project deleted.");
+                  setSuccess(
+                    "Project deleted from your draft. Publish to update your public portfolio."
+                  );
                 },
                 onError: (err) => {
                   const error = err as ApiError;
