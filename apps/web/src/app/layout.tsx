@@ -4,7 +4,7 @@ import Script from "next/script";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { Header } from "@/components/header";
-import { SocialLinks } from "@/components/social-links";
+import { SocialGradientDefs, SocialLinks } from "@/components/social-links";
 import { isAbsoluteHttpUrl } from "@/lib/resume";
 import { getAboutState, getContactState } from "@/lib/resume-server";
 import "./globals.css";
@@ -62,6 +62,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body>
+        <SocialGradientDefs />
         <Script
           id="theme-init"
           strategy="afterInteractive"
