@@ -25,10 +25,10 @@ export default async function WorkspacePage() {
     {
       title: "Tell your story",
       detail:
-        "Add experience or a project. You can also add education, skills, and contact details.",
+        "Add experience, education, skills, or a project — in whatever order suits you.",
       state: status.has_work ? "Complete" : "Optional",
-      href: "/admin/resume?step=projects",
-      action: "Edit projects",
+      href: "/admin/resume?step=experience",
+      action: "Edit experience",
     },
     {
       title: "Connect your socials",

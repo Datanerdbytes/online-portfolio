@@ -227,6 +227,62 @@ export async function updateExperience(
   return result as ApiExperience;
 }
 
+// Experience highlights live on separate endpoints: create accepts them in
+// the entry payload, but edits add/patch/delete one bullet at a time.
+export async function addExperienceHighlight(
+  expId: number,
+  body: { text: string; display_order?: number }
+): Promise<unknown> {
+  return resumePost(`/resume/experience/${expId}/highlights`, body);
+}
+
+export async function updateExperienceHighlight(
+  id: number,
+  body: { text?: string; display_order?: number }
+): Promise<unknown> {
+  return resumePatch(`/resume/experience/highlights/${id}`, body);
+}
+
+export async function deleteExperienceHighlight(id: number): Promise<void> {
+  await resumeDelete(`/resume/experience/highlights/${id}`);
+}
+
+export function useAddExperienceHighlight() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      expId,
+      body,
+    }: {
+      expId: number;
+      body: { text: string; display_order?: number };
+    }) => addExperienceHighlight(expId, body),
+    onSuccess: () => refreshResume(queryClient),
+  });
+}
+
+export function useUpdateExperienceHighlight() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: number;
+      body: { text?: string; display_order?: number };
+    }) => updateExperienceHighlight(id, body),
+    onSuccess: () => refreshResume(queryClient),
+  });
+}
+
+export function useDeleteExperienceHighlight() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteExperienceHighlight(id),
+    onSuccess: () => refreshResume(queryClient),
+  });
+}
+
 export async function deleteExperience(id: number): Promise<void> {
   await resumeDelete(`/resume/experience/${id}`);
 }
@@ -293,6 +349,12 @@ export function useResume(options?: { initialData?: ApiResume }) {
   });
 }
 
+function invalidatePublicationStatus(
+  queryClient: ReturnType<typeof useQueryClient>
+) {
+  queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
+}
+
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -302,6 +364,7 @@ export function useUpdateProfile() {
         RESUME_QUERY_KEY,
         (old: ApiResume | undefined) => ({ ...old, profile: data })
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -319,6 +382,7 @@ export function useAddSkillGroup() {
           skills: [...(old?.skills ?? []), data],
         })
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -338,6 +402,7 @@ export function useUpdateSkillGroup() {
           return { ...old, skills };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -358,6 +423,7 @@ export function useUpdateSkillItem() {
           return { ...old, skills };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -374,6 +440,7 @@ export function useDeleteSkillGroup() {
           return { ...old, skills };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -393,6 +460,7 @@ export function useDeleteSkillItem() {
           return { ...old, skills };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -425,6 +493,7 @@ export function useAddSkillItem() {
           return { ...old, skills };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -444,6 +513,7 @@ export function useUpdateExperience() {
           return { ...old, experience };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -462,6 +532,7 @@ export function useDeleteExperience() {
           return { ...old, experience };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -478,6 +549,7 @@ export function useAddExperience() {
           experience: [...(old?.experience ?? []), data],
         })
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -497,6 +569,7 @@ export function useUpdateEducation() {
           return { ...old, education };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -515,6 +588,7 @@ export function useDeleteEducation() {
           return { ...old, education };
         }
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -531,6 +605,7 @@ export function useAddEducation() {
           education: [...(old?.education ?? []), data],
         })
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -960,6 +1035,7 @@ export function useUploadProfileImage(kind: ProfileImageKind) {
         })
       );
       queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -977,6 +1053,7 @@ export function useRemoveProfileImage(kind: ProfileImageKind) {
         })
       );
       queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
@@ -993,12 +1070,14 @@ export function useUpdateContact() {
           contact: data,
         })
       );
+      invalidatePublicationStatus(queryClient);
     },
   });
 }
 
 function refreshResume(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: RESUME_QUERY_KEY });
+  queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
 }
 
 export function useAddContactLink() {

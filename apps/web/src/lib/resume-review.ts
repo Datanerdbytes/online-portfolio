@@ -122,6 +122,39 @@ export function skipMatchedReview(review: Review): Review {
   return review.target == null ? review : { ...review, active: false };
 }
 
+// Month validation shared by import review and the manual editors, so both
+// paths enforce the same stored `YYYY-MM` rules with the same wording.
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+export function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+export function dateProblems(
+  values: { started?: string | null; ended?: string | null; current?: boolean },
+  section: Section
+): string[] {
+  const problems: string[] = [];
+  for (const key of ["started", "ended"] as const) {
+    const raw = values[key];
+    if (raw && !MONTH_PATTERN.test(raw))
+      problems.push(
+        `${label(key)} needs a complete YYYY-MM date; do not guess.`
+      );
+  }
+  if (section === "experience" && !values.current && !values.ended)
+    problems.push(
+      "Supply an end date or explicitly mark this role as current."
+    );
+  if (
+    values.started &&
+    values.ended &&
+    String(values.ended) < String(values.started)
+  )
+    problems.push("End date must follow start date.");
+  return problems;
+}
+
 export function issues(review: Review, context: ImportContext): string[] {
   if (!review.active || !Object.keys(selectedValues(review)).length) return [];
   const value = merged(review, context);
@@ -129,22 +162,8 @@ export function issues(review: Review, context: ImportContext): string[] {
   const problems = required[section]
     .filter((k) => !display(value[k]).trim())
     .map((k) => `${label(k)} is required for this entry.`);
-  for (const key of ["started", "ended"])
-    if (value[key] && !/^\d{4}-(0[1-9]|1[0-2])$/.test(String(value[key])))
-      problems.push(
-        `${label(key)} needs a complete YYYY-MM date; do not guess.`
-      );
-  if (section === "experience" && !value.current && !value.ended)
-    problems.push(
-      "Supply an end date or explicitly mark this role as current."
-    );
-  if (
-    value.started &&
-    value.ended &&
-    String(value.ended) < String(value.started)
-  )
-    problems.push("End date must follow start date.");
-  if (value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value.email)))
+  problems.push(...dateProblems(value, section));
+  if (value.email && !isValidEmail(String(value.email)))
     problems.push("Check this email address.");
   for (const key of ["url", "repository_url", "demo_url"])
     if (value[key]) {

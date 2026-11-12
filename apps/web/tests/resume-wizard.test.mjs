@@ -26,15 +26,15 @@ function compile(path, globals = {}) {
 
 const wizard = compile("lib/resume-wizard");
 
-test("steps keep the agreed seven-page order", () => {
+test("steps follow the resume-authoring order", () => {
   assert.deepEqual(
     [...wizard.STEPS],
     [
       "profile",
-      "skills",
-      "projects",
       "experience",
       "education",
+      "skills",
+      "projects",
       "contact",
       "review",
     ]

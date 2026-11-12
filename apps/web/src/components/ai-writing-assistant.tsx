@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { fetchOwnerId } from "@/lib/owner";
 import type { Section } from "@/lib/resume-import";
 
 export const writingLimits: Partial<Record<Section, Record<string, number>>> = {
@@ -21,7 +22,8 @@ export function AiWritingAssistant({
 }: {
   section: Section;
   field: string;
-  ownerId: string;
+  /** Owner id when already known; resolved lazily when null. */
+  ownerId: string | null;
   currentText: string;
   facts: string;
   disabled: boolean;
@@ -57,6 +59,12 @@ export function AiWritingAssistant({
     setPending(true);
     setError("");
     try {
+      const owner = ownerId ?? (await fetchOwnerId());
+      if (!owner) {
+        throw new Error(
+          "AI writing is unavailable right now. Your text is unchanged."
+        );
+      }
       const response = await fetch("/api/resume-import/write", {
         method: "POST",
         cache: "no-store",
@@ -67,7 +75,7 @@ export function AiWritingAssistant({
         },
         body: JSON.stringify({
           consent: true,
-          expected_owner_id: ownerId,
+          expected_owner_id: owner,
           section,
           field,
           facts,
@@ -215,5 +223,48 @@ export function AiWritingAssistant({
         </div>
       )}
     </aside>
+  );
+}
+
+/**
+ * Manual-mode affordance for the five writing-supported fields: the same
+ * assistant the import review offers, rendered as a collapsible block under
+ * the field. Renders nothing for fields the writing endpoint does not cover.
+ */
+export function FieldAiWriting({
+  section,
+  field,
+  ownerId,
+  currentText,
+  facts,
+  disabled = false,
+  onUse,
+}: {
+  section: Section;
+  field: string;
+  ownerId: string | null;
+  currentText: string;
+  facts: string;
+  disabled?: boolean;
+  onUse: (text: string) => void;
+}) {
+  if (!writingLimits[section]?.[field]) return null;
+  return (
+    <details className="text-sm">
+      <summary className="min-h-8 w-fit cursor-pointer rounded underline underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4">
+        Draft this with AI
+      </summary>
+      <div className="pt-2">
+        <AiWritingAssistant
+          section={section}
+          field={field}
+          ownerId={ownerId ?? ""}
+          currentText={currentText}
+          facts={facts}
+          disabled={disabled}
+          onUse={onUse}
+        />
+      </div>
+    </details>
   );
 }
