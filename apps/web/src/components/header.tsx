@@ -55,18 +55,45 @@ export function Header({
 
   useEffect(() => {
     if (pathname !== "/") return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting);
-        if (visible.length) setActive(visible[0].target.id);
-      },
-      { rootMargin: "-15% 0px -55% 0px" }
-    );
-    navigation.forEach(({ id }) => {
-      const section = document.getElementById(id);
-      if (section) observer.observe(section);
-    });
-    return () => observer.disconnect();
+
+    // The homepage streams its sections (Suspense fallbacks swap in streamed
+    // content after mount), so a node reference captured once can end up
+    // detached. Resolve the sections by id on every update instead.
+    const lastId = navigation[navigation.length - 1].id;
+    let frame = 0;
+
+    function update() {
+      frame = 0;
+      const probe = window.innerHeight * 0.4;
+      let current = "about";
+      for (const { id } of navigation) {
+        if (id === "resume") continue; // separate page, no homepage section
+        const section = document.getElementById(id);
+        if (!section) continue;
+        if (section.getBoundingClientRect().top <= probe) current = id;
+      }
+      const documentElement = document.documentElement;
+      if (
+        window.innerHeight + window.scrollY >=
+        documentElement.scrollHeight - 1
+      ) {
+        current = lastId;
+      }
+      setActive(current);
+    }
+
+    function schedule() {
+      if (!frame) frame = requestAnimationFrame(update);
+    }
+
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
   }, [pathname]);
 
   function isCurrent(id: string) {
