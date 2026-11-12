@@ -10,12 +10,15 @@ import { Card } from "@/components/ui/card";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProjectSaveButton } from "@/components/project-save-button";
+import { PublishChangesButton } from "@/components/publish-changes-button";
 import { Spinner } from "@/components/ui/spinner";
 import type { Project } from "@/lib/api";
 import {
   useCreateProject,
   useDeleteProject,
+  usePortfolioStatus,
   useProjects,
+  usePublishPortfolio,
   useReorderProjects,
   useUpdateProject,
   useUploadProjectScreenshot,
@@ -271,6 +274,8 @@ export function ProjectManager({
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
   const reorderMutation = useReorderProjects();
+  const portfolioStatus = usePortfolioStatus();
+  const publishMutation = usePublishPortfolio();
   const pending =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -431,6 +436,25 @@ export function ProjectManager({
       },
       onError: (err) => {
         const error = err as ApiError;
+        setAuthError(error.status === 401 || error.status === 403);
+        setError(error.message);
+      },
+    });
+  }
+  function publishChanges() {
+    if (pending || publishMutation.isPending) return;
+    const status = portfolioStatus.data;
+    if (!status) return;
+    clearMessages();
+    publishMutation.mutate(status.revision, {
+      onSuccess: () => {
+        setSuccess("Changes published. Your public portfolio is up to date.");
+      },
+      onError: (err) => {
+        const error = err as ApiError;
+        // A stale revision is recoverable: refetching loads the revision the
+        // backend expects, so the next attempt can succeed.
+        if (error.status === 409) void portfolioStatus.refetch();
         setAuthError(error.status === 401 || error.status === 403);
         setError(error.message);
       },
@@ -965,6 +989,12 @@ export function ProjectManager({
                 >
                   {reorderMutation.isPending ? "Saving order…" : "Save order"}
                 </Button>
+                <PublishChangesButton
+                  status={portfolioStatus.data ?? null}
+                  publishing={publishMutation.isPending}
+                  disabled={pending || Boolean(deleteTarget)}
+                  onPublish={publishChanges}
+                />
               </div>
             </div>
           </div>

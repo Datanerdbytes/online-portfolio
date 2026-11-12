@@ -49,6 +49,7 @@ function harness(options = {}) {
           if (id === "react") return { useRef: (current) => ({ current }) };
           if (id === "@/lib/project-management")
             return load("lib/project-management");
+          if (id === "@/lib/portfolio") return load("lib/portfolio");
           if (id === "@/lib/avatar")
             return {
               AVATAR_PATH: "/api/resume/profile/avatar",
@@ -235,6 +236,99 @@ test("removeProjectScreenshot uses DELETE and requires an empty 204 response", a
   await h.load("lib/project-queries").removeProjectScreenshot("resume-site");
   assert.equal(captured.url, "/api/projects/resume-site/screenshot");
   assert.equal(captured.init.method, "DELETE");
+});
+
+function portfolioStatus() {
+  return {
+    owner_id: "owner-1",
+    is_published: true,
+    has_unpublished_changes: false,
+    revision: 4,
+    published_at: "2026-11-12T00:00:00.000Z",
+    profile_complete: true,
+    has_work: true,
+  };
+}
+
+test("publish forwards the saved revision and validates the returned status", async () => {
+  const h = harness();
+  let captured;
+  h.setFetch(async (url, init) => {
+    captured = { url, init };
+    return Response.json(portfolioStatus());
+  });
+  const result = await h
+    .load("lib/project-queries")
+    .publishPortfolioRevision(3);
+  assert.equal(captured.url, "/api/portfolio/publish");
+  assert.equal(captured.init.method, "POST");
+  assert.deepEqual(JSON.parse(captured.init.body), { revision: 3 });
+  assert.equal(
+    captured.init.headers["X-Requested-With"],
+    "online-resume-admin"
+  );
+  assert.deepEqual(result, portfolioStatus());
+});
+
+test("publication errors stay sanitized and map to retryable guidance", async () => {
+  const h = harness();
+  h.setFetch(
+    async () =>
+      new Response(JSON.stringify({ detail: "raw backend detail" }), {
+        status: 409,
+        headers: new Headers({ "content-type": "application/json" }),
+      })
+  );
+  const { publishPortfolioRevision } = h.load("lib/project-queries");
+  await assert.rejects(
+    publishPortfolioRevision(3),
+    (error) =>
+      error.status === 409 &&
+      error.message ===
+        "Your draft changed while publishing. Try again to publish the latest saved version."
+  );
+
+  const outage = harness();
+  outage.setFetch(async () => {
+    throw new Error("upstream unavailable");
+  });
+  const { publishPortfolioRevision: publishThroughOutage } = outage.load(
+    "lib/project-queries"
+  );
+  await assert.rejects(
+    publishThroughOutage(3),
+    (error) => error.status === 502
+  );
+});
+
+test("the publication status read validates the payload and maps auth failures", async () => {
+  const h = harness();
+  let captured;
+  h.setFetch(async (url, init) => {
+    captured = { url, init };
+    return Response.json({ unexpected: true });
+  });
+  const { fetchPortfolioStatus } = h.load("lib/project-queries");
+  await assert.rejects(
+    fetchPortfolioStatus(),
+    (error) =>
+      error.status === 502 && error.message === "Invalid publication status"
+  );
+  assert.equal(captured.url, "/api/portfolio");
+  assert.equal(captured.init.method, "GET");
+
+  const unauthorized = harness();
+  unauthorized.setFetch(async () => new Response(null, { status: 401 }));
+  const { fetchPortfolioStatus: fetchWhileSignedOut } = unauthorized.load(
+    "lib/project-queries"
+  );
+  await assert.rejects(
+    fetchWhileSignedOut(),
+    (error) =>
+      error.status === 401 &&
+      error.message ===
+        "Your session could not be verified. Sign in in another tab, then retry here."
+  );
 });
 
 test("addSkillItem forwards its stable idempotency key", async () => {
