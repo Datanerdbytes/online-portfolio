@@ -15,7 +15,6 @@ const navigation = [
   { id: "projects", label: "Work", href: "/projects" },
   { id: "experience", label: "Experience", href: "/experience" },
   { id: "education", label: "Education", href: "/education" },
-  { id: "resume", label: "Resume", href: "/resume" },
   { id: "contact", label: "Contact", href: "/contact" },
 ];
 
@@ -67,7 +66,6 @@ export function Header({
       const probe = window.innerHeight * 0.4;
       let current = "about";
       for (const { id } of navigation) {
-        if (id === "resume") continue; // separate page, no homepage section
         const section = document.getElementById(id);
         if (!section) continue;
         if (section.getBoundingClientRect().top <= probe) current = id;
@@ -97,7 +95,6 @@ export function Header({
   }, [pathname]);
 
   function isCurrent(id: string) {
-    if (id === "resume") return pathname === "/resume";
     if (pathname === "/") return active === id;
     return pathname === `/${id}`;
   }
