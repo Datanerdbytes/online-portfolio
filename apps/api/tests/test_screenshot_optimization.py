@@ -51,53 +51,193 @@ MAX_BYTES = 2_000
 GENEROUS_MAX_BYTES = 10_000_000
 
 
-def _gif(*, animated: bool = True) -> bytes:
-    frame = Image.new("P", (8, 8), "navy")
+def _gif(*, animated: bool = True, size: tuple[int, int] = (8, 8), frames: int = 3) -> bytes:
+    # Distinct palette indices per frame: Pillow's GIF encoder collapses
+    # identical frames, so a shared image object would produce one frame.
+    frames_images = [Image.new("P", size, (i * 20, 10, 90)) for i in range(frames)]
     buffer = BytesIO()
     if animated:
-        frame.save(buffer, format="GIF", save_all=True, append_images=[frame, frame], duration=100)
+        frames_images[0].save(
+            buffer,
+            format="GIF",
+            save_all=True,
+            append_images=frames_images[1:],
+            duration=[100, 200, 300, 400, 500][:frames],
+            loop=0,
+        )
     else:
-        frame.save(buffer, format="GIF")
+        frames_images[0].save(buffer, format="GIF")
     return buffer.getvalue()
 
 
-def test_prepare_returns_declared_gif_verbatim_even_when_animated():
-    payload = _gif()
+def _frame_durations(output) -> list:
+    durations = []
+    for index in range(output.n_frames):
+        output.seek(index)
+        output.load()
+        durations.append(output.info["duration"])
+    return durations
+
+
+def test_prepare_transcodes_animated_gif_to_animated_webp():
+    payload = _gif(frames=3)
     detected, stored = screenshots.prepare_screenshot_upload(
         declared_content_type="image/gif",
         declared_size=len(payload),
         data=payload,
-        max_bytes=MAX_BYTES,
+        max_bytes=GENEROUS_MAX_BYTES,
     )
 
-    assert detected == "image/gif"
-    assert stored == payload
+    assert detected == "image/webp"
+    with Image.open(BytesIO(stored)) as output:
+        assert output.format == "WEBP"
+        assert output.is_animated
+        assert output.n_frames == 3
+        assert _frame_durations(output) == [100, 200, 300]
+        assert output.info["loop"] == 0
 
 
-def test_prepare_stores_single_frame_gif_verbatim_too():
+def test_prepare_transcodes_static_gif_to_single_frame_webp():
     payload = _gif(animated=False)
     detected, stored = screenshots.prepare_screenshot_upload(
         declared_content_type="image/gif",
         declared_size=None,
         data=payload,
-        max_bytes=MAX_BYTES,
+        max_bytes=GENEROUS_MAX_BYTES,
     )
 
-    assert detected == "image/gif"
-    assert stored == payload
+    assert detected == "image/webp"
+    with Image.open(BytesIO(stored)) as output:
+        assert output.format == "WEBP"
+        assert not output.is_animated
 
 
-def test_prepare_strips_content_type_parameters_from_gif_declaration():
+def test_prepare_transcodes_gif_declared_with_content_type_parameters():
     payload = _gif()
     detected, stored = screenshots.prepare_screenshot_upload(
         declared_content_type="image/gif; charset=binary",
         declared_size=None,
         data=payload,
-        max_bytes=MAX_BYTES,
+        max_bytes=GENEROUS_MAX_BYTES,
     )
 
-    assert detected == "image/gif"
-    assert stored == payload
+    assert detected == "image/webp"
+    assert stored
+
+
+def test_gif_transcode_never_upscales_and_downsizes_large_frames():
+    detected, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=None,
+        data=_gif(size=(800, 450)),
+        max_bytes=GENEROUS_MAX_BYTES,
+    )
+
+    assert detected == "image/webp"
+    with Image.open(BytesIO(stored)) as output:
+        assert output.size == (400, 225)
+
+    _, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=None,
+        data=_gif(size=(246, 126)),
+        max_bytes=GENEROUS_MAX_BYTES,
+    )
+    with Image.open(BytesIO(stored)) as output:
+        assert output.size == (246, 126)
+
+
+def test_gif_transcode_samples_frames_and_preserves_total_duration(monkeypatch):
+    # The source is five frames at 100-500ms (1500ms total). Keeping two evenly
+    # spaced frames must merge each dropped frame's duration into the span of
+    # the kept frame that follows it, preserving the loop's total duration.
+    payload = _gif(frames=5)
+    monkeypatch.setattr(screenshots, "MAX_ANIMATED_FRAMES", 2)
+
+    detected, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=None,
+        data=payload,
+        max_bytes=GENEROUS_MAX_BYTES,
+    )
+
+    assert detected == "image/webp"
+    with Image.open(BytesIO(stored)) as output:
+        assert output.n_frames == 2
+        durations = _frame_durations(output)
+        assert durations == [600, 900]
+        assert sum(durations) == 1500
+
+
+def test_gif_transcode_without_loop_block_plays_once():
+    frames_images = [Image.new("P", (8, 8), (i * 20, 10, 90)) for i in range(2)]
+    buffer = BytesIO()
+    frames_images[0].save(
+        buffer, format="GIF", save_all=True, append_images=frames_images[1:], duration=100
+    )
+    detected, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=None,
+        data=buffer.getvalue(),
+        max_bytes=GENEROUS_MAX_BYTES,
+    )
+
+    assert detected == "image/webp"
+    with Image.open(BytesIO(stored)) as output:
+        assert output.info["loop"] == 1
+
+
+def test_gif_transcode_rejects_oversized_canvas(monkeypatch):
+    monkeypatch.setattr(screenshots, "MAX_SCREENSHOT_PIXELS", 100)
+    with pytest.raises(screenshots.InvalidScreenshot):
+        screenshots.prepare_screenshot_upload(
+            declared_content_type="image/gif",
+            declared_size=None,
+            data=_gif(size=(16, 16)),
+            max_bytes=GENEROUS_MAX_BYTES,
+        )
+
+
+def test_gif_transcode_rejects_malformed_payload():
+    with pytest.raises(screenshots.InvalidScreenshot):
+        screenshots.prepare_screenshot_upload(
+            declared_content_type="image/gif",
+            declared_size=None,
+            data=b"GIF89a" + b"\x00" * 32,
+            max_bytes=GENEROUS_MAX_BYTES,
+        )
+
+
+def test_gif_transcode_falls_back_to_fewer_frames_for_the_size_budget():
+    from app.core.image_processing import optimize_animated_gif
+
+    payload = _gif(frames=3)
+    first_tier = optimize_animated_gif(
+        payload,
+        max_edge=screenshots.MAX_SCREENSHOT_EDGE,
+        max_pixels=screenshots.MAX_SCREENSHOT_PIXELS,
+        max_frames=screenshots.MAX_ANIMATED_FRAMES,
+        quality=screenshots.ANIMATED_QUALITY,
+    )
+    # A budget just under the first tier's output must switch to the fallback
+    # tier (fewer frames, lower quality) instead of rejecting the upload.
+    detected, stored = screenshots.prepare_screenshot_upload(
+        declared_content_type="image/gif",
+        declared_size=None,
+        data=payload,
+        max_bytes=len(first_tier) - 1,
+    )
+
+    assert detected == "image/webp"
+    assert len(stored) <= len(first_tier) - 1
+
+
+def test_gif_transcode_rejects_when_no_tier_fits_the_budget():
+    payload = _gif(frames=3)
+    with pytest.raises(screenshots.AvatarValidationError) as raised:
+        screenshots._transcode_gif(payload, max_bytes=0)
+    assert raised.value.detail == "Screenshot too large"
+    assert raised.value.status_code == 413
 
 
 def test_prepare_rejects_gif_declaration_without_gif_bytes():

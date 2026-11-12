@@ -172,14 +172,17 @@ Project screenshots are decoded on upload, oriented, and resized to fit within
 400 × 400 pixels without stretching, cropping, or enlarging small images. They
 are stored as WebP at quality 80 without source metadata. Uploads accept JPEG,
 PNG, or WebP up to 2 MiB; screenshots above 20 million pixels are rejected.
-GIF uploads are verified against their magic bytes and the same 2 MiB limit,
-then stored verbatim instead of re-encoded: re-encoding frame by frame would
-risk the animation and its timing. GIF dimensions are not resized; project
-cards scale them with CSS. Profile photos use the same processing with a
-512 × 512 bound and do not accept GIFs; hero banners use a 1200 × 1200 bound.
-Both use WebP quality 85. Proportions are preserved without upscaling, and the
-frontend's existing crops still control the displayed shape. The same 2 MiB
-upload and 20-million-pixel input limits apply to all three types.
+GIF uploads are verified against their magic bytes and the same 2 MiB input
+limit, then transcoded into an animated WebP thumbnail: every frame is
+re-encoded at ≤400 px on the long edge (never upscaled), the loop count and
+per-frame timing are preserved, and recordings longer than 120 frames keep
+evenly spaced frames whose durations absorb the dropped ones. If the encoded
+animation exceeds 2 MiB, a second tier halves the frame rate and quality
+before the upload is rejected with 413. Profile photos use the same processing
+with a 512 × 512 bound and do not accept GIFs; hero banners use a 1200 × 1200
+bound. Both use WebP quality 85. Proportions are preserved without upscaling,
+and the frontend's existing crops still control the displayed shape. The same
+2 MiB upload and 20-million-pixel input limits apply to all three types.
 
 To convert existing screenshots, run from `apps/api` with the intended database
 and media settings configured. Preview first; applying requires a new backup

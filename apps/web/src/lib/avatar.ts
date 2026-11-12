@@ -21,8 +21,10 @@ export const AVATAR_CONTENT_TYPES = [
 export const AVATAR_ACCEPT = "image/jpeg,image/png,image/webp";
 
 /**
- * Project screenshots additionally accept GIFs, which the API stores verbatim
- * so their animation survives. Raster images are resized to a thumbnail.
+ * Project screenshots additionally accept GIFs, which the API converts into a
+ * bounded animated WebP thumbnail (frames sampled, loop and timing kept) so
+ * the animation survives without oversized files. Raster images are resized
+ * to a static thumbnail.
  */
 export const SCREENSHOT_CONTENT_TYPES = [
   ...AVATAR_CONTENT_TYPES,
