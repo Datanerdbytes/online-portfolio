@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { ProjectSaveButton } from "@/components/project-save-button";
 import type { Project } from "@/lib/api";
 import {
   useCreateProject,
@@ -73,7 +74,17 @@ function valuesFor(project: Project): Values {
   };
 }
 
-function ProjectScreenshotControl({ project }: { project: Project }) {
+function ProjectScreenshotControl({
+  project,
+  disabled,
+  onBusyChange,
+}: {
+  project: Project;
+  /** True while the surrounding form is saving, so uploads must not overlap. */
+  disabled: boolean;
+  /** Reports whether a screenshot write is in flight to the parent form. */
+  onBusyChange: (busy: boolean) => void;
+}) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -85,6 +96,10 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
   const upload = useUploadProjectScreenshot();
   const remove = useRemoveProjectScreenshot();
   const busy = upload.isPending || remove.isPending;
+  useEffect(() => {
+    onBusyChange(busy);
+    return () => onBusyChange(false);
+  }, [busy, onBusyChange]);
   const imageSrc = profileImageUrl(
     project.screenshot_url,
     project.screenshot_updated_at,
@@ -180,7 +195,7 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
             <Button
               type="button"
               onClick={() => fileInput.current?.click()}
-              disabled={busy}
+              disabled={busy || disabled}
             >
               {busy
                 ? "Uploading…"
@@ -193,7 +208,7 @@ function ProjectScreenshotControl({ project }: { project: Project }) {
                 type="button"
                 variant="outline"
                 onClick={() => setConfirmRemove(true)}
-                disabled={busy}
+                disabled={busy || disabled}
               >
                 Remove screenshot
               </Button>
@@ -277,12 +292,23 @@ export function ProjectManager({
     updateMutation.isPending ||
     deleteMutation.isPending ||
     reorderMutation.isPending;
+  // The submit button reports only its own request, so its busy state never
+  // reflects an unrelated delete or reorder that happens to be in flight.
+  const saving = createMutation.isPending || updateMutation.isPending;
+  // Screenshot uploads and removals write the same project row, so they must
+  // not overlap the form save in either direction.
+  const [screenshotBusy, setScreenshotBusy] = useState(false);
+  const formBusy = saving || screenshotBusy;
+  const onScreenshotBusy = useCallback((busy: boolean) => {
+    setScreenshotBusy(busy);
+  }, []);
   const dialog = useRef<HTMLDialogElement>(null);
   const cancelDelete = useRef<HTMLButtonElement>(null);
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const addButton = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const previousMode = useRef(mode);
+  const submitting = useRef(false);
 
   const clearMessages = useCallback(() => {
     setError("");
@@ -331,7 +357,9 @@ export function ProjectManager({
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    // The ref flips synchronously, so a fast second submit cannot slip through
+    // the gap before React re-renders with the pending flag.
+    if (submitting.current || pending) return;
     clearMessages();
     const title = values.title.trim(),
       summary = values.summary.trim();
@@ -403,10 +431,12 @@ export function ProjectManager({
         setSuccess(PROJECT_NO_CHANGES_MESSAGE);
         return;
       }
+      submitting.current = true;
       updateMutation.mutate(
         { slug: editing.slug, body },
         {
           onSuccess: () => {
+            submitting.current = false;
             setMode("list");
             setEditing(null);
             setSuccess(
@@ -414,6 +444,7 @@ export function ProjectManager({
             );
           },
           onError: (err) => {
+            submitting.current = false;
             const error = err as ApiError;
             setAuthError(error.status === 401 || error.status === 403);
             setError(error.message);
@@ -421,10 +452,12 @@ export function ProjectManager({
         }
       );
     } else {
+      submitting.current = true;
       createMutation.mutate(
         { slug: values.slug, ...writable },
         {
           onSuccess: () => {
+            submitting.current = false;
             setMode("list");
             setValues(blank());
             setSuccess(
@@ -432,6 +465,7 @@ export function ProjectManager({
             );
           },
           onError: (err) => {
+            submitting.current = false;
             const error = err as ApiError;
             setAuthError(error.status === 401 || error.status === 403);
             setError(error.message);
@@ -562,6 +596,8 @@ export function ProjectManager({
                 projects.find((project) => project.slug === editing.slug) ??
                 editing
               }
+              disabled={formBusy}
+              onBusyChange={onScreenshotBusy}
             />
           ) : null}
           {mode === "create" ? (
@@ -727,13 +763,11 @@ export function ProjectManager({
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Button type="submit" size="lg" disabled={pending}>
-              {pending
-                ? "Saving…"
-                : mode === "create"
-                  ? "Create project"
-                  : "Save project details"}
-            </Button>
+            <ProjectSaveButton
+              mode={mode === "create" ? "create" : "edit"}
+              saving={saving}
+              disabled={formBusy}
+            />
             <Button
               type="button"
               size="lg"
