@@ -168,6 +168,10 @@ export function ResumeWizard({
 
   const formDirty = () => snapshotOf(container.current) !== baseline.current;
 
+  // The projects step reports its own semantic dirty state; the DOM snapshot
+  // baseline goes stale there whenever the edit form opens or closes.
+  const [projectsDirty, setProjectsDirty] = useState(false);
+
   useEffect(() => {
     baseline.current = snapshotOf(container.current);
   }, [step, flow.saved, resume.dataUpdatedAt]);
@@ -226,14 +230,16 @@ export function ResumeWizard({
 
   function go(next: Step) {
     if (next === step) return;
-    if (
-      !reviewing &&
-      formDirty() &&
-      !window.confirm(
-        "You have unsaved edits on this step. Leave and discard them?"
+    if (!reviewing) {
+      const dirty = step === "projects" ? projectsDirty : formDirty();
+      if (
+        dirty &&
+        !window.confirm(
+          "You have unsaved edits on this step. Leave and discard them?"
+        )
       )
-    )
-      return;
+        return;
+    }
     setStep(next);
     window.history.pushState(null, "", stepHref(next));
     setTimeout(() => stepHeading.current?.focus(), 0);
@@ -521,6 +527,7 @@ export function ResumeWizard({
         initialProjects={initialProjects}
         initialListStatus={initialListStatus}
         headingLevel="h3"
+        onDirtyChange={setProjectsDirty}
       />
     );
   }

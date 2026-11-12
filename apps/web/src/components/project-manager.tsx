@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,15 @@ import { Card } from "@/components/ui/card";
 import { RecordActionButtons } from "@/components/record-action-buttons";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ProjectSaveButton } from "@/components/project-save-button";
+import { PublishChangesButton } from "@/components/publish-changes-button";
+import { Spinner } from "@/components/ui/spinner";
 import type { Project } from "@/lib/api";
 import {
   useCreateProject,
   useDeleteProject,
+  usePortfolioStatus,
   useProjects,
+  usePublishPortfolio,
   useReorderProjects,
   useUpdateProject,
   useUploadProjectScreenshot,
@@ -27,52 +31,22 @@ import {
   validateAvatarFile,
 } from "@/lib/avatar";
 import {
+  blankProjectForm,
   changedOrders,
-  orderedProjects,
-  moveProjectToPosition,
   isSlug,
   MAX_ORDER,
-  formTechnologies,
-  formHighlights,
-  parseOrder,
+  moveProjectToPosition,
+  orderedProjects,
+  parseProjectForm,
+  projectEditsPending,
+  projectFormFor,
   projectUpdateBody,
   PROJECT_NO_CHANGES_MESSAGE,
   safeProjectLink,
+  type ProjectFormValues,
 } from "@/lib/project-management";
 
-type Values = {
-  slug: string;
-  title: string;
-  summary: string;
-  technologies: string;
-  highlights: string;
-  repository_url: string;
-  demo_url: string;
-  display_order: string;
-};
 type Status = "loading" | "ok" | "unavailable";
-const blank = (): Values => ({
-  slug: "",
-  title: "",
-  summary: "",
-  technologies: "",
-  highlights: "",
-  repository_url: "",
-  demo_url: "",
-  display_order: "0",
-});
-function valuesFor(project: Project): Values {
-  return {
-    slug: project.slug,
-    title: project.title,
-    summary: project.summary,
-    technologies: project.technologies.join(", "),
-    highlights: (project.highlights ?? []).join("\n"),
-    repository_url: project.repository_url ?? "",
-    demo_url: project.demo_url ?? "",
-    display_order: String(project.display_order),
-  };
-}
 
 function ProjectScreenshotControl({
   project,
@@ -194,23 +168,33 @@ function ProjectScreenshotControl({
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
+              className="gap-2"
               onClick={() => fileInput.current?.click()}
               disabled={busy || disabled}
             >
-              {busy
-                ? "Uploading…"
-                : imageSrc
-                  ? "Replace screenshot"
-                  : "Upload screenshot"}
+              {upload.isPending ? (
+                <>
+                  <Spinner />
+                  Uploading…
+                </>
+              ) : imageSrc ? (
+                "Replace screenshot"
+              ) : (
+                "Upload screenshot"
+              )}
             </Button>
             {imageSrc ? (
               <Button
                 type="button"
+                size="icon"
                 variant="outline"
+                className="h-11 w-11"
                 onClick={() => setConfirmRemove(true)}
                 disabled={busy || disabled}
+                aria-label="Remove screenshot"
+                title="Remove screenshot"
               >
-                Remove screenshot
+                <Trash2 className="size-4" aria-hidden="true" />
               </Button>
             ) : null}
           </div>
@@ -256,10 +240,13 @@ export function ProjectManager({
   initialProjects,
   initialListStatus = "ok",
   headingLevel = "h2",
+  onDirtyChange,
 }: {
   initialProjects: Project[];
   initialListStatus?: Status;
   headingLevel?: "h2" | "h3";
+  /** Reports whether unsaved edits exist, for the wizard's step-leave guard. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const projectsQuery = useProjects({
     initialData:
@@ -276,7 +263,7 @@ export function ProjectManager({
       : "ok";
   const [mode, setMode] = useState<"list" | "create" | "edit">("list");
   const [editing, setEditing] = useState<Project | null>(null);
-  const [values, setValues] = useState<Values>(blank);
+  const [values, setValues] = useState<ProjectFormValues>(blankProjectForm);
   const [orders, setOrders] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState(false);
@@ -287,6 +274,8 @@ export function ProjectManager({
   const updateMutation = useUpdateProject();
   const deleteMutation = useDeleteProject();
   const reorderMutation = useReorderProjects();
+  const portfolioStatus = usePortfolioStatus();
+  const publishMutation = usePublishPortfolio();
   const pending =
     createMutation.isPending ||
     updateMutation.isPending ||
@@ -361,72 +350,22 @@ export function ProjectManager({
     // the gap before React re-renders with the pending flag.
     if (submitting.current || pending) return;
     clearMessages();
-    const title = values.title.trim(),
-      summary = values.summary.trim();
-    const technologies = formTechnologies(
-      values.technologies,
-      mode === "edit" ? editing?.technologies : undefined
-    );
-    const highlights = formHighlights(
-      values.highlights,
-      mode === "edit" ? editing?.highlights : undefined
-    );
-    const order = parseOrder(values.display_order);
-    const repository = values.repository_url.trim(),
-      demo = values.demo_url.trim();
     if (mode === "create" && !isSlug(values.slug)) {
       setError(
         "Slug must use lowercase letters, numbers, and single hyphens (1–100 characters), with no surrounding spaces."
       );
       return;
     }
-    if (!title || title.length > 200 || !summary || summary.length > 1000) {
-      setError(
-        "Title must contain 1–200 characters and summary 1–1000 characters."
-      );
+    const parsed = parseProjectForm(values, mode === "edit" ? editing : null);
+    if (parsed.values === null) {
+      setError(parsed.error);
       return;
     }
-    if (technologies === null) {
-      setError(
-        "Use 0–20 unique technologies, each 1–50 characters, separated by commas. Leave blank for none."
-      );
-      return;
-    }
-    if (highlights === null) {
-      setError(
-        "Use 0–20 unique highlights, each 1–500 characters, one per line. Leave blank for none."
-      );
-      return;
-    }
-    const repositoryChanged =
-      mode === "create" || repository !== (editing?.repository_url ?? "");
-    const demoChanged = mode === "create" || demo !== (editing?.demo_url ?? "");
-    if (
-      (repositoryChanged && repository && !safeProjectLink(repository)) ||
-      (demoChanged && demo && !safeProjectLink(demo))
-    ) {
-      setError(
-        "URLs must be absolute HTTP(S) URLs of at most 1024 characters, or blank."
-      );
-      return;
-    }
-    if (order === null) {
-      setError(
-        "Sort priority must be a whole number between 0 and 2147483647."
-      );
-      return;
-    }
-    const writable = {
-      title,
-      summary,
-      technologies,
-      highlights,
-      repository_url: repository || null,
-      demo_url: demo || null,
-      display_order: order,
-    };
     if (mode === "edit" && editing) {
-      const body = projectUpdateBody(writable, editing);
+      const body = projectUpdateBody(parsed.values, {
+        ...editing,
+        highlights: editing.highlights ?? [],
+      });
       if (!body) {
         setSuccess(PROJECT_NO_CHANGES_MESSAGE);
         return;
@@ -454,12 +393,12 @@ export function ProjectManager({
     } else {
       submitting.current = true;
       createMutation.mutate(
-        { slug: values.slug, ...writable },
+        { slug: values.slug, ...parsed.values },
         {
           onSuccess: () => {
             submitting.current = false;
             setMode("list");
-            setValues(blank());
+            setValues(blankProjectForm());
             setSuccess(
               "Project created in your draft. Publish to update your public portfolio."
             );
@@ -502,7 +441,36 @@ export function ProjectManager({
       },
     });
   }
+  function publishChanges() {
+    if (pending || publishMutation.isPending) return;
+    const status = portfolioStatus.data;
+    if (!status) return;
+    clearMessages();
+    publishMutation.mutate(status.revision, {
+      onSuccess: () => {
+        setSuccess("Changes published. Your public portfolio is up to date.");
+      },
+      onError: (err) => {
+        const error = err as ApiError;
+        // A stale revision is recoverable: refetching loads the revision the
+        // backend expects, so the next attempt can succeed.
+        if (error.status === 409) void portfolioStatus.refetch();
+        setAuthError(error.status === 401 || error.status === 403);
+        setError(error.message);
+      },
+    });
+  }
   const orderChanges = changedOrders(projects, orders);
+  // Semantic "unsaved edits" signal for the wizard's step-leave guard: covers
+  // the open form (including invalid input) and unsaved order drafts alike.
+  const editsPending =
+    projectEditsPending(mode, values, editing) ||
+    orderChanges.orders === null ||
+    (orderChanges.orders?.length ?? 0) > 0;
+  useEffect(() => {
+    onDirtyChange?.(editsPending);
+    return () => onDirtyChange?.(false);
+  }, [editsPending, onDirtyChange]);
   const inputClass =
     "min-h-11 w-full min-w-0 rounded-md border border-input px-3 py-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
   const messages = (
@@ -575,7 +543,7 @@ export function ProjectManager({
             disabled={pending || Boolean(deleteTarget)}
             onClick={() => {
               clearMessages();
-              setValues(blank());
+              setValues(blankProjectForm());
               setEditing(null);
               setMode("create");
             }}
@@ -970,7 +938,7 @@ export function ProjectManager({
                         recordTitle={project.title}
                         onEdit={() => {
                           setEditing(project);
-                          setValues(valuesFor(project));
+                          setValues(projectFormFor(project));
                           clearMessages();
                           setMode("edit");
                         }}
@@ -1021,6 +989,12 @@ export function ProjectManager({
                 >
                   {reorderMutation.isPending ? "Saving order…" : "Save order"}
                 </Button>
+                <PublishChangesButton
+                  status={portfolioStatus.data ?? null}
+                  publishing={publishMutation.isPending}
+                  disabled={pending || Boolean(deleteTarget)}
+                  onPublish={publishChanges}
+                />
               </div>
             </div>
           </div>

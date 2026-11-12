@@ -917,6 +917,73 @@ test("unchanged project details produce helpful feedback without a mutation", ()
   );
 });
 
+test("projectEditsPending mirrors the real unsaved-edit surface", () => {
+  const {
+    blankProjectForm,
+    parseProjectForm,
+    projectEditsPending,
+    projectFormFor,
+  } = harness().load("lib/project-management");
+  const original = project();
+
+  assert.equal(
+    parseProjectForm({ ...blankProjectForm(), title: "" }).error,
+    "Title must contain 1–200 characters and summary 1–1000 characters."
+  );
+
+  assert.equal(projectEditsPending("list", blankProjectForm(), null), false);
+  assert.equal(projectEditsPending("create", blankProjectForm(), null), false);
+  assert.equal(
+    projectEditsPending("create", { ...blankProjectForm(), slug: "new" }, null),
+    true
+  );
+  assert.equal(
+    projectEditsPending(
+      "create",
+      { ...blankProjectForm(), display_order: "3" },
+      null
+    ),
+    true
+  );
+
+  assert.equal(
+    projectEditsPending("edit", projectFormFor(original), original),
+    false
+  );
+  // A stored project without highlights must still read as unchanged.
+  assert.equal(
+    projectEditsPending("edit", projectFormFor(original), {
+      ...original,
+      highlights: undefined,
+    }),
+    false
+  );
+  assert.equal(
+    projectEditsPending(
+      "edit",
+      { ...projectFormFor(original), summary: "Changed summary." },
+      original
+    ),
+    true
+  );
+  assert.equal(
+    projectEditsPending(
+      "edit",
+      { ...projectFormFor(original), technologies: "x".repeat(51) },
+      original
+    ),
+    true
+  );
+  assert.equal(
+    projectEditsPending(
+      "edit",
+      { ...projectFormFor(original), display_order: "1.5" },
+      original
+    ),
+    true
+  );
+});
+
 test("admin links omit unsafe or malformed URLs", () => {
   const { safeProjectLink } = harness().load("lib/project-management");
   for (const value of [

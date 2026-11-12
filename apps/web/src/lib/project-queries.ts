@@ -16,6 +16,7 @@ import {
   isProjectsResponse,
   failure,
 } from "@/lib/project-management";
+import { isPortfolioStatus, type PortfolioStatus } from "@/lib/portfolio";
 import {
   AVATAR_PATH,
   AVATAR_MAX_BYTES,
@@ -61,6 +62,67 @@ export function useProjects(options?: { initialData?: ProjectsResponse }) {
     queryFn: ({ signal }) => fetchProjectsData(signal),
     initialData: options?.initialData,
     retry: false,
+  });
+}
+
+export const PORTFOLIO_STATUS_QUERY_KEY = ["portfolio-status"];
+
+export function publicationFailure(status: number): string {
+  switch (status) {
+    case 409:
+      return "Your draft changed while publishing. Try again to publish the latest saved version.";
+    case 401:
+    case 403:
+      return "Your session could not be verified. Sign in in another tab, then retry here.";
+    case 429:
+      return "Too many requests. Please try again later.";
+    default:
+      return "We couldn’t update publication. Please retry; your draft is saved.";
+  }
+}
+
+export async function fetchPortfolioStatus(
+  signal?: AbortSignal
+): Promise<PortfolioStatus> {
+  const response = await request("/portfolio", { method: "GET", signal });
+  if (!response.ok)
+    throw new ApiError(response.status, publicationFailure(response.status));
+  const data: unknown = await response.json();
+  if (!isPortfolioStatus(data))
+    throw new ApiError(502, "Invalid publication status");
+  return data;
+}
+
+export function usePortfolioStatus() {
+  return useQuery({
+    queryKey: PORTFOLIO_STATUS_QUERY_KEY,
+    queryFn: ({ signal }) => fetchPortfolioStatus(signal),
+    retry: false,
+  });
+}
+
+export async function publishPortfolioRevision(
+  revision: number
+): Promise<PortfolioStatus> {
+  const response = await request("/portfolio/publish", {
+    method: "POST",
+    body: JSON.stringify({ revision }),
+  });
+  if (!response.ok)
+    throw new ApiError(response.status, publicationFailure(response.status));
+  const data: unknown = await response.json();
+  if (!isPortfolioStatus(data))
+    throw new ApiError(502, "Invalid publication status");
+  return data;
+}
+
+export function usePublishPortfolio() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: publishPortfolioRevision,
+    onSuccess: (data) => {
+      queryClient.setQueryData(PORTFOLIO_STATUS_QUERY_KEY, data);
+    },
   });
 }
 
@@ -548,6 +610,7 @@ export function useUpdateProject() {
               ),
           }
       );
+      queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
     },
   });
 }
@@ -638,6 +701,7 @@ function useUpdateProjectScreenshot(
             ),
           }
       );
+      queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
     },
   });
 }
@@ -670,6 +734,7 @@ export function useRemoveProjectScreenshot() {
             ),
           }
       );
+      queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
     },
   });
 }
@@ -690,6 +755,7 @@ export function useDeleteProject() {
             items: old.items.filter((project) => project.slug !== variables),
           }
       );
+      queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
     },
   });
 }
@@ -738,6 +804,7 @@ export function useCreateProject() {
           };
         }
       );
+      queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
       if (!queryClient.getQueryData(PROJECTS_QUERY_KEY)) {
         await queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
       }
@@ -795,6 +862,7 @@ export function useReorderProjects() {
           };
         }
       );
+      queryClient.invalidateQueries({ queryKey: PORTFOLIO_STATUS_QUERY_KEY });
     },
   });
 }
