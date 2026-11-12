@@ -124,8 +124,11 @@ function SocialMark({ brand }: { brand: Exclude<SocialBrand, "tableau"> }) {
   const [width, height, , , pathData] = icon.icon;
   const paths = Array.isArray(pathData) ? pathData : [pathData];
   const isInstagram = brand === "instagram";
+  // The gradient lives once per document in <SocialGradientDefs>; the solid
+  // pink after the url() is the SVG paint fallback so the icon still renders
+  // brand-colored if the reference cannot resolve.
   const fill = isInstagram
-    ? `url(#${INSTAGRAM_GRADIENT_ID})`
+    ? `url(#${INSTAGRAM_GRADIENT_ID}) #D62976`
     : BRAND_FILLS[brand];
   return (
     <svg
@@ -135,28 +138,40 @@ function SocialMark({ brand }: { brand: Exclude<SocialBrand, "tableau"> }) {
       focusable="false"
       style={fill ? { fill } : undefined}
     >
-      {isInstagram && (
-        <defs>
-          <linearGradient
-            id={INSTAGRAM_GRADIENT_ID}
-            x1="0"
-            y1="1"
-            x2="1"
-            y2="0"
-          >
-            {INSTAGRAM_GRADIENT_STOPS.map((stop) => (
-              <stop
-                key={stop.offset}
-                offset={stop.offset}
-                stopColor={stop.color}
-              />
-            ))}
-          </linearGradient>
-        </defs>
-      )}
       {paths.map((path, index) => (
         <path d={path} key={index} />
       ))}
+    </svg>
+  );
+}
+
+/**
+ * Renders the Instagram gradient exactly once per document so every
+ * Instagram icon references the same paint server. It must appear before
+ * any social icon in the DOM and must not sit inside a display:none
+ * subtree — paint servers referenced across SVGs fail to resolve from
+ * hidden ones, which made the icons render blank.
+ */
+export function SocialGradientDefs() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      width="0"
+      height="0"
+      style={{ position: "absolute", overflow: "hidden" }}
+    >
+      <defs>
+        <linearGradient id={INSTAGRAM_GRADIENT_ID} x1="0" y1="1" x2="1" y2="0">
+          {INSTAGRAM_GRADIENT_STOPS.map((stop) => (
+            <stop
+              key={stop.offset}
+              offset={stop.offset}
+              stopColor={stop.color}
+            />
+          ))}
+        </linearGradient>
+      </defs>
     </svg>
   );
 }

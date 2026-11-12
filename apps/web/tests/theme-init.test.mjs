@@ -41,7 +41,8 @@ async function themeScript() {
       if (id === "@/lib/resume") return { isAbsoluteHttpUrl: () => true };
       if (id === "@/components/site-frame") return { SiteFrame: "div" };
       if (id === "@/components/header") return { Header: "header" };
-      if (id === "@/components/social-links") return { SocialLinks: "div" };
+      if (id === "@/components/social-links")
+        return { SocialLinks: "div", SocialGradientDefs: "svg" };
       if (id === "./globals.css") return {};
       return require(id);
     },
