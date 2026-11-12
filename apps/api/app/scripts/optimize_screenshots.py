@@ -41,8 +41,9 @@ def convert(*, apply: bool, backup_dir: Path | None) -> None:
                     if source.format == "WEBP" and max(source.size) <= MAX_SCREENSHOT_EDGE:
                         continue
                     if source.format == "GIF":
-                        # GIF screenshots are stored verbatim so their animation
-                        # survives; transcoding would reduce them to one frame.
+                        # GIF screenshots uploaded before the animated-WebP
+                        # pipeline were stored verbatim; this one-off script
+                        # skips them. Re-uploading a GIF converts it.
                         continue
                 thumbnail = optimize_screenshot(data)
                 before += len(data)

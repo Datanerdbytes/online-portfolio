@@ -174,30 +174,47 @@ def test_upload_saves_metadata_and_returns_public_url():
     assert session.committed
 
 
-def test_upload_preserves_gif_bytes_and_content_type():
-    frames = Image.new("P", (800, 450), "navy")
+def test_upload_transcodes_gif_to_animated_webp():
+    frames_images = [Image.new("P", (800, 450), (i * 20, 10, 90)) for i in range(3)]
     animated = BytesIO()
-    frames.save(animated, format="GIF", save_all=True, append_images=[frames], duration=100)
-    gif_bytes = animated.getvalue()
+    frames_images[0].save(
+        animated,
+        format="GIF",
+        save_all=True,
+        append_images=frames_images[1:],
+        duration=[100, 200, 300],
+        loop=0,
+    )
 
     project = _project()
     session, store = StubSession(project), StubStore()
     with _client(session, store) as client:
         response = client.put(
             SCREENSHOT_PATH,
-            files={"file": ("screenshot.gif", gif_bytes, "image/gif")},
+            files={"file": ("screenshot.gif", animated.getvalue(), "image/gif")},
         )
 
     assert response.status_code == 200
     assert response.json()["screenshot_url"] == SCREENSHOT_PATH
-    assert project.screenshot_content_type == "image/gif"
-    assert project.screenshot_filename.endswith(".gif")
-    # Stored verbatim: no WebP re-encode, animation intact.
-    assert store.saved[0][1] == gif_bytes
+    assert project.screenshot_content_type == "image/webp"
+    assert project.screenshot_filename.endswith(".webp")
+    with Image.open(BytesIO(store.saved[0][1])) as thumbnail:
+        assert thumbnail.format == "WEBP"
+        assert thumbnail.is_animated
+        assert thumbnail.n_frames == 3
+        durations = []
+        for index in range(thumbnail.n_frames):
+            thumbnail.seek(index)
+            thumbnail.load()
+            durations.append(thumbnail.info["duration"])
+        assert durations == [100, 200, 300]
+        assert thumbnail.info["loop"] == 0
     assert session.committed
 
 
 def test_served_gif_reports_image_content_type():
+    # GIFs uploaded before the animated-WebP pipeline were stored verbatim;
+    # they must keep serving with their recorded content type.
     frames = Image.new("P", (300, 200), "navy")
     gif = BytesIO()
     frames.save(gif, format="GIF")
