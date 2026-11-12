@@ -1,5 +1,5 @@
 /**
- * Avatar helpers and constants.
+ * Avatar helpers, constants, and the project-screenshot upload rules.
  *
  * Pure module so it can be used by both client and server code and remains
  * easy to load in the Node test harness.
@@ -19,6 +19,16 @@ export const AVATAR_CONTENT_TYPES = [
 ] as const;
 
 export const AVATAR_ACCEPT = "image/jpeg,image/png,image/webp";
+
+/**
+ * Project screenshots additionally accept GIFs, which the API stores verbatim
+ * so their animation survives. Raster images are resized to a thumbnail.
+ */
+export const SCREENSHOT_CONTENT_TYPES = [
+  ...AVATAR_CONTENT_TYPES,
+  "image/gif",
+] as const;
+export const SCREENSHOT_ACCEPT = `${AVATAR_ACCEPT},image/gif`;
 
 export function initialsFromName(name: string): string {
   const parts = name
@@ -66,6 +76,20 @@ export function validateAvatarFile(file: File): string | null {
     )
   ) {
     return "Upload a JPEG, PNG, or WebP image.";
+  }
+  if (file.size > AVATAR_MAX_BYTES) {
+    return "Image must be 2 MB or smaller.";
+  }
+  return null;
+}
+
+export function validateScreenshotFile(file: File): string | null {
+  if (
+    !SCREENSHOT_CONTENT_TYPES.includes(
+      file.type as (typeof SCREENSHOT_CONTENT_TYPES)[number]
+    )
+  ) {
+    return "Upload a JPEG, PNG, WebP, or GIF image.";
   }
   if (file.size > AVATAR_MAX_BYTES) {
     return "Image must be 2 MB or smaller.";

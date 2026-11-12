@@ -23,7 +23,7 @@ import {
   AVATAR_MAX_BYTES,
   BANNER_PATH,
   type ProfileImageKind,
-  validateAvatarFile,
+  validateScreenshotFile,
 } from "@/lib/avatar";
 
 export const PROJECTS_QUERY_KEY = ["projects"];
@@ -647,7 +647,7 @@ export async function uploadProjectScreenshot(
   slug: string,
   file: File
 ): Promise<Project> {
-  const validationError = validateAvatarFile(file);
+  const validationError = validateScreenshotFile(file);
   if (validationError) throw new ApiError(400, validationError);
 
   const formData = new FormData();
@@ -680,7 +680,7 @@ export async function uploadProjectScreenshot(
 }
 
 function screenshotFailure(status: number): string {
-  if (status === 400) return "Upload a JPEG, PNG, or WebP image.";
+  if (status === 400) return "Upload a JPEG, PNG, WebP, or GIF image.";
   if (status === 413) return "Image must be 2 MB or smaller.";
   return failure(status);
 }

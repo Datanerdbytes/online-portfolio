@@ -69,7 +69,7 @@ class StubStore:
         self.deleted = []
 
     def save(self, data, content_type):
-        extension = "webp" if content_type == "image/webp" else "png"
+        extension = {"image/webp": "webp", "image/gif": "gif"}.get(content_type, "png")
         filename = f"screenshot-{len(self.saved) + 1}.{extension}"
         self.files[filename] = data
         self.saved.append((filename, data, content_type))
@@ -172,6 +172,78 @@ def test_upload_saves_metadata_and_returns_public_url():
         assert thumbnail.format == "WEBP"
         assert thumbnail.size == (400, 225)
     assert session.committed
+
+
+def test_upload_preserves_gif_bytes_and_content_type():
+    frames = Image.new("P", (800, 450), "navy")
+    animated = BytesIO()
+    frames.save(animated, format="GIF", save_all=True, append_images=[frames], duration=100)
+    gif_bytes = animated.getvalue()
+
+    project = _project()
+    session, store = StubSession(project), StubStore()
+    with _client(session, store) as client:
+        response = client.put(
+            SCREENSHOT_PATH,
+            files={"file": ("screenshot.gif", gif_bytes, "image/gif")},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["screenshot_url"] == SCREENSHOT_PATH
+    assert project.screenshot_content_type == "image/gif"
+    assert project.screenshot_filename.endswith(".gif")
+    # Stored verbatim: no WebP re-encode, animation intact.
+    assert store.saved[0][1] == gif_bytes
+    assert session.committed
+
+
+def test_served_gif_reports_image_content_type():
+    frames = Image.new("P", (300, 200), "navy")
+    gif = BytesIO()
+    frames.save(gif, format="GIF")
+    project = _project(
+        screenshot_filename="screen.gif",
+        screenshot_content_type="image/gif",
+    )
+    store = StubStore({"screen.gif": gif.getvalue()})
+    with _client(StubSession(project), store, override_owner=False) as client:
+        response = client.get(SCREENSHOT_PATH)
+
+    assert response.status_code == 200
+    assert response.content == gif.getvalue()
+    assert response.headers["content-type"] == "image/gif"
+
+
+def test_upload_rejects_gif_declared_without_gif_magic_bytes():
+    store = StubStore()
+    with _client(StubSession(_project()), store) as client:
+        response = client.put(
+            SCREENSHOT_PATH,
+            files={"file": ("screenshot.gif", PNG_BYTES, "image/gif")},
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Unsupported image type"}
+    assert not store.saved
+
+
+def test_upload_rejects_oversized_gif():
+    frames = Image.new("P", (10, 10), "navy")
+    gif = BytesIO()
+    frames.save(gif, format="GIF")
+    oversized = gif.getvalue() + b"\x00" * (settings.MAX_AVATAR_BYTES + 1)
+
+    project = _project()
+    session, store = StubSession(project), StubStore()
+    with _client(session, store) as client:
+        response = client.put(
+            SCREENSHOT_PATH,
+            files={"file": ("screenshot.gif", oversized, "image/gif")},
+        )
+
+    assert response.status_code == 413
+    assert response.json() == {"detail": "Screenshot too large"}
+    assert not store.saved
 
 
 def test_upload_replaces_previous_file_after_commit():

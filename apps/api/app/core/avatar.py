@@ -58,6 +58,26 @@ def detect_content_type(data: bytes) -> str | None:
     return None
 
 
+def validate_size_bounds(
+    *,
+    declared_size: int | None,
+    data: bytes,
+    max_bytes: int,
+    kind: str = "Avatar",
+) -> None:
+    """Shared payload size checks: declared size, empty payload, actual size.
+
+    Callers apply the content-type check first, so the order stays: declared
+    type, declared size, empty payload, actual size, magic bytes.
+    """
+    if declared_size is not None and declared_size > max_bytes:
+        raise AvatarValidationError(f"{kind} too large", status_code=413)
+    if not data:
+        raise AvatarValidationError("Invalid request")
+    if len(data) > max_bytes:
+        raise AvatarValidationError(f"{kind} too large", status_code=413)
+
+
 def validate_avatar_payload(
     *,
     declared_content_type: str | None,
@@ -73,12 +93,7 @@ def validate_avatar_payload(
     declared = normalize_content_type(declared_content_type)
     if declared not in ALLOWED_CONTENT_TYPES:
         raise AvatarValidationError("Unsupported image type")
-    if declared_size is not None and declared_size > max_bytes:
-        raise AvatarValidationError("Avatar too large", status_code=413)
-    if not data:
-        raise AvatarValidationError("Invalid request")
-    if len(data) > max_bytes:
-        raise AvatarValidationError("Avatar too large", status_code=413)
+    validate_size_bounds(declared_size=declared_size, data=data, max_bytes=max_bytes)
     detected = detect_content_type(data)
     if detected is None or detected != declared:
         raise AvatarValidationError("Unsupported image type")

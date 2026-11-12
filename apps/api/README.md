@@ -40,7 +40,7 @@ All endpoints live under `/api/v1`. OpenAPI documentation is available at `/docs
 - `GET /api/v1/resume/profile/avatar` and `GET /api/v1/resume/profile/banner` — Public image reads for the independent sidebar profile photo and square hero banner. Both return the image bytes with an ETag; absent images return 404.
 - `PUT` and `DELETE` on those image paths — Owner-only uploads and removals. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default). Image files are stored beneath `MEDIA_ROOT`; the database stores only generated filenames and image metadata.
 - `GET /api/v1/projects/{slug}/screenshot` — Public read of the project's optional screenshot, returned with an ETag. Missing projects or screenshots return 404.
-- `PUT` and `DELETE /api/v1/projects/{slug}/screenshot` — Owner-only upload, replacement, or removal. Uploads accept JPEG, PNG, or WebP up to `MAX_AVATAR_BYTES` (2 MiB by default), reuse the validated profile-image storage, and persist only generated filenames and image metadata. Uploaded screenshots are shown as small thumbnails beside project technology tags.
+- `PUT` and `DELETE /api/v1/projects/{slug}/screenshot` — Owner-only upload, replacement, or removal. Uploads accept JPEG, PNG, WebP, or GIF up to `MAX_AVATAR_BYTES` (2 MiB by default), reuse the validated profile-image storage, and persist only generated filenames and image metadata. Uploaded screenshots are shown as small thumbnails beside project technology tags.
 
 ### Public portfolio sections
 
@@ -170,12 +170,16 @@ transfer existing files when this setting changes.
 
 Project screenshots are decoded on upload, oriented, and resized to fit within
 400 × 400 pixels without stretching, cropping, or enlarging small images. They
-are stored as WebP at quality 80 without source metadata. Uploads still accept
-JPEG, PNG, or WebP up to 2 MiB; screenshots above 20 million pixels are rejected.
-Profile photos use the same processing with a 512 × 512 bound; hero banners use
-a 1200 × 1200 bound. Both use WebP quality 85. Proportions are preserved without
-upscaling, and the frontend's existing crops still control the displayed shape.
-The same 2 MiB upload and 20-million-pixel input limits apply to all three types.
+are stored as WebP at quality 80 without source metadata. Uploads accept JPEG,
+PNG, or WebP up to 2 MiB; screenshots above 20 million pixels are rejected.
+GIF uploads are verified against their magic bytes and the same 2 MiB limit,
+then stored verbatim instead of re-encoded: re-encoding frame by frame would
+risk the animation and its timing. GIF dimensions are not resized; project
+cards scale them with CSS. Profile photos use the same processing with a
+512 × 512 bound and do not accept GIFs; hero banners use a 1200 × 1200 bound.
+Both use WebP quality 85. Proportions are preserved without upscaling, and the
+frontend's existing crops still control the displayed shape. The same 2 MiB
+upload and 20-million-pixel input limits apply to all three types.
 
 To convert existing screenshots, run from `apps/api` with the intended database
 and media settings configured. Preview first; applying requires a new backup
@@ -187,8 +191,8 @@ uv run python -m app.scripts.optimize_screenshots
 uv run python -m app.scripts.optimize_screenshots --apply --backup-dir media/backups/screenshots-YYYYMMDD
 ```
 
-Already-small WebP screenshots are skipped. Do not run this command at startup
-or as part of a deployment build.
+Already-small WebP screenshots and GIF screenshots are skipped. Do not run this
+command at startup or as part of a deployment build.
 
 `uv run pytest` covers auth without PostgreSQL, including malformed configuration,
 strict claims, absolute expiry/key rotation, rate limits and credential-free

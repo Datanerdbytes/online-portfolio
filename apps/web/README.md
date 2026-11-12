@@ -44,7 +44,7 @@ Authenticated project-management proxy routes (require the admin session cookie 
 - `PATCH /api/projects/[slug]` → `PATCH /api/v1/projects/{slug}` — partial update (200). Null clears only `repository_url` or `demo_url`; omitted fields are unchanged.
 - `DELETE /api/projects/[slug]` → `DELETE /api/v1/projects/{slug}` — delete (204).
 - `POST /api/projects/reorder` → `POST /api/v1/projects/reorder` — atomic batch display-order update (200).
-- `GET`, `PUT`, and `DELETE /api/projects/[slug]/screenshot` → the corresponding `/api/v1/projects/{slug}/screenshot` routes — owner-authenticated draft image read, upload, replacement, and removal. Uploads accept JPEG, PNG, or WebP up to 2 MiB. Screenshot management is available when editing an existing project; uploaded screenshots appear as small thumbnails beside the technology tags in public project cards.
+- `GET`, `PUT`, and `DELETE /api/projects/[slug]/screenshot` → the corresponding `/api/v1/projects/{slug}/screenshot` routes — owner-authenticated draft image read, upload, replacement, and removal. Uploads accept JPEG, PNG, WebP, or GIF up to 2 MiB. Screenshot management is available when editing an existing project; uploaded screenshots appear as small thumbnails beside the technology tags in public project cards.
 
 All authenticated mutation proxies construct the backend `Authorization: Bearer` header only from the server-read admin cookie, set `Cache-Control: no-store`, apply a bounded deadline that stays active through body parsing, and return sanitized errors. They never forward browser-supplied `Authorization` or owner headers.
 
@@ -91,7 +91,7 @@ These require a signed-in owner session and a stub or real FastAPI backend on `A
 8. Cancel deletion — the dialog closes and the project remains.
 9. Reorder — change display-order numbers and save; `POST /api/projects/reorder` returns `{"updated":N}` and the list reflects the new order.
 10. Unavailable backend — create/edit/delete/reorder each show a clear error and distinguish "not authenticated" from "service unavailable."
-11. Project screenshot — edit an existing project, upload or replace a JPEG/PNG/WebP screenshot (up to 2 MiB), verify its draft preview, publish to check the public thumbnail, then remove it from the draft; the public image remains until another publication.
+11. Project screenshot — edit an existing project, upload or replace a JPEG/PNG/WebP/GIF screenshot (up to 2 MiB), verify its draft preview, publish to check the public thumbnail, then remove it from the draft; the public image remains until another publication. GIFs keep their animation because screenshots are rendered through unoptimized images.
 
 Run `npm run test:auth` for the Node regression suite (uses the installed
 TypeScript compiler and real handlers; no additional test framework). It covers

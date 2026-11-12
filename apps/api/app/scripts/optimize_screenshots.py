@@ -40,6 +40,10 @@ def convert(*, apply: bool, backup_dir: Path | None) -> None:
                 with Image.open(BytesIO(data)) as source:
                     if source.format == "WEBP" and max(source.size) <= MAX_SCREENSHOT_EDGE:
                         continue
+                    if source.format == "GIF":
+                        # GIF screenshots are stored verbatim so their animation
+                        # survives; transcoding would reduce them to one frame.
+                        continue
                 thumbnail = optimize_screenshot(data)
                 before += len(data)
                 after += len(thumbnail)

@@ -58,6 +58,7 @@ function harness(options = {}) {
               AVATAR_UPLOAD_MAX_BYTES: 2 * 1024 * 1024 + 64 * 1024,
               BANNER_PATH: "/api/resume/profile/banner",
               validateAvatarFile: () => null,
+              validateScreenshotFile: () => null,
             };
           if (id === "@/lib/api") return {};
           throw new Error(`Unexpected import: ${id}`);
