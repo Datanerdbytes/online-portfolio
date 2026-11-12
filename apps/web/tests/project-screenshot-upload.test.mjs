@@ -33,14 +33,29 @@ test("validateScreenshotFile rejects unsupported types", () => {
   );
 });
 
-test("validateScreenshotFile enforces the 2 MB limit", () => {
+test("validateScreenshotFile enforces the 2 MB raster limit", () => {
   assert.equal(
-    validateScreenshotFile(file("image/gif", 2 * 1024 * 1024 + 1)),
+    validateScreenshotFile(file("image/png", 2 * 1024 * 1024 + 1)),
     "Image must be 2 MB or smaller."
   );
   assert.equal(
-    validateScreenshotFile(file("image/gif", 2 * 1024 * 1024)),
+    validateScreenshotFile(file("image/png", 2 * 1024 * 1024)),
     null
+  );
+});
+
+test("validateScreenshotFile accepts GIFs up to 4 MB", () => {
+  assert.equal(
+    validateScreenshotFile(file("image/gif", 2 * 1024 * 1024 + 1)),
+    null
+  );
+  assert.equal(
+    validateScreenshotFile(file("image/gif", 4 * 1024 * 1024)),
+    null
+  );
+  assert.equal(
+    validateScreenshotFile(file("image/gif", 4 * 1024 * 1024 + 1)),
+    "GIF must be 4 MB or smaller."
   );
 });
 

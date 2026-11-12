@@ -67,9 +67,11 @@ app.add_middleware(
     method="PUT",
     path="/api/v1/resume/profile/avatar",
 )
+# GIF screenshots may arrive above the stored limit; the body bound follows the
+# GIF input cap and the route re-checks the size for each declared type.
 app.add_middleware(
     RequestBodyLimitMiddleware,
-    max_bytes=settings.MAX_AVATAR_BYTES + MULTIPART_OVERHEAD_BYTES,
+    max_bytes=settings.MAX_SCREENSHOT_GIF_BYTES + MULTIPART_OVERHEAD_BYTES,
     method="PUT",
     path_pattern=re.compile(r"/api/v1/projects/[^/]+/screenshot"),
     too_large_detail="Screenshot too large",

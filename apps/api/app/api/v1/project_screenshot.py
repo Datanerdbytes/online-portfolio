@@ -164,13 +164,16 @@ def upload_project_screenshot(
 
     limit = settings.MAX_AVATAR_BYTES
     size = _uploaded_size(file)
-    data = file.file.read(limit + 1)
+    # GIFs may arrive above the stored limit; the transcode brings the stored
+    # bytes back under `limit`, so buffer up to the GIF input cap instead.
+    data = file.file.read(settings.MAX_SCREENSHOT_GIF_BYTES + 1)
     try:
         detected, data = prepare_screenshot_upload(
             declared_content_type=file.content_type,
             declared_size=size,
             data=data,
             max_bytes=limit,
+            input_max_bytes=settings.MAX_SCREENSHOT_GIF_BYTES,
         )
     except AvatarValidationError as exc:
         detail = "Screenshot too large" if exc.status_code == 413 else exc.detail

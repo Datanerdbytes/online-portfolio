@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     # Directory that holds stored avatars. parents[2] resolves to apps/api.
     MEDIA_ROOT: Path = Path(__file__).resolve().parents[2] / "media"
     MAX_AVATAR_BYTES: int = 2097152
+    # GIF screenshots may arrive above the stored limit: the transcode brings
+    # the stored bytes back under MAX_AVATAR_BYTES.
+    MAX_SCREENSHOT_GIF_BYTES: int = 4194304
     MEDIA_STORAGE: Literal["local", "database"] = "local"
     LOGIN_RATE_LIMIT_STORAGE: Literal["local", "database"] = "local"
     DATABASE_POOL_MODE: Literal["local", "external"] = "local"

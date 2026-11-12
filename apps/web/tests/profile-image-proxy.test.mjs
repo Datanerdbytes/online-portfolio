@@ -8,7 +8,7 @@ import ts from "typescript";
 const require = createRequire(import.meta.url);
 const { NextResponse } = require("next/server");
 
-function imageProxy(path, fetch, token = "test-owner-token") {
+function imageProxy(path, fetch, token = "test-owner-token", maxUploadBytes) {
   const source = readFileSync(
     new URL("../src/lib/profile-image-proxy.ts", import.meta.url),
     "utf8"
@@ -25,7 +25,11 @@ function imageProxy(path, fetch, token = "test-owner-token") {
     exports: compiled.exports,
     require: (id) => {
       if (id === "next/server") return { NextResponse };
-      if (id === "@/lib/auth") return { readAdminToken: async () => token };
+      if (id === "@/lib/auth")
+        return {
+          readAdminToken: async () => token,
+          validateMutation: () => null,
+        };
       if (id === "@/lib/api") return { API_BASE_URL: "https://api.test" };
       if (id === "@/lib/avatar") return { AVATAR_UPLOAD_MAX_BYTES: 2162688 };
       throw new Error(`Unexpected import: ${id}`);
@@ -37,7 +41,11 @@ function imageProxy(path, fetch, token = "test-owner-token") {
     clearTimeout,
     fetch,
   });
-  return compiled.exports.createProfileImageHandlers(path, "Image");
+  return compiled.exports.createProfileImageHandlers(
+    path,
+    "Image",
+    maxUploadBytes === undefined ? {} : { maxUploadBytes }
+  );
 }
 
 for (const path of [
@@ -93,4 +101,44 @@ test("draft image reads require a session instead of falling back to public cont
   const response = await proxy.GET(new Request("https://site.test/image"));
   assert.equal(response.status, 401);
   assert.equal(response.headers.get("cache-control"), "no-store");
+});
+
+test("upload bodies above the default bound return 413 without reaching upstream", async () => {
+  const proxy = imageProxy("/api/v1/resume/profile/avatar", async () => {
+    assert.fail("An over-limit body must not reach the upstream");
+  });
+  const response = await proxy.PUT(
+    new Request("https://site.test/image", {
+      method: "PUT",
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      body: new Uint8Array(2162688 + 1),
+    })
+  );
+  assert.equal(response.status, 413);
+  assert.equal((await response.json()).detail, "Image too large");
+});
+
+test("the screenshot endpoint opts into a larger upload bound for GIFs", async () => {
+  let upstreamBodyLength = 0;
+  const proxy = imageProxy(
+    "/api/v1/projects/example/screenshot",
+    async (_url, init) => {
+      upstreamBodyLength = init.body.byteLength;
+      return new Response("{}", {
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    "test-owner-token",
+    4 * 1024 * 1024 + 64 * 1024
+  );
+  // Above the 2 MiB raster limit, below the raised screenshot bound.
+  const response = await proxy.PUT(
+    new Request("https://site.test/image", {
+      method: "PUT",
+      headers: { "content-type": "multipart/form-data; boundary=x" },
+      body: new Uint8Array(3 * 1024 * 1024),
+    })
+  );
+  assert.equal(response.status, 200);
+  assert.equal(upstreamBodyLength, 3 * 1024 * 1024);
 });

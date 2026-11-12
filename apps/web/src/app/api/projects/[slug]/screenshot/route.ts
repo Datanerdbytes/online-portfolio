@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createProfileImageHandlers } from "@/lib/profile-image-proxy";
+import { SCREENSHOT_UPLOAD_MAX_BYTES } from "@/lib/avatar";
 import { isSlug } from "@/lib/project-management";
 
 type RouteContext = { params: Promise<{ slug: string }> };
@@ -11,7 +12,9 @@ async function handlers(context: RouteContext) {
   }
   return createProfileImageHandlers(
     `/api/v1/projects/${encodeURIComponent(slug)}/screenshot`,
-    "Screenshot"
+    "Screenshot",
+    // GIFs may arrive above the stored limit; the API compresses them.
+    { maxUploadBytes: SCREENSHOT_UPLOAD_MAX_BYTES }
   );
 }
 

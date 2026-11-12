@@ -681,7 +681,7 @@ export async function uploadProjectScreenshot(
 
 function screenshotFailure(status: number): string {
   if (status === 400) return "Upload a JPEG, PNG, WebP, or GIF image.";
-  if (status === 413) return "Image must be 2 MB or smaller.";
+  if (status === 413) return "GIFs must be 4 MB or smaller; other images 2 MB.";
   return failure(status);
 }
 
