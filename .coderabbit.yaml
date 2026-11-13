@@ -1,0 +1,57 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/getting-started/configure-code-suggestions
+# AGENTS.md at the repo root is picked up automatically as global review guidance.
+
+language: en-US
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  poem: false
+  review_status: true
+  commit_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+  path_filters:
+    - "!**/package-lock.json"
+    - "!**/node_modules/**"
+    - "!**/*.pdf"
+    - "!**/*.gif"
+    - "!**/*.webp"
+    - "!**/*.png"
+    - "!**/.env.example"
+    - "!.scratch/**"
+    - "!**/coverage/**"
+    - "!**/.next/**"
+  path_instructions:
+    - path: "apps/api/**"
+      instructions: >-
+        This is the FastAPI backend. Review for: SQLAlchemy 2 typed patterns
+        (async/sync consistency), request-scoped sessions that close correctly,
+        Alembic-only schema changes (never create_all() at startup), settings
+        centralized via DATABASE_URL, and no endpoints or models beyond the
+        approved scope. Ensure no raw database exceptions or connection
+        details leak into responses. Flag blocking database calls inside
+        async handlers that are not offloaded.
+    - path: "apps/web/**"
+      instructions: >-
+        This is the Next.js App Router frontend. Review for: Server Components
+        for static content and client components only where interactive,
+        semantic landmarks with ordered heading levels, keyboard-operable
+        controls with visible focus, accessible contrast, and honest API
+        states (loading, success, timeout, unavailable). Personal content
+        must never be invented — placeholders must stay clearly labeled, and
+        fake download/repository/social/contact links must be rejected.
+    - path: ".github/workflows/**"
+      instructions: >-
+        CI runs required checks and production deployments. Never weaken,
+        skip, or bypass required checks, release gates, or environment
+        approvals. Pin third-party actions by commit SHA.
+
+chat:
+  auto_reply: true
