@@ -871,6 +871,14 @@ export function SkillsTab({
                     disabled={busy || unavailable}
                     autoFocus
                     onKeyDown={(e) => {
+                      // Ignore the Enter that confirms an IME composition,
+                      // including Safari's out-of-order compositionend (keyCode 229).
+                      if (
+                        e.nativeEvent.isComposing ||
+                        e.nativeEvent.keyCode === 229
+                      ) {
+                        return;
+                      }
                       if (e.key === "Enter" && newItemValue.trim()) {
                         setStagedItems((staged) => ({
                           ...staged,
