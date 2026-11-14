@@ -3,11 +3,66 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import vm from "node:vm";
-import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
+
+async function themeToggleModule(globals = {}) {
+  const source = readFileSync(
+    new URL("../src/components/theme-toggle.tsx", import.meta.url),
+    "utf8"
+  );
+  const code = ts.transpileModule(source, {
+    compilerOptions: {
+      jsx: ts.JsxEmit.ReactJSX,
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+  }).outputText;
+  const compiledModule = { exports: {} };
+  vm.runInNewContext(code, {
+    ...globals,
+    module: compiledModule,
+    exports: compiledModule.exports,
+    require(id) {
+      if (id === "lucide-react") return { Moon: "moon", Sun: "sun" };
+      return require(id);
+    },
+  });
+  return compiledModule.exports;
+}
+
+// A fresh document/localStorage/window pair recording the applied "light"
+// class and the dispatched portfolio-theme events.
+function themeSandbox(saved, events) {
+  let light = false;
+  const sandbox = {
+    document: {
+      documentElement: {
+        classList: {
+          toggle(name, enabled) {
+            assert.equal(name, "light");
+            light = enabled;
+          },
+        },
+      },
+    },
+    localStorage: {
+      getItem(key) {
+        assert.equal(key, "portfolio-theme");
+        if (saved === "blocked") throw new Error("Storage unavailable");
+        return saved;
+      },
+    },
+    window: {
+      dispatchEvent: (event) => events.push({ type: event.type, light }),
+    },
+    Event,
+  };
+  return { sandbox, light: () => light };
+}
 
 async function themeScript() {
   const source = readFileSync(
@@ -99,6 +154,29 @@ test("theme initialization stays consistent when re-executed during client layou
     assert.equal(events.at(-1).light, saved === "light");
   }
 });
+
+for (const saved of ["light", "dark", null, "unrecognized", "blocked"]) {
+  test(`theme recovery helper matches the inline payload: ${saved}`, async () => {
+    const script = await themeScript();
+    const payloadEvents = [];
+    const payloadBox = themeSandbox(saved, payloadEvents);
+    vm.runInNewContext(
+      script.props.dangerouslySetInnerHTML.__html,
+      payloadBox.sandbox
+    );
+
+    const helperEvents = [];
+    const helperBox = themeSandbox(saved, helperEvents);
+    const toggle = await themeToggleModule(helperBox.sandbox);
+    toggle.applyStoredTheme();
+
+    // The mount-time recovery path must apply exactly what the first-paint
+    // payload applies, event behavior included.
+    assert.equal(payloadBox.light(), saved === "light");
+    assert.equal(helperBox.light(), saved === "light");
+    assert.deepEqual(helperEvents, payloadEvents);
+  });
+}
 
 for (const saved of ["light", "dark", null, "unrecognized", "blocked"]) {
   test(`theme initialization synchronizes the toggle with saved preference: ${saved}`, async () => {
