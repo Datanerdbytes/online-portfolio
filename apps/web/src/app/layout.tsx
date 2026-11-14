@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Script from "next/script";
 import { Geist, Geist_Mono, Poppins } from "next/font/google";
 import { SiteFrame } from "@/components/site-frame";
 import { Header } from "@/components/header";
@@ -29,6 +28,9 @@ export const metadata: Metadata = {
   title: "Resume & Portfolio",
   description:
     "A resume and portfolio in data analytics and data engineering, with personal editing access.",
+  other: {
+    "color-scheme": "light dark",
+  },
 };
 
 export default async function RootLayout({
@@ -62,14 +64,15 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${poppins.variable} h-full antialiased`}
     >
       <body>
-        <SocialGradientDefs />
-        <Script
+        {/* Runs inline before first paint so a stored light theme never
+            flashes the default dark theme. */}
+        <script
           id="theme-init"
-          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `try{document.documentElement.classList.toggle('light',localStorage.getItem('portfolio-theme')==='light')}catch{}window.dispatchEvent(new Event('portfolio-theme'));`,
           }}
         />
+        <SocialGradientDefs />
         <a className="skip-link" href="#main-content">
           Skip to content
         </a>

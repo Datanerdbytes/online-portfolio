@@ -8,9 +8,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
-const {
-  HeadManagerContext,
-} = require("next/dist/shared/lib/head-manager-context.shared-runtime");
 
 async function themeScript() {
   const source = readFileSync(
@@ -53,17 +50,54 @@ async function themeScript() {
   );
 }
 
-test("theme initialization does not render an inert script during client layout recovery", async () => {
+test("theme initialization renders an inline script that runs before first paint", async () => {
   const script = await themeScript();
-  const html = renderToStaticMarkup(
-    React.createElement(
-      HeadManagerContext.Provider,
-      { value: { appDir: true } },
-      script
-    )
+  const html = renderToStaticMarkup(script);
+  // Server-rendered markup is what makes the script execute while the HTML is
+  // parsed, before first paint. A client-injected script would flash the
+  // default dark theme to users with a stored light theme on every load.
+  assert.match(html, /^<script\b/);
+  assert.ok(
+    html.includes("classList.toggle('light'"),
+    `unexpected theme script markup: ${html}`
   );
-  assert.equal(html, "");
-  assert.equal(script.props.strategy, "afterInteractive");
+});
+
+test("theme initialization stays consistent when re-executed during client layout recovery", async () => {
+  const script = await themeScript();
+  const payload = script.props.dangerouslySetInnerHTML.__html;
+  for (const saved of ["light", "dark", null]) {
+    let light = false;
+    const events = [];
+    // A client-side recovery re-render can execute the payload a second time;
+    // the forced toggle must land on the saved preference again, never flip it.
+    for (let run = 0; run < 2; run += 1) {
+      vm.runInNewContext(payload, {
+        document: {
+          documentElement: {
+            classList: {
+              toggle(name, enabled) {
+                assert.equal(name, "light");
+                light = enabled;
+              },
+            },
+          },
+        },
+        localStorage: {
+          getItem(key) {
+            assert.equal(key, "portfolio-theme");
+            return saved;
+          },
+        },
+        window: {
+          dispatchEvent: (event) => events.push({ type: event.type, light }),
+        },
+        Event,
+      });
+    }
+    assert.equal(events.length, 2);
+    assert.equal(events.at(-1).light, saved === "light");
+  }
 });
 
 for (const saved of ["light", "dark", null, "unrecognized", "blocked"]) {

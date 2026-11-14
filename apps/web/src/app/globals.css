@@ -6,6 +6,10 @@
 /* ------------------------------------------------------------------ */
 
 :root {
+  /* Default (dark) theme: native browser UI (scrollbars, form controls,
+     initial canvas) follows the used color scheme. */
+  color-scheme: dark;
+
   --background: 0 0% 0%;
   --foreground: 0 0% 96%;
 
@@ -48,6 +52,8 @@
 }
 
 .light {
+  color-scheme: light;
+
   --background: 0 0% 100%;
   --foreground: 0 0% 9%;
 
