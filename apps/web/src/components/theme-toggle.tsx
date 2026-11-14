@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useSyncExternalStore } from "react";
 import { Moon, Sun } from "lucide-react";
+
+// Layout effects do nothing on the server, so fall back to useEffect there;
+// on the client the stored theme must be restored before the first recovered
+// frame can paint.
+const useBeforePaintEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
  * Re-applies the stored theme preference to <html>.
@@ -45,7 +51,7 @@ export function ThemeToggle() {
     () => true
   );
 
-  useEffect(() => {
+  useBeforePaintEffect(() => {
     applyStoredTheme();
   }, []);
 
